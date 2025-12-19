@@ -36,7 +36,16 @@ import {
   Guitar,
   Mic,
   Piano,
+  Filter,
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import type { IMusic, PaginatedResponse } from '@/types';
 
 interface MusicTableProps {
@@ -48,7 +57,7 @@ const INSTRUMENTS = ['drums', 'bass', 'guitar', 'prokeys', 'vocals'] as const;
 const InstrumentIcon = ({ instrument }: { instrument: string }) => {
   switch (instrument) {
     case 'drums': return <Drum className="h-4 w-4" />;
-    case 'bass': return <Guitar className="h-4 w-4 rotate-180" />;
+    case 'bass': return <Guitar className="h-4 w-4 scale-x-[-1]" />;
     case 'guitar': return <Guitar className="h-4 w-4" />;
     case 'prokeys': return <Piano className="h-4 w-4" />;
     case 'vocals': return <Mic className="h-4 w-4" />;
@@ -65,6 +74,7 @@ const DifficultyBadge = ({ value }: { value: number }) => {
     'bg-orange-500',
     'bg-red-500',
     'bg-purple-500',
+    'bg-indigo-500',
   ];
   return (
     <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-white text-xs font-bold ${colors[value] || colors[0]}`}>
@@ -86,6 +96,7 @@ export default function MusicTable({ onSelectionChange }: MusicTableProps) {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [source, setSource] = useState<string>('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [instruments, setInstruments] = useState<string[]>([]);
 
   // Debounce search query
   useEffect(() => {
@@ -107,6 +118,7 @@ export default function MusicTable({ onSelectionChange }: MusicTableProps) {
       });
       if (debouncedQuery) params.set('query', debouncedQuery);
       if (source) params.set('source', source);
+      if (instruments.length > 0) params.set('instruments', instruments.join(','));
 
       const response = await fetch(`/api/music?${params}`);
       if (response.ok) {
@@ -119,7 +131,7 @@ export default function MusicTable({ onSelectionChange }: MusicTableProps) {
       console.error('Error fetching music:', error);
     }
     setLoading(false);
-  }, [page, limit, sortBy, sortOrder, debouncedQuery, source]);
+  }, [page, limit, sortBy, sortOrder, debouncedQuery, source, instruments]);
 
   useEffect(() => {
     fetchData();
@@ -178,16 +190,51 @@ export default function MusicTable({ onSelectionChange }: MusicTableProps) {
             className="pl-10"
           />
         </div>
-        <Select value={source || 'all'} onValueChange={(v) => setSource(v === 'all' ? '' : v)}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Sources" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Sources</SelectItem>
-            <SelectItem value="enchor">Enchor.us</SelectItem>
-            <SelectItem value="rhythmverse">Rhythmverse</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="w-[180px] justify-start text-left font-normal">
+                  <Filter className="mr-2 h-4 w-4" />
+                  {instruments.length > 0 ? `${instruments.length} selected` : 'All Instruments'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end">
+                <DropdownMenuLabel>Filter by Instrument</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {INSTRUMENTS.map((inst) => (
+                  <DropdownMenuCheckboxItem
+                    key={inst}
+                    checked={instruments.includes(inst)}
+                    onCheckedChange={(checked) => {
+                      setInstruments(prev => 
+                        checked 
+                          ? [...prev, inst]
+                          : prev.filter(i => i !== inst)
+                      );
+                      setPage(1);
+                    }}
+                    className="capitalize"
+                  >
+                    <div className="flex items-center gap-2">
+                       <InstrumentIcon instrument={inst} />
+                       {inst}
+                    </div>
+                  </DropdownMenuCheckboxItem>
+                ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Select value={source || 'all'} onValueChange={(v) => setSource(v === 'all' ? '' : v)}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="All Sources" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Sources</SelectItem>
+              <SelectItem value="enchor">Enchor.us</SelectItem>
+              <SelectItem value="rhythmverse">Rhythmverse</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Results count */}

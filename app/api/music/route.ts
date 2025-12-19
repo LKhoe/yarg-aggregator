@@ -46,6 +46,28 @@ export async function GET(request: NextRequest) {
       query.source = params.source;
     }
 
+    // Filter by multiple instruments (existence)
+    const instrumentsParam = searchParams.get('instruments');
+    if (instrumentsParam) {
+      const selectedInstruments = instrumentsParam.split(',');
+      const instrumentConditions = selectedInstruments.map(inst => ({
+        [`instruments.${inst}`]: { $exists: true }
+      }));
+      
+      if (instrumentConditions.length > 0) {
+        if (query.$or) {
+          // If search query exists, we need to combine with $and
+          query.$and = [
+            { $or: query.$or },
+            { $or: instrumentConditions }
+          ];
+          delete query.$or;
+        } else {
+          query.$or = instrumentConditions;
+        }
+      }
+    }
+
     // Filter by instrument difficulty
     if (params.instrument && (params.minDifficulty !== undefined || params.maxDifficulty !== undefined)) {
       const diffQuery: Record<string, number> = {};
