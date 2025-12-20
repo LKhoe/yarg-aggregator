@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     if (useQueue) {
       // Queue-based async fetching
       const jobId = await addProviderJob({ source, concurrency: 5 });
-      return NextResponse.json({ 
+      return NextResponse.json({
         message: 'Provider fetch job queued',
         jobId,
       });
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
         });
       });
 
-      return NextResponse.json({ 
+      return NextResponse.json({
         message: 'Provider fetch started',
         jobId,
       });
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
     } else {
       // Queue job status
       const status = await getJobStatus(jobId);
-      
+
       if (!status) {
         return NextResponse.json(
           { error: 'Job not found' },

@@ -83,7 +83,7 @@ export async function runProvider(options: ProviderOptions): Promise<ProviderRes
   let totalFetched = 0;
   let totalSaved = 0;
 
-  const sources: ('enchor' | 'rhythmverse')[] = 
+  const sources: ('enchor' | 'rhythmverse')[] =
     source === 'all' ? ['enchor', 'rhythmverse'] : [source];
 
   const redis = getRedis();
@@ -142,7 +142,7 @@ export async function runProvider(options: ProviderOptions): Promise<ProviderRes
 
             if (allOld) {
               console.log(`Reached existing data for ${src} at page ${page}. Stopping.`);
-              break; 
+              break;
             }
           }
 
@@ -160,7 +160,7 @@ export async function runProvider(options: ProviderOptions): Promise<ProviderRes
               currentPage: page,
               totalPages,
               songsProcessed: totalFetched,
-              totalSongs: totalFetched, 
+              totalSongs: totalFetched,
             });
           }
 
@@ -176,7 +176,7 @@ export async function runProvider(options: ProviderOptions): Promise<ProviderRes
           // But here we update checkpoint AFTER success.
         }
       }
-      
+
       // If we finished successfully or stopped early due to 'allOld', reset checkpoint to 1 for next run?
       // Or keep it? If we keep it, next run starts at page X. 
       // User asked: "start from where it stopped (if an error occurred)".
@@ -187,7 +187,7 @@ export async function runProvider(options: ProviderOptions): Promise<ProviderRes
       // So: Only clear checkpoint if we finish the loop naturally or break due to 'allOld'.
       // If we exit due to crash/error, checkpoint remains.
       if (errors.length === 0) {
-          await redis.del(checkpointKey);
+        await redis.del(checkpointKey);
       }
 
     } catch (sourceError) {

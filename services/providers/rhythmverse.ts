@@ -47,7 +47,7 @@ interface RhythmVerseSongEntry {
     download_page_url_full: string;
     download_url: string;
     author?: {
-        name: string;
+      name: string;
     };
   };
 }
@@ -85,7 +85,7 @@ export async function fetchRhythmverse(
     }
 
     const json = (await response.json()) as RhythmVerseResponse;
-    
+
     if (json.status !== 'success') {
       throw new Error(`RhythmVerse API returned status: ${json.status}`);
     }
@@ -123,11 +123,11 @@ export async function fetchRhythmverse(
     });
 
     console.log(`Fetched ${results.length} songs from RhythmVerse API page ${page}`);
-    
+
     if (onProgress) {
-        onProgress(results.length, records.total_filtered);
+      onProgress(results.length, records.total_filtered);
     }
-    
+
     return results;
   } catch (error) {
     console.error('Error fetching RhythmVerse API:', error);
@@ -144,7 +144,7 @@ function parseDifficulty(diff: string | null | number): number | undefined {
 
 export async function getTotalPages(): Promise<number> {
   try {
-     const body = new URLSearchParams();
+    const body = new URLSearchParams();
     body.append('instrument[]', 'bass');
     body.append('instrument[]', 'drums');
     body.append('instrument[]', 'guitar');
@@ -172,7 +172,7 @@ export async function getTotalPages(): Promise<number> {
 
     const totalFiltered = json.data.records.total_filtered;
     const recordsPerPage = 25;
-    
+
     return Math.ceil(totalFiltered / recordsPerPage);
   } catch {
     return 1;

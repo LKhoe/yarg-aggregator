@@ -101,7 +101,7 @@ export async function fetchEnchor(
         name: song.name,
         artist: song.artist,
         album: song.album,
-        coverUrl: coverUrl, 
+        coverUrl: coverUrl,
         downloadUrl: downloadUrl,
         sourceUpdatedAt: !isNaN(Date.parse(song.uploaded_at)) ? new Date(song.uploaded_at) : new Date(),
         year: parseInt(song.year, 10) || undefined,
@@ -118,16 +118,16 @@ export async function fetchEnchor(
     });
 
     console.log(`Fetched ${results.length} songs from Enchor API page ${page}`);
-    
+
     // Notify progress
     // We treat the current batch size as 'current' for this call, 
     // but the caller might want total progress.
     // The previous implementation passed `processed, total`.
     // Here we know the total `out_of`.
     if (onProgress) {
-        onProgress(results.length, out_of);
+      onProgress(results.length, out_of);
     }
-    
+
     return results;
   } catch (error) {
     console.error('Error fetching Enchor API:', error);
@@ -139,12 +139,12 @@ export async function getTotalPages(): Promise<number> {
   try {
     // Make a request for page 1 to get the total count
     const response = await fetch(ENCHOR_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:146.0) Gecko/20100101 Firefox/146.0',
-        },
-        body: JSON.stringify({
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:146.0) Gecko/20100101 Firefox/146.0',
+      },
+      body: JSON.stringify({
         instrument: "bass",
         difficulty: null,
         drumType: null,
@@ -183,21 +183,21 @@ export async function getTotalPages(): Promise<number> {
         modchart: null,
         page: 1
       }),
-      });
-  
-      if (!response.ok) return 1;
-  
-      const json = (await response.json()) as EnchorResponse;
-      // Assuming 20 items per page? Enchor usually returns 20 or 25.
-      // The payload asked for page 1.
-      // Let's assume a default page size if not returned. 
-      // The response doesn't strictly say "totalPages", but "found".
-      // We can calculate: found / results.length
-      
-      if (json.data.length === 0) return 1;
-      
-      const itemsPerPage = json.data.length; // Approximate
-      return Math.ceil(json.found / itemsPerPage);
+    });
+
+    if (!response.ok) return 1;
+
+    const json = (await response.json()) as EnchorResponse;
+    // Assuming 20 items per page? Enchor usually returns 20 or 25.
+    // The payload asked for page 1.
+    // Let's assume a default page size if not returned. 
+    // The response doesn't strictly say "totalPages", but "found".
+    // We can calculate: found / results.length
+
+    if (json.data.length === 0) return 1;
+
+    const itemsPerPage = json.data.length; // Approximate
+    return Math.ceil(json.found / itemsPerPage);
   } catch {
     return 1;
   }

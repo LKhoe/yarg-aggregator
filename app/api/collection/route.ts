@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     await connectDB();
 
     const deviceId = request.headers.get('x-device-id');
-    
+
     if (!deviceId) {
       return NextResponse.json(
         { error: 'Device ID is required in x-device-id header' },
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ collections: [] });
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       collections: user.collections,
       deviceName: user.deviceName,
     });
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     const createdCollection = user.collections[user.collections.length - 1];
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       message: 'Collection created',
       collection: createdCollection,
     });

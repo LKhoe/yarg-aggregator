@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     };
 
     const fetcher = providerMap[source as keyof typeof providerMap];
-    
+
     console.log(`Testing ${source} provider, page ${page}`);
     const data = await fetcher(page);
 

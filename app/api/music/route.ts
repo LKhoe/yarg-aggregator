@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     await connectDB();
 
     const searchParams = request.nextUrl.searchParams;
-    
+
     const params: SearchParams = {
       query: searchParams.get('query') || undefined,
       page: parseInt(searchParams.get('page') || '1', 10),
@@ -17,11 +17,11 @@ export async function GET(request: NextRequest) {
       sortOrder: (searchParams.get('sortOrder') as SearchParams['sortOrder']) || 'asc',
       genre: searchParams.get('genre') || undefined,
       instrument: searchParams.get('instrument') || undefined,
-      minDifficulty: searchParams.get('minDifficulty') 
-        ? parseInt(searchParams.get('minDifficulty')!, 10) 
+      minDifficulty: searchParams.get('minDifficulty')
+        ? parseInt(searchParams.get('minDifficulty')!, 10)
         : undefined,
-      maxDifficulty: searchParams.get('maxDifficulty') 
-        ? parseInt(searchParams.get('maxDifficulty')!, 10) 
+      maxDifficulty: searchParams.get('maxDifficulty')
+        ? parseInt(searchParams.get('maxDifficulty')!, 10)
         : undefined,
       source: (searchParams.get('source') as SearchParams['source']) || undefined,
     };
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       const instrumentConditions = selectedInstruments.map(inst => ({
         [`instruments.${inst}`]: { $exists: true }
       }));
-      
+
       if (instrumentConditions.length > 0) {
         if (query.$or) {
           // If search query exists, we need to combine with $and

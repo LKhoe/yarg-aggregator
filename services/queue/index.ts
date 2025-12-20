@@ -40,7 +40,7 @@ export async function addProviderJob(data: ProviderJobData): Promise<string> {
 export async function getJobStatus(jobId: string) {
   const queue = getProviderQueue();
   const job = await queue.getJob(jobId);
-  
+
   if (!job) {
     return null;
   }

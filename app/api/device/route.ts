@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
 
     const user = await User.findOneAndUpdate(
       { deviceId },
-      { 
+      {
         $setOnInsert: { deviceId, collections: [] },
         $set: { deviceName },
       },

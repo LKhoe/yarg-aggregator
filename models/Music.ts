@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 import type { IMusic } from '@/types';
 
-export interface IMusicDocument extends Omit<IMusic, '_id'>, Document {}
+export interface IMusicDocument extends Omit<IMusic, '_id'>, Document { }
 
 const MusicSchema = new Schema<IMusicDocument>(
   {
@@ -10,11 +10,11 @@ const MusicSchema = new Schema<IMusicDocument>(
     album: { type: String, default: '' },
     coverUrl: { type: String, default: '' },
     downloadUrl: { type: String, required: true },
-    source: { 
-      type: String, 
-      enum: ['enchor', 'rhythmverse'], 
+    source: {
+      type: String,
+      enum: ['enchor', 'rhythmverse'],
       required: true,
-      index: true 
+      index: true
     },
     sourceUpdatedAt: { type: Date, index: true },
     instruments: {
@@ -39,7 +39,7 @@ MusicSchema.index({ name: 'text', artist: 'text', album: 'text' });
 // Unique constraint to avoid duplicates
 MusicSchema.index({ name: 1, artist: 1, source: 1 }, { unique: true });
 
-const Music: Model<IMusicDocument> = 
+const Music: Model<IMusicDocument> =
   mongoose.models.Music || mongoose.model<IMusicDocument>('Music', MusicSchema);
 
 export default Music;

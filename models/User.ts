@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 import type { IUser, ICollection } from '@/types';
 
-export interface IUserDocument extends Omit<IUser, '_id'>, Document {}
+export interface IUserDocument extends Omit<IUser, '_id'>, Document { }
 
 const CollectionSchema = new Schema<ICollection>(
   {
@@ -23,7 +23,7 @@ const UserSchema = new Schema<IUserDocument>(
   }
 );
 
-const User: Model<IUserDocument> = 
+const User: Model<IUserDocument> =
   mongoose.models.User || mongoose.model<IUserDocument>('User', UserSchema);
 
 export default User;
