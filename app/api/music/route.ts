@@ -59,11 +59,11 @@ export async function GET(request: NextRequest) {
           // If search query exists, we need to combine with $and
           query.$and = [
             { $or: query.$or },
-            { $or: instrumentConditions }
+            { $and: instrumentConditions }
           ];
           delete query.$or;
         } else {
-          query.$or = instrumentConditions;
+          query.$and = instrumentConditions;
         }
       }
     }

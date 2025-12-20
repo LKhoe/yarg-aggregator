@@ -34,6 +34,7 @@ interface RhythmVerseSongEntry {
     diff_prokeys: string | null;
     update_date: string;
     charter?: string; // Not typically in 'data' but maybe?
+    album_art: string | null;
   };
   file: {
     file_title: string;
@@ -42,8 +43,8 @@ interface RhythmVerseSongEntry {
     file_year: number;
     file_genre: string;
     file_name: string;
-    album_art: string | null;
-    download_page_url_full?: string; // Sometimes present
+    file_url: string;
+    download_page_url_full: string;
     download_url: string;
     author?: {
         name: string;
@@ -97,9 +98,9 @@ export async function fetchRhythmverse(
       const name = file.file_title || data.title;
       const artist = file.file_artist || data.artist;
       const album = file.file_album || data.album;
-      
-      const downloadUrl = file.download_page_url_full || (file.download_url ? `${RHYTHMVERSE_BASE_URL}${file.download_url}` : '');
-      const coverUrl = file.album_art ? `${RHYTHMVERSE_BASE_URL}${file.album_art}` : '';
+
+      const downloadUrl = file.download_page_url_full;
+      const coverUrl = `${RHYTHMVERSE_BASE_URL}${data.album_art}`;
 
       return {
         name,

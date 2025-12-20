@@ -2,6 +2,8 @@ import type { ProviderMusic } from '@/types';
 
 const ENCHOR_BASE_URL = 'https://www.enchor.us';
 const ENCHOR_API_URL = 'https://api.enchor.us/search/advanced';
+const ENCHOR_FILES_URL = 'https://files.enchor.us'
+
 
 interface EnchorResponse {
   found: number;
@@ -27,6 +29,7 @@ interface EnchorSong {
   md5: string;
   albumArtMd5: string;
   uploaded_at: string; // "2023-10-27T..."
+  drivePath: string;
 }
 
 export async function fetchEnchor(
@@ -91,22 +94,8 @@ export async function fetchEnchor(
     const { data, out_of } = json;
 
     const results: ProviderMusic[] = data.map((song) => {
-      // Construct closest approximation to download URL or chart page
-      // Enchor API doesn't return a direct download URL in the search result
-      // We'll point to the chart details page if possible, or leave it empty/placeholder
-      // For now, using a placeholder based on chartId which might be useful
-      const downloadUrl = `${ENCHOR_BASE_URL}/chart/${song.chartId}`;
-
-      // Construct cover URL
-      // Enchor usually serves images via a CDN or API path. 
-      // Based on typical Enchor behavior (observation): https://api.enchor.us/cover/<md5>
-      // But let's stick to base URL or empty if not sure.
-      // enchor.md shows `albumArtMd5`. 
-      // Let's assume generic or empty for now, or maybe the user knows.
-      // I'll leave it empty or try to construct something reasonable.
-      const coverUrl = song.albumArtMd5 
-        ? `${ENCHOR_BASE_URL}/assets/img/album/${song.albumArtMd5}.jpg` // Pure guess, safer to leave empty or use a generic
-        : ''; 
+      const downloadUrl = `${ENCHOR_BASE_URL}/download?md5=${song.md5}&isSng=false&downloadNovideoVersion=false&filename=${song.drivePath} (${song.charter})`;
+      const coverUrl = `${ENCHOR_FILES_URL}/${song.albumArtMd5}.jpg`;
 
       return {
         name: song.name,

@@ -67,18 +67,18 @@ const InstrumentIcon = ({ instrument }: { instrument: string }) => {
 
 const DifficultyBadge = ({ value }: { value: number }) => {
   const colors = [
-    'bg-gray-400',
-    'bg-green-500',
-    'bg-lime-500',
-    'bg-yellow-500',
-    'bg-orange-500',
-    'bg-red-500',
-    'bg-purple-500',
-    'bg-indigo-500',
+    'bg-gray-400',   // 0 – Unknown
+    'bg-green-400',  // 1 – Very Easy
+    'bg-lime-400',   // 2 – Easy
+    'bg-yellow-400', // 3 – Normal
+    'bg-amber-400',  // 4 – Challenging
+    'bg-orange-500', // 5 – Hard
+    'bg-red-500',    // 6 – Very Hard
+    'bg-rose-600'    // 7 – Extreme
   ];
   return (
     <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-white text-xs font-bold ${colors[value] || colors[0]}`}>
-      {value}
+      {value === 0 ? '?' : value}
     </span>
   );
 };
