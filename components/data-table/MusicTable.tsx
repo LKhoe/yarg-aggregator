@@ -38,14 +38,6 @@ import {
   Piano,
   Filter,
 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import type { IMusic, PaginatedResponse } from '@/types';
 import { DifficultyMedal } from '@/components/ui/difficulty-medal';
 import { InstrumentIcon } from '@/components/ui/instrument-icon';
