@@ -64,24 +64,6 @@ interface MusicTableProps {
 
 const INSTRUMENTS = ['bass', 'guitar', 'drums', 'vocals', 'prokeys'] as const;
 
-const DifficultyBadge = ({ value }: { value: number }) => {
-  const colors = [
-    'bg-gray-400',   // 0 – Unknown
-    'bg-green-400',  // 1 – Very Easy
-    'bg-lime-400',   // 2 – Easy
-    'bg-yellow-400', // 3 – Normal
-    'bg-amber-400',  // 4 – Challenging
-    'bg-orange-500', // 5 – Hard
-    'bg-red-500',    // 6 – Very Hard
-    'bg-rose-600'    // 7 – Extreme
-  ];
-  return (
-    <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-white text-xs font-bold ${colors[value] || colors[0]}`}>
-      {value === 0 ? '?' : value}
-    </span>
-  );
-};
-
 export default function MusicTable({ onSelectionChange }: MusicTableProps) {
   const [data, setData] = useState<IMusic[]>([]);
   const [loading, setLoading] = useState(true);
