@@ -49,6 +49,14 @@ import {
 import type { IMusic, PaginatedResponse } from '@/types';
 import { DifficultyMedal } from '@/components/ui/difficulty-medal';
 import { InstrumentIcon } from '@/components/ui/instrument-icon';
+import {
+  MultiSelect,
+  MultiSelectContent,
+  MultiSelectGroup,
+  MultiSelectItem,
+  MultiSelectTrigger,
+  MultiSelectValue,
+} from "@/components/ui/multi-select"
 
 interface MusicTableProps {
   onSelectionChange?: (selected: IMusic[]) => void;
@@ -182,39 +190,6 @@ export default function MusicTable({ onSelectionChange }: MusicTableProps) {
           />
         </div>
         <div className="flex gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="w-[180px] justify-start text-left font-normal">
-                <Filter className="mr-2 h-4 w-4" />
-                {instruments.length > 0 ? `${instruments.length} selected` : 'All Instruments'}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end">
-              <DropdownMenuLabel>Filter by Instrument</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {INSTRUMENTS.map((inst) => (
-                <DropdownMenuCheckboxItem
-                  key={inst}
-                  checked={instruments.includes(inst)}
-                  onCheckedChange={(checked) => {
-                    setInstruments(prev =>
-                      checked
-                        ? [...prev, inst]
-                        : prev.filter(i => i !== inst)
-                    );
-                    setPage(1);
-                  }}
-                  className="capitalize"
-                >
-                  <div className="flex items-center gap-2">
-                    <InstrumentIcon instrument={inst} className="size-[26px]" />
-                    {inst}
-                  </div>
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
           <Select value={source || 'all'} onValueChange={(v) => setSource(v === 'all' ? '' : v)}>
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="All Sources" />
@@ -229,11 +204,38 @@ export default function MusicTable({ onSelectionChange }: MusicTableProps) {
       </div>
 
       {/* Results count */}
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>{total} songs found</span>
-        {selected.size > 0 && (
-          <Badge variant="secondary">{selected.size} selected</Badge>
-        )}
+      <div className="flex flex-row gap-4">
+        <div className="flex gap-2 items-center">
+          <span>{total} songs found</span>
+          {selected.size > 0 && (
+            <Badge variant="secondary">{selected.size} selected</Badge>
+          )}
+        </div>
+        <div className="relative flex-1">
+          <MultiSelect
+            values={instruments}
+            onValuesChange={(val) => {
+              setInstruments(val);
+              setPage(1);
+            }}
+          >
+            <MultiSelectTrigger className="h-[36px] min-w-[300px] w-full">
+              <MultiSelectValue placeholder="All Instruments" />
+            </MultiSelectTrigger>
+            <MultiSelectContent>
+              <MultiSelectGroup>
+                {INSTRUMENTS.map((inst) => (
+                  <MultiSelectItem key={inst} value={inst} className="capitalize">
+                    <div className="flex items-center gap-2">
+                      <InstrumentIcon instrument={inst} className="size-5" />
+                      {inst}
+                    </div>
+                  </MultiSelectItem>
+                ))}
+              </MultiSelectGroup>
+            </MultiSelectContent>
+          </MultiSelect>
+        </div>
       </div>
 
       {/* Table */}
