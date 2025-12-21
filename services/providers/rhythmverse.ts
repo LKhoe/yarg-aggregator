@@ -119,6 +119,7 @@ export async function fetchRhythmverse(
           prokeys: parseDifficulty(data.diff_prokeys) || parseDifficulty(data.diff_keys),
           vocals: parseDifficulty(data.diff_vocals),
         },
+        rawData: entry,
       };
     });
 

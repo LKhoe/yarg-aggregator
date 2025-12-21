@@ -27,6 +27,7 @@ const MusicSchema = new Schema<IMusicDocument>(
     genre: { type: String, index: true },
     year: { type: Number },
     charter: { type: String },
+    rawData: { type: Schema.Types.Mixed },
   },
   {
     timestamps: true,
@@ -36,8 +37,11 @@ const MusicSchema = new Schema<IMusicDocument>(
 // Compound index for efficient searching
 MusicSchema.index({ name: 'text', artist: 'text', album: 'text' });
 
-// Unique constraint to avoid duplicates
-MusicSchema.index({ name: 1, artist: 1, source: 1 }, { unique: true });
+// Index on instruments for filtering
+MusicSchema.index({ instruments: 1 });
+
+// Unique constraint to avoid duplicates - includes instruments to allow same song with different configs
+MusicSchema.index({ name: 1, artist: 1, source: 1, instruments: 1 }, { unique: true });
 
 const Music: Model<IMusicDocument> =
   mongoose.models.Music || mongoose.model<IMusicDocument>('Music', MusicSchema);

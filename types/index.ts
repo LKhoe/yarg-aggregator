@@ -18,6 +18,7 @@ export interface IMusic {
   genre?: string;
   year?: number;
   charter?: string;
+  rawData?: any;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -90,6 +91,7 @@ export interface ProviderMusic {
   genre?: string;
   year?: number;
   charter?: string;
+  rawData?: any;
 }
 
 // Socket Types

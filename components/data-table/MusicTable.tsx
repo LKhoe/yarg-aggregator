@@ -47,23 +47,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { IMusic, PaginatedResponse } from '@/types';
+import { DifficultyMedal } from '@/components/ui/difficulty-medal';
+import { InstrumentIcon } from '@/components/ui/instrument-icon';
 
 interface MusicTableProps {
   onSelectionChange?: (selected: IMusic[]) => void;
 }
 
-const INSTRUMENTS = ['drums', 'bass', 'guitar', 'prokeys', 'vocals'] as const;
-
-const InstrumentIcon = ({ instrument }: { instrument: string }) => {
-  switch (instrument) {
-    case 'drums': return <Drum className="h-4 w-4" />;
-    case 'bass': return <Guitar className="h-4 w-4 scale-x-[-1]" />;
-    case 'guitar': return <Guitar className="h-4 w-4" />;
-    case 'prokeys': return <Piano className="h-4 w-4" />;
-    case 'vocals': return <Mic className="h-4 w-4" />;
-    default: return <Music className="h-4 w-4" />;
-  }
-};
+const INSTRUMENTS = ['bass', 'guitar', 'drums', 'vocals', 'prokeys'] as const;
 
 const DifficultyBadge = ({ value }: { value: number }) => {
   const colors = [
@@ -148,7 +139,7 @@ export default function MusicTable({ onSelectionChange }: MusicTableProps) {
 
   const SortIcon = ({ column }: { column: string }) => {
     if (sortBy !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />;
-    return sortOrder === 'asc' 
+    return sortOrder === 'asc'
       ? <ArrowUp className="ml-2 h-4 w-4" />
       : <ArrowDown className="ml-2 h-4 w-4" />;
   };
@@ -191,36 +182,36 @@ export default function MusicTable({ onSelectionChange }: MusicTableProps) {
           />
         </div>
         <div className="flex gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="w-[180px] justify-start text-left font-normal">
-                  <Filter className="mr-2 h-4 w-4" />
-                  {instruments.length > 0 ? `${instruments.length} selected` : 'All Instruments'}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end">
-                <DropdownMenuLabel>Filter by Instrument</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {INSTRUMENTS.map((inst) => (
-                  <DropdownMenuCheckboxItem
-                    key={inst}
-                    checked={instruments.includes(inst)}
-                    onCheckedChange={(checked) => {
-                      setInstruments(prev => 
-                        checked 
-                          ? [...prev, inst]
-                          : prev.filter(i => i !== inst)
-                      );
-                      setPage(1);
-                    }}
-                    className="capitalize"
-                  >
-                    <div className="flex items-center gap-2">
-                       <InstrumentIcon instrument={inst} />
-                       {inst}
-                    </div>
-                  </DropdownMenuCheckboxItem>
-                ))}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="w-[180px] justify-start text-left font-normal">
+                <Filter className="mr-2 h-4 w-4" />
+                {instruments.length > 0 ? `${instruments.length} selected` : 'All Instruments'}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end">
+              <DropdownMenuLabel>Filter by Instrument</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {INSTRUMENTS.map((inst) => (
+                <DropdownMenuCheckboxItem
+                  key={inst}
+                  checked={instruments.includes(inst)}
+                  onCheckedChange={(checked) => {
+                    setInstruments(prev =>
+                      checked
+                        ? [...prev, inst]
+                        : prev.filter(i => i !== inst)
+                    );
+                    setPage(1);
+                  }}
+                  className="capitalize"
+                >
+                  <div className="flex items-center gap-2">
+                    <InstrumentIcon instrument={inst} className="size-[26px]" />
+                    {inst}
+                  </div>
+                </DropdownMenuCheckboxItem>
+              ))}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -341,8 +332,7 @@ export default function MusicTable({ onSelectionChange }: MusicTableProps) {
                         if (diff === undefined) return null;
                         return (
                           <div key={inst} className="flex items-center gap-1" title={inst}>
-                            <InstrumentIcon instrument={inst} />
-                            <DifficultyBadge value={diff} />
+                            <DifficultyMedal level={diff} size="sm" icon={<InstrumentIcon instrument={inst} />} />
                           </div>
                         );
                       })}

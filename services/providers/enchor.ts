@@ -114,6 +114,7 @@ export async function fetchEnchor(
           prokeys: song.diff_keys === -1 ? undefined : song.diff_keys, // enchor calls it diff_keys
           vocals: song.diff_vocals === -1 ? undefined : song.diff_vocals,
         },
+        rawData: song,
       };
     });
 
