@@ -37,6 +37,7 @@ import {
   Mic,
   Piano,
   Filter,
+  Heart,
 } from 'lucide-react';
 import type { IMusic, PaginatedResponse } from '@/types';
 import { DifficultyMedal } from '@/components/ui/difficulty-medal';
@@ -49,14 +50,17 @@ import {
   MultiSelectTrigger,
   MultiSelectValue,
 } from "@/components/ui/multi-select"
+import { useSavedSongs } from '@/context/SavedSongsContext';
 
 interface MusicTableProps {
-  onSelectionChange?: (selected: IMusic[]) => void;
+  deviceId: string;
+  deviceName?: string;
+  onSavedSongsChange?: () => void;
 }
 
 const INSTRUMENTS = ['bass', 'guitar', 'drums', 'vocals', 'prokeys'] as const;
 
-export default function MusicTable({ onSelectionChange }: MusicTableProps) {
+export default function MusicTable({ deviceId, deviceName, onSavedSongsChange }: MusicTableProps) {
   const [data, setData] = useState<IMusic[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
@@ -68,8 +72,8 @@ export default function MusicTable({ onSelectionChange }: MusicTableProps) {
   const [sortBy, setSortBy] = useState<string>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [source, setSource] = useState<string>('');
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [instruments, setInstruments] = useState<string[]>([]);
+  const { savedSongIds, addSong, removeSong } = useSavedSongs();
 
   // Debounce search query
   useEffect(() => {
@@ -126,27 +130,11 @@ export default function MusicTable({ onSelectionChange }: MusicTableProps) {
       : <ArrowDown className="ml-2 h-4 w-4" />;
   };
 
-  const toggleSelect = (id: string) => {
-    const newSelected = new Set(selected);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
+  const toggleSave = async (music: IMusic) => {
+    if (savedSongIds.has(music._id!)) {
+      await removeSong(music._id!);
     } else {
-      newSelected.add(id);
-    }
-    setSelected(newSelected);
-    if (onSelectionChange) {
-      onSelectionChange(data.filter(m => newSelected.has(m._id!)));
-    }
-  };
-
-  const toggleSelectAll = () => {
-    if (selected.size === data.length) {
-      setSelected(new Set());
-      if (onSelectionChange) onSelectionChange([]);
-    } else {
-      const allIds = new Set(data.map(m => m._id!));
-      setSelected(allIds);
-      if (onSelectionChange) onSelectionChange(data);
+      await addSong(music);
     }
   };
 
@@ -181,9 +169,6 @@ export default function MusicTable({ onSelectionChange }: MusicTableProps) {
       <div className="flex flex-row gap-4">
         <div className="flex gap-2 items-center">
           <span>{total} songs found</span>
-          {selected.size > 0 && (
-            <Badge variant="secondary">{selected.size} selected</Badge>
-          )}
         </div>
         <div className="relative flex-1">
           <MultiSelect
@@ -217,12 +202,7 @@ export default function MusicTable({ onSelectionChange }: MusicTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12">
-                <Checkbox
-                  checked={data.length > 0 && selected.size === data.length}
-                  onCheckedChange={toggleSelectAll}
-                />
-              </TableHead>
+              <TableHead className="w-12"></TableHead>
               <TableHead className="w-16">Cover</TableHead>
               <TableHead>
                 <Button variant="ghost" onClick={() => handleSort('name')} className="p-0 hover:bg-transparent">
@@ -248,7 +228,7 @@ export default function MusicTable({ onSelectionChange }: MusicTableProps) {
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                  <TableCell><Skeleton className="h-8 w-8 rounded-full" /></TableCell>
                   <TableCell><Skeleton className="h-12 w-12 rounded" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
@@ -270,12 +250,21 @@ export default function MusicTable({ onSelectionChange }: MusicTableProps) {
               </TableRow>
             ) : (
               data.map((music) => (
-                <TableRow key={music._id} className={selected.has(music._id!) ? 'bg-accent' : ''}>
+                <TableRow key={music._id}>
                   <TableCell>
-                    <Checkbox
-                      checked={selected.has(music._id!)}
-                      onCheckedChange={() => toggleSelect(music._id!)}
-                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => toggleSave(music)}
+                    >
+                      <Heart
+                        className={`h-5 w-5 ${savedSongIds.has(music._id!)
+                          ? 'fill-primary text-primary'
+                          : 'text-muted-foreground'
+                          }`}
+                      />
+                    </Button>
                   </TableCell>
                   <TableCell>
                     {music.coverUrl ? (

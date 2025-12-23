@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import MusicTable from '@/components/data-table/MusicTable';
 import ProviderPanel from '@/components/providers/ProviderPanel';
-import CollectionManager from '@/components/collection/CollectionManager';
+import SavedSongs from '@/components/collection/SavedSongs';
+import { SavedSongsProvider } from '@/context/SavedSongsContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -20,7 +21,6 @@ import type { IMusic } from '@/types';
 import { Toaster } from '@/components/ui/sonner';
 
 export default function HomePage() {
-  const [selectedSongs, setSelectedSongs] = useState<IMusic[]>([]);
   const [deviceId, setDeviceId] = useState<string>('');
   const [deviceName, setDeviceName] = useState('');
   const [showDeviceDialog, setShowDeviceDialog] = useState(false);
@@ -45,7 +45,7 @@ export default function HomePage() {
 
   const saveDeviceName = async () => {
     if (!deviceName.trim()) return;
-    
+
     localStorage.setItem('deviceName', deviceName);
     setShowDeviceDialog(false);
 
@@ -95,37 +95,40 @@ export default function HomePage() {
 
       {/* Main Content */}
       <main className="container mx-auto py-8 px-4 relative z-10">
-        <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
-          {/* Main Content Area */}
-          <div className="space-y-8">
-            {/* Hero Section */}
-            <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-primary/20 via-accent/10 to-primary/5 p-6 border border-primary/20">
-              <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent" />
-              <div className="relative">
-                <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                  Welcome to YARG Aggregator
-                </h2>
-                <p className="text-muted-foreground max-w-2xl">
-                  Browse, search, and download music charts from Enchor.us and Rhythmverse. 
-                  Create collections and share them with other users in real-time.
-                </p>
+        <SavedSongsProvider deviceId={deviceId} deviceName={deviceName}>
+          <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+            {/* Main Content Area */}
+            <div className="space-y-8">
+              {/* Hero Section */}
+              <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-primary/20 via-accent/10 to-primary/5 p-6 border border-primary/20">
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent" />
+                <div className="relative">
+                  <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                    Welcome to YARG Aggregator
+                  </h2>
+                  <p className="text-muted-foreground max-w-2xl">
+                    Browse, search, and download music charts from Enchor.us and Rhythmverse.
+                    Create collections and share them with other users in real-time.
+                  </p>
+                </div>
               </div>
+
+              {/* Music Table */}
+              <MusicTable
+                deviceId={deviceId}
+                deviceName={deviceName}
+              />
             </div>
 
-            {/* Music Table */}
-            <MusicTable onSelectionChange={setSelectedSongs} />
+            {/* Sidebar */}
+            <aside className="space-y-6">
+              <ProviderPanel />
+              <SavedSongs
+                deviceId={deviceId}
+              />
+            </aside>
           </div>
-
-          {/* Sidebar */}
-          <aside className="space-y-6">
-            <ProviderPanel />
-            <CollectionManager
-              selectedSongs={selectedSongs}
-              deviceId={deviceId}
-              onClearSelection={() => setSelectedSongs([])}
-            />
-          </aside>
-        </div>
+        </SavedSongsProvider>
       </main>
 
       {/* Footer */}
@@ -141,7 +144,7 @@ export default function HomePage() {
           <DialogHeader>
             <DialogTitle>Welcome to YARG Aggregator!</DialogTitle>
             <DialogDescription>
-              Please enter a name for your device. This will be used to identify you 
+              Please enter a name for your device. This will be used to identify you
               when sharing collections with other users.
             </DialogDescription>
           </DialogHeader>
