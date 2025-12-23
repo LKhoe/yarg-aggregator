@@ -6,11 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Loader2, Play, RefreshCw, FlaskConical } from 'lucide-react';
+import { Loader2, Play, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { NumberInput } from '@/components/ui/number-input';
 
 type ProviderSource = 'all' | 'enchor' | 'rhythmverse';
 
@@ -21,18 +20,42 @@ interface JobProgress {
   currentPage?: number;
   totalPages?: number;
   songsProcessed?: number;
+  totalSongs?: number;
+  totalAvailable?: number;
   totalFetched?: number;
   totalSaved?: number;
+  jobsCompleted?: number;
+  jobsTotal?: number;
+  failedJobIndex?: number;
   errors?: string[];
+}
+
+interface ProviderStat {
+  source: string;
+  totalFetched: number;
+  totalAvailable: number;
+  lastFetchedAt?: string;
 }
 
 export default function ProviderPanel() {
   const [source, setSource] = useState<ProviderSource>('all');
   const [isRunning, setIsRunning] = useState(false);
-  const [forceSync, setForceSync] = useState(false);
-  const [maxPages, setMaxPages] = useState(10);
+  const [recordsToFetch, setRecordsToFetch] = useState(10);
   const [jobId, setJobId] = useState<string | null>(null);
   const [progress, setProgress] = useState<JobProgress | null>(null);
+  const [stats, setStats] = useState<ProviderStat[]>([]);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const response = await fetch('/api/providers/stats');
+      if (response.ok) {
+        const data = await response.json();
+        setStats(data);
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  }, []);
 
   const pollProgress = useCallback(async (id: string) => {
     try {
@@ -40,9 +63,10 @@ export default function ProviderPanel() {
       if (response.ok) {
         const data = await response.json();
         setProgress(data);
-        
+
         if (data.status === 'completed' || data.status === 'failed') {
           setIsRunning(false);
+          fetchStats(); // Refresh stats when job finishes
         } else {
           // Continue polling
           setTimeout(() => pollProgress(id), 1000);
@@ -54,37 +78,36 @@ export default function ProviderPanel() {
   }, []);
 
   useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  useEffect(() => {
     if (jobId && isRunning) {
       pollProgress(jobId);
     }
   }, [jobId, isRunning, pollProgress]);
 
-  const testProvider = async () => {
-    if (source === 'all') {
-      toast.error('Please select a specific source to test');
-      return;
-    }
-    
+  const retryFailed = async () => {
+    if (!jobId) return;
     setIsRunning(true);
     try {
-      const response = await fetch('/api/providers/test', {
+      const response = await fetch('/api/providers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source }),
+        body: JSON.stringify({ action: 'retry', sessionId: jobId, source }),
       });
-      
-      const data = await response.json();
-      console.log('Test result:', data);
-      
-      if (response.ok) {
-        toast.success(`Test successful! Fetched ${data.count} items. Check console for details.`);
-      } else {
-        toast.error(data.error || 'Test failed');
+      if (!response.ok) {
+        const data = await response.json();
+        toast.error(data.error || 'Failed to retry');
+        setIsRunning(false);
+        return;
       }
+
+      toast.success('Retry enqueued');
+      pollProgress(jobId);
     } catch (error) {
-      console.error('Test failed:', error);
-      toast.error('Test failed. Check console for details.');
-    } finally {
+      console.error('Error retrying fetch:', error);
+      toast.error('Failed to retry fetch');
       setIsRunning(false);
     }
   };
@@ -97,7 +120,7 @@ export default function ProviderPanel() {
       const response = await fetch('/api/providers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source, maxPages, forceSync }),
+        body: JSON.stringify({ source, amount: recordsToFetch }),
       });
 
       if (response.ok) {
@@ -149,42 +172,44 @@ export default function ProviderPanel() {
                     <SelectItem value="rhythmverse">Rhythmverse</SelectItem>
                   </SelectContent>
                 </Select>
-                
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  onClick={testProvider} 
-                  disabled={isRunning || source === 'all'} 
-                  title="Test Provider (1 page)"
-                  className="shrink-0"
-                >
-                  <FlaskConical className="h-4 w-4" />
-                </Button>
+              </div>
+
+              {/* Provider Stats Display */}
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {['enchor', 'rhythmverse'].map((src) => {
+                  const stat = stats.find((s) => s.source === src);
+                  return (
+                    <div key={src} className="bg-muted/50 p-2 rounded-md border">
+                      <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">
+                        {src === 'enchor' ? 'Enchor.us' : 'Rhythmverse'}
+                      </p>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-sm font-semibold">{stat?.totalFetched || 0}</span>
+                        <span className="text-[10px] text-muted-foreground italic">/ {stat?.totalAvailable || 0}</span>
+                      </div>
+                      {stat?.totalAvailable ? (
+                        <div className="w-full bg-secondary h-1 rounded-full mt-1 overflow-hidden">
+                          <div
+                            className="bg-primary h-full transition-all duration-500"
+                            style={{ width: `${Math.min(100, (stat.totalFetched / stat.totalAvailable) * 100)}%` }}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="forceSync" 
-                checked={forceSync} 
-                onCheckedChange={(c) => setForceSync(!!c)} 
-              />
-              <Label 
-                htmlFor="forceSync" 
-                className="text-xs text-muted-foreground cursor-pointer font-normal flex-1"
-              >
-                Force Full Sync (Ignore Resume)
-              </Label>
-            </div>
-
             <div className="space-y-1">
-                <label className="text-sm font-medium">Max Pages</label>
-                <Input 
-                    type="number" 
-                    min={1} 
-                    value={maxPages} 
-                    onChange={(e) => setMaxPages(parseInt(e.target.value) || 1)}
-                />
+              <label className="text-sm font-medium">Records to Fetch</label>
+              <NumberInput
+                value={recordsToFetch}
+                min={10}
+                max={100}
+                defaultValue={10}
+                onValueChange={(v) => setRecordsToFetch(v || 1)}
+              />
             </div>
 
             <Button onClick={startFetch} disabled={isRunning} className="w-full cursor-pointer">
@@ -211,10 +236,10 @@ export default function ProviderPanel() {
                 {progress.status}
               </Badge>
             </div>
-            
+
             <div className="space-y-1">
               <div className="flex justify-between text-sm">
-                <span>Progress</span>
+                <span>Total Progress</span>
                 <span>{progress.progress || 0}%</span>
               </div>
               <Progress value={progress.progress || 0} />
@@ -227,23 +252,30 @@ export default function ProviderPanel() {
               </div>
             )}
 
-            {progress.currentPage && progress.totalPages && (
+            {progress.songsProcessed !== undefined && progress.totalSongs && (
               <div className="flex justify-between text-sm">
-                <span>Page</span>
-                <span>{progress.currentPage} / {progress.totalPages}</span>
+                <span>Session Records</span>
+                <span>{progress.songsProcessed} / {progress.totalSongs}</span>
               </div>
             )}
 
-            {(progress.songsProcessed || progress.totalFetched) && (
+            {progress.jobsCompleted !== undefined && progress.jobsTotal !== undefined && (
               <div className="flex justify-between text-sm">
-                <span>Songs Processed</span>
-                <span>{progress.songsProcessed || progress.totalFetched}</span>
+                <span>Jobs</span>
+                <span>{progress.jobsCompleted} / {progress.jobsTotal}</span>
+              </div>
+            )}
+
+            {progress.totalAvailable !== undefined && (
+              <div className="flex justify-between text-sm">
+                <span>Provider Total</span>
+                <span>{progress.totalAvailable}</span>
               </div>
             )}
 
             {progress.totalSaved !== undefined && (
-              <div className="flex justify-between text-sm">
-                <span>Songs Saved</span>
+              <div className="flex justify-between text-sm font-medium text-primary">
+                <span>Total Saved (Overall)</span>
                 <span>{progress.totalSaved}</span>
               </div>
             )}
@@ -260,6 +292,12 @@ export default function ProviderPanel() {
                   )}
                 </ul>
               </div>
+            )}
+
+            {progress.status === 'failed' && progress.failedJobIndex !== undefined && jobId && (
+              <Button onClick={retryFailed} disabled={isRunning} className="w-full cursor-pointer" variant="outline">
+                Retry Failed Job
+              </Button>
             )}
           </div>
         )}

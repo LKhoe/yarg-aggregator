@@ -54,10 +54,13 @@ interface RhythmVerseSongEntry {
 
 export async function fetchRhythmverse(
   page: number = 1,
-  onProgress?: (current: number, total: number) => void
-): Promise<ProviderMusic[]> {
+  pageSize: number = 25,
+  sortDirection: 'ASC' | 'DESC' = 'ASC',
+  onProgress?: (current: number, total: number) => void,
+  signal?: AbortSignal
+): Promise<{ songs: ProviderMusic[]; totalFound: number }> {
   try {
-    console.log(`Fetching RhythmVerse API page ${page}...`);
+    console.log(`Fetching RhythmVerse API page ${page} (size: ${pageSize}, sort: ${sortDirection})...`);
 
     const body = new URLSearchParams();
     body.append('instrument[]', 'bass');
@@ -65,10 +68,10 @@ export async function fetchRhythmverse(
     body.append('instrument[]', 'guitar');
     body.append('instrument[]', 'vocals');
     body.append('sort[0][sort_by]', 'update_date');
-    body.append('sort[0][sort_order]', 'ASC');
+    body.append('sort[0][sort_order]', sortDirection);
     body.append('data_type', 'full');
     body.append('page', page.toString());
-    body.append('records', '25');
+    body.append('records', pageSize.toString());
 
     const response = await fetch(RHYTHMVERSE_API_URL, {
       method: 'POST',
@@ -77,6 +80,7 @@ export async function fetchRhythmverse(
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:146.0) Gecko/20100101 Firefox/146.0',
         'X-Requested-With': 'XMLHttpRequest',
       },
+      signal,
       body: body.toString(),
     });
 
@@ -129,7 +133,7 @@ export async function fetchRhythmverse(
       onProgress(results.length, records.total_filtered);
     }
 
-    return results;
+    return { songs: results, totalFound: records.total_filtered };
   } catch (error) {
     console.error('Error fetching RhythmVerse API:', error);
     throw error;

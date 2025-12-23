@@ -23,20 +23,34 @@ export interface IMusic {
   updatedAt: Date;
 }
 
+export interface ISavedSong {
+  _id?: string;
+  musicId: string;
+  name: string;
+  artist: string;
+  addedAt: Date;
+}
+
 export interface IUser {
   _id?: string;
   deviceId: string;
   deviceName: string;
-  collections: ICollection[];
+  savedSongs: ISavedSong[];
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface ICollection {
+export interface IFailedJob {
   _id?: string;
-  name: string;
-  musicIds: string[];
-  createdAt: Date;
+  initIndex: number;
+  endIndex: number;
+}
+
+export interface IProviderStats {
+  source: 'enchor' | 'rhythmverse';
+  totalFetched: number;
+  totalAvailable: number;
+  failedJobs: IFailedJob[];
 }
 
 // API Types
@@ -95,10 +109,10 @@ export interface ProviderMusic {
 }
 
 // Socket Types
-export interface ShareCollectionPayload {
+export interface ShareSongsPayload {
   fromDeviceId: string;
   toDeviceId: string;
-  collection: ICollection;
+  songs: ISavedSong[];
 }
 
 export interface ConnectedDevice {

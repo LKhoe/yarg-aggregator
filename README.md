@@ -7,7 +7,6 @@ The **YARG Content Aggregator** is a modern, high-performance web platform desig
 *   **Unified Search**: Browse and filter music charts from multiple sources in one place.
 *   **Advanced Filtering**: Filter by instrument difficulty, genre, artist, and more.
 *   **Provider Integration**: Direct API integration with Enchor and Rhythmverse to fetch the latest charts.
-*   **Asynchronous Processing**: Uses **BullMQ** and **Redis** to handle large data fetching jobs in the background.
 *   **Real-time Sharing**: Create collections and share them instantly with other devices on the network using **Socket.io**.
 *   **Modern UI**: built with **Next.js**, **Tailwind CSS**, and **Shadcn UI** for a responsive and premium experience.
 
@@ -17,7 +16,6 @@ The **YARG Content Aggregator** is a modern, high-performance web platform desig
 *   **Language:** [TypeScript](https://www.typescriptlang.org/)
 *   **Styling:** [Tailwind CSS](https://tailwindcss.com/) + [Shadcn UI](https://ui.shadcn.com/)
 *   **Database:** [MongoDB](https://www.mongodb.com/) (Data persistence)
-*   **Queue & Cache:** [Redis](https://redis.io/) (Job queues & caching)
 *   **Real-time:** [Socket.io](https://socket.io/) (Device-to-device sharing)
 *   **Containerization:** Docker & Docker Compose
 
@@ -47,22 +45,15 @@ Ensure you have the following installed:
     ```env
     # Database
     MONGODB_URI=mongodb://localhost:27017/yarg_db
-    
-    # Redis
-    REDIS_HOST=localhost
-    REDIS_PORT=6379
-    
+
     # App
     NEXT_PUBLIC_APP_URL=http://localhost:3000
-    
-    # Provider Configuration
-    PROVIDER_CONCURRENCY=5
     ```
 
 4.  **Start Infrastructure:**
     Start the required MongoDB and Redis services using Docker:
     ```bash
-    docker-compose up -d mongo redis
+    docker-compose up -d
     ```
     *Note: Ensure you have a `docker-compose.yml` configured for these services, or install them locally.*
 
@@ -78,7 +69,7 @@ Ensure you have the following installed:
 1.  Navigate to the **Provider Control** panel on the right sidebar.
 2.  Select a source (`Enchor`, `Rhythmverse`, or `All`).
 3.  Click **Start Fetch**.
-4.  The system will queue a job to fetch the latest songs. You can monitor progress in real-time.
+4.  The system will start a background fetch on the backend. You can monitor progress in real-time.
 
 ### Browsing & Filtering
 *   Use the main table to browse songs.
@@ -108,7 +99,7 @@ Ensure you have the following installed:
 │   ├── models              # Mongoose Schemas
 │   ├── services            # Business Logic
 │   │   ├── providers       # API Clients (Enchor, Rhythmverse)
-│   │   └── queue           # Job Queue Logic
+│   │   └── queue           # (deprecated)
 │   └── types               # TypeScript Interfaces
 ```
 

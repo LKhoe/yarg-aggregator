@@ -34,10 +34,13 @@ interface EnchorSong {
 
 export async function fetchEnchor(
   page: number = 1,
-  onProgress?: (current: number, total: number) => void
-): Promise<ProviderMusic[]> {
+  pageSize: number = 20,
+  sortDirection: 'asc' | 'desc' = 'asc',
+  onProgress?: (current: number, total: number) => void,
+  signal?: AbortSignal
+): Promise<{ songs: ProviderMusic[]; totalFound: number }> {
   try {
-    console.log(`Fetching Enchor API page ${page}...`);
+    console.log(`Fetching Enchor API page ${page} (size: ${pageSize}, sort: ${sortDirection})...`);
 
     const response = await fetch(ENCHOR_API_URL, {
       method: 'POST',
@@ -45,12 +48,13 @@ export async function fetchEnchor(
         'Content-Type': 'application/json',
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:146.0) Gecko/20100101 Firefox/146.0',
       },
+      signal,
       body: JSON.stringify({
         instrument: "bass",
         difficulty: null,
         drumType: null,
         drumsReviewed: false,
-        sort: { type: "modifiedTime", direction: "asc" },
+        sort: { type: "modifiedTime", direction: sortDirection },
         source: "website",
         name: { value: "", exact: false, exclude: false },
         artist: { value: "", exact: false, exclude: false },
@@ -82,7 +86,8 @@ export async function fetchEnchor(
         hasIssues: null,
         hasVideoBackground: null,
         modchart: null,
-        page: page
+        page: page,
+        pageSize: pageSize
       }),
     });
 
@@ -91,7 +96,7 @@ export async function fetchEnchor(
     }
 
     const json = (await response.json()) as EnchorResponse;
-    const { data, out_of } = json;
+    const { data, found } = json;
 
     const results: ProviderMusic[] = data.map((song) => {
       const downloadUrl = `${ENCHOR_BASE_URL}/download?md5=${song.md5}&isSng=false&downloadNovideoVersion=false&filename=${song.drivePath} (${song.charter})`;
@@ -120,16 +125,11 @@ export async function fetchEnchor(
 
     console.log(`Fetched ${results.length} songs from Enchor API page ${page}`);
 
-    // Notify progress
-    // We treat the current batch size as 'current' for this call, 
-    // but the caller might want total progress.
-    // The previous implementation passed `processed, total`.
-    // Here we know the total `out_of`.
     if (onProgress) {
-      onProgress(results.length, out_of);
+      onProgress(results.length, found);
     }
 
-    return results;
+    return { songs: results, totalFound: found };
   } catch (error) {
     console.error('Error fetching Enchor API:', error);
     throw error;
