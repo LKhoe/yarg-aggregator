@@ -1,3 +1,6 @@
 export async function register() {
-    return;
+    if (process.env.NEXT_RUNTIME === 'nodejs') {
+        const { initProviderWorker } = await import('@/lib/queue');
+        initProviderWorker();
+    }
 }

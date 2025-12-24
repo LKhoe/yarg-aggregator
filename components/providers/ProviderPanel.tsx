@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { Loader2, Play, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { NumberInput } from '@/components/ui/number-input';
@@ -35,6 +34,8 @@ interface ProviderStat {
   totalFetched: number;
   totalAvailable: number;
   lastFetchedAt?: string;
+  isRunning: boolean;
+  failedJobs: any[];
 }
 
 export default function ProviderPanel() {
@@ -47,7 +48,7 @@ export default function ProviderPanel() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const response = await fetch('/api/providers/stats');
+      const response = await fetch('/api/providers');
       if (response.ok) {
         const data = await response.json();
         setStats(data);
@@ -57,60 +58,9 @@ export default function ProviderPanel() {
     }
   }, []);
 
-  const pollProgress = useCallback(async (id: string) => {
-    try {
-      const response = await fetch(`/api/providers?jobId=${id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setProgress(data);
-
-        if (data.status === 'completed' || data.status === 'failed') {
-          setIsRunning(false);
-          fetchStats(); // Refresh stats when job finishes
-        } else {
-          // Continue polling
-          setTimeout(() => pollProgress(id), 1000);
-        }
-      }
-    } catch (error) {
-      console.error('Error polling progress:', error);
-    }
-  }, []);
-
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
-
-  useEffect(() => {
-    if (jobId && isRunning) {
-      pollProgress(jobId);
-    }
-  }, [jobId, isRunning, pollProgress]);
-
-  const retryFailed = async () => {
-    if (!jobId) return;
-    setIsRunning(true);
-    try {
-      const response = await fetch('/api/providers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'retry', sessionId: jobId, source }),
-      });
-      if (!response.ok) {
-        const data = await response.json();
-        toast.error(data.error || 'Failed to retry');
-        setIsRunning(false);
-        return;
-      }
-
-      toast.success('Retry enqueued');
-      pollProgress(jobId);
-    } catch (error) {
-      console.error('Error retrying fetch:', error);
-      toast.error('Failed to retry fetch');
-      setIsRunning(false);
-    }
-  };
 
   const startFetch = async () => {
     setIsRunning(true);
@@ -125,13 +75,12 @@ export default function ProviderPanel() {
 
       if (response.ok) {
         const data = await response.json();
-        setJobId(data.jobId);
       } else {
         setIsRunning(false);
+        toast.error('Failed to start fetch job');
       }
     } catch (error) {
-      console.error('Error starting fetch:', error);
-      toast.error('Failed to start fetch job');
+      toast.error(`Failed to start fetch job: ${error}`);
       setIsRunning(false);
     }
   };
@@ -292,12 +241,6 @@ export default function ProviderPanel() {
                   )}
                 </ul>
               </div>
-            )}
-
-            {progress.status === 'failed' && progress.failedJobIndex !== undefined && jobId && (
-              <Button onClick={retryFailed} disabled={isRunning} className="w-full cursor-pointer" variant="outline">
-                Retry Failed Job
-              </Button>
             )}
           </div>
         )}

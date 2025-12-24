@@ -1,6 +1,6 @@
 import type { ProviderMusic } from '@/types';
 
-const RHYTHMVERSE_BASE_URL = 'https://www.rhythmverse.co';
+const RHYTHMVERSE_BASE_URL = 'https://rhythmverse.co';
 const RHYTHMVERSE_API_URL = 'https://rhythmverse.co/api/yarg/songfiles/list';
 
 interface RhythmVerseResponse {

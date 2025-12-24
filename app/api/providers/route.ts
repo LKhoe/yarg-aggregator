@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
-import ProviderFetchSession from '@/models/ProviderFetchSession';
 import ProviderStats from '@/models/ProviderStats';
 import Music from '@/models/Music';
-import { fetchEnchor, fetchRhythmverse, getEnchorSongs, getRhythmverseSongs, runProviderSession } from '@/services/providers';
+import { getEnchorSongs, getRhythmverseSongs } from '@/services/providers';
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,11 +26,24 @@ export async function POST(request: NextRequest) {
     const now = Date.now();
     const last = providerData?.lastFetchedAt?.getTime() || 0;
 
-    if (providerData?.isRunning && now - last < 60_000) {
-      return NextResponse.json(
-        { error: `Provider is already running for ${source}` },
-        { status: 400 }
-      );
+    if (providerData?.isRunning) {
+      // Double check with queue if it's really running?
+      // For now trusting the DB flag, but user asked: "The isRunning logic inside the providerstats should consider if there is any worker running"
+      // Let's check active counts from queue
+      const { providerQueue } = await import('@/lib/queue');
+      const activeCount = await providerQueue.getActiveCount();
+      const waitingCount = await providerQueue.getWaitingCount();
+
+      if (activeCount > 0 || waitingCount > 0) {
+        return NextResponse.json(
+          { error: `Provider is already running for ${source}` },
+          { status: 400 }
+        );
+      } else {
+        // If DB says running but queue is empty, maybe we should reset?
+        // Continuing execution will effectively restart it.
+        console.log(`Provider ${source} marked as running but queue is empty. Restarting.`);
+      }
     } else if (now - last < 60_000) {
       // Provider is taking too long to finish
       // Should be stopped
@@ -67,10 +79,7 @@ export async function POST(request: NextRequest) {
       {
         $setOnInsert: {
           source,
-          isRunning: true,
-          totalAvailable,
           totalFetched: localCount,
-          lastFetchedAt: new Date(),
         },
         $set: {
           isRunning: true,
@@ -100,28 +109,25 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    const fetchFn = async (item: { page: number, pageSize: number, sortDirection: 'asc' | 'desc' }) => {
-      return await (source === 'enchor' ? fetchEnchor : fetchRhythmverse)(item.page, item.pageSize, item.sortDirection);
-    }
+    const jobData = paramsList.map(param => ({
+      name: `fetch-${source}-${param.page}`,
+      data: {
+        source: source as 'enchor' | 'rhythmverse',
+        page: param.page,
+        pageSize: param.pageSize,
+        sortDirection: param.sortDirection
+      },
+      opts: {
+        removeOnComplete: true,
+        removeOnFail: false
+      }
+    }));
 
-    // The code bellow should be swaped for Redis + BullMQ
-    // const { results, errors } = await PromisePool
-    //   .for(paramsList)
-    //   .withConcurrency(10)
-    //   .withTaskTimeout(30000) // milliseconds
-    //   .onTaskStarted((item, pool) => {
-    //     console.log(`Progress: ${pool.processedPercentage()}%`)
-    //     console.log(`Active tasks: ${pool.processedItems().length}`)
-    //     console.log(`Active tasks: ${pool.activeTasksCount()}`)
-    //     console.log(`Finished tasks: ${pool.processedItems().length}`)
-    //     console.log(`Finished tasks: ${pool.processedCount()}`)
-    //   })
-    //   .onTaskFinished((item, pool) => {
-    //     console.log(`Finished task: ${item.page}`)
-    //   })
-    //   .process(fetchFn)
+    // Import dynamically to avoid build-time issues if possible, but route.ts is server-only.
+    const { providerQueue } = await import('@/lib/queue');
+    await providerQueue.addBulk(jobData);
 
-    return NextResponse.json({ message: 'Provider fetch started' });
+    return NextResponse.json({ success: true, message: 'Provider fetch started' });
   } catch (error) {
     console.error('Error starting provider:', error);
     return NextResponse.json(
@@ -133,26 +139,10 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const jobId = request.nextUrl.searchParams.get('jobId');
-
-    if (!jobId) {
-      return NextResponse.json(
-        { error: 'jobId is required' },
-        { status: 400 }
-      );
-    }
-
     await connectDB();
-    const session = await ProviderFetchSession.findOne(
-      { sessionId: jobId },
-      { _id: 0, __v: 0, jobs: 0 }
-    );
-
-    if (!session) {
-      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
-    }
-
-    return NextResponse.json(session.toObject());
+    // Use projection to exclude _id and __v, and lean() for plain JS objects
+    const providerData = await ProviderStats.find({}, { _id: 0, __v: 0 }).lean();
+    return NextResponse.json(providerData);
   } catch (error) {
     console.error('Error getting provider status:', error);
     return NextResponse.json(

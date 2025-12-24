@@ -75,8 +75,7 @@ export async function POST(request: NextRequest) {
     // Check if song is already saved
     const songExists = user.savedSongs.some(
       (song: ISavedSong) => {
-        const songId = typeof song.musicId === 'string' ? song.musicId : song.musicId.toString();
-        return songId === musicId.toString();
+        return song.musicId === musicId.toString();
       }
     );
 
@@ -95,7 +94,7 @@ export async function POST(request: NextRequest) {
       artist,
       addedAt: new Date(),
     } as const;
-    user.savedSongs.push(newSong as ISavedSong & { _id: Types.ObjectId });
+    user.savedSongs.push(newSong as unknown as ISavedSong & { _id: Types.ObjectId });
 
     await user.save();
 
