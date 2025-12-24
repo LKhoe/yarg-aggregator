@@ -51,6 +51,8 @@ export interface IProviderStats {
   totalFetched: number;
   totalAvailable: number;
   failedJobs: IFailedJob[];
+  isRunning: boolean;
+  lastFetchedAt: Date;
 }
 
 // API Types

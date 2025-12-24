@@ -205,7 +205,7 @@ export default function ProviderPanel() {
               <label className="text-sm font-medium">Records to Fetch</label>
               <NumberInput
                 value={recordsToFetch}
-                min={10}
+                min={1}
                 max={100}
                 defaultValue={10}
                 onValueChange={(v) => setRecordsToFetch(v || 1)}

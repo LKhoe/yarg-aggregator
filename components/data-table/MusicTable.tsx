@@ -51,6 +51,7 @@ import {
   MultiSelectValue,
 } from "@/components/ui/multi-select"
 import { useSavedSongs } from '@/context/SavedSongsContext';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface MusicTableProps {
   deviceId: string;
@@ -297,7 +298,14 @@ export default function MusicTable({ deviceId, deviceName, onSavedSongsChange }:
                         if (diff === undefined) return null;
                         return (
                           <div key={inst} className="flex items-center gap-1" title={inst}>
-                            <DifficultyMedal level={diff} size="sm" icon={<InstrumentIcon instrument={inst} />} />
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <DifficultyMedal level={diff} size="sm" icon={<InstrumentIcon instrument={inst} />} />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {inst.charAt(0).toUpperCase() + inst.slice(1)} ({diff} / 7)
+                              </TooltipContent>
+                            </Tooltip>
                           </div>
                         );
                       })}

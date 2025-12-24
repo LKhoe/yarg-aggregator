@@ -53,12 +53,10 @@ interface RhythmVerseSongEntry {
 }
 
 export async function fetchRhythmverse(
-  page: number = 1,
-  pageSize: number = 25,
-  sortDirection: 'ASC' | 'DESC' = 'ASC',
-  onProgress?: (current: number, total: number) => void,
-  signal?: AbortSignal
-): Promise<{ songs: ProviderMusic[]; totalFound: number }> {
+  page: number,
+  pageSize: number,
+  sortDirection: 'asc' | 'desc',
+): Promise<{ songs: ProviderMusic[] }> {
   try {
     console.log(`Fetching RhythmVerse API page ${page} (size: ${pageSize}, sort: ${sortDirection})...`);
 
@@ -68,7 +66,7 @@ export async function fetchRhythmverse(
     body.append('instrument[]', 'guitar');
     body.append('instrument[]', 'vocals');
     body.append('sort[0][sort_by]', 'update_date');
-    body.append('sort[0][sort_order]', sortDirection);
+    body.append('sort[0][sort_order]', sortDirection.toUpperCase());
     body.append('data_type', 'full');
     body.append('page', page.toString());
     body.append('records', pageSize.toString());
@@ -80,7 +78,6 @@ export async function fetchRhythmverse(
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:146.0) Gecko/20100101 Firefox/146.0',
         'X-Requested-With': 'XMLHttpRequest',
       },
-      signal,
       body: body.toString(),
     });
 
@@ -129,11 +126,7 @@ export async function fetchRhythmverse(
 
     console.log(`Fetched ${results.length} songs from RhythmVerse API page ${page}`);
 
-    if (onProgress) {
-      onProgress(results.length, records.total_filtered);
-    }
-
-    return { songs: results, totalFound: records.total_filtered };
+    return { songs: results };
   } catch (error) {
     console.error('Error fetching RhythmVerse API:', error);
     throw error;
@@ -147,7 +140,7 @@ function parseDifficulty(diff: string | null | number): number | undefined {
   return isNaN(parsed) || parsed === -1 ? undefined : parsed;
 }
 
-export async function getTotalPages(): Promise<number> {
+export async function getTotalSongs(): Promise<number> {
   try {
     const body = new URLSearchParams();
     body.append('instrument[]', 'bass');
@@ -176,9 +169,8 @@ export async function getTotalPages(): Promise<number> {
     if (json.status !== 'success') return 1;
 
     const totalFiltered = json.data.records.total_filtered;
-    const recordsPerPage = 25;
 
-    return Math.ceil(totalFiltered / recordsPerPage);
+    return totalFiltered;
   } catch {
     return 1;
   }

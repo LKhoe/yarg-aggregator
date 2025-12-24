@@ -24,6 +24,8 @@ const ProviderStatsSchema = new Schema<IProviderStatsDocument>(
         totalFetched: { type: Number, default: 0 },
         totalAvailable: { type: Number, default: 0 },
         failedJobs: [FiledJobsSchema],
+        isRunning: { type: Boolean, default: false },
+        lastFetchedAt: { type: Date },
     },
     {
         timestamps: true

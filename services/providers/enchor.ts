@@ -33,12 +33,10 @@ interface EnchorSong {
 }
 
 export async function fetchEnchor(
-  page: number = 1,
-  pageSize: number = 20,
-  sortDirection: 'asc' | 'desc' = 'asc',
-  onProgress?: (current: number, total: number) => void,
-  signal?: AbortSignal
-): Promise<{ songs: ProviderMusic[]; totalFound: number }> {
+  page: number,
+  pageSize: number,
+  sortDirection: 'asc' | 'desc',
+): Promise<{ songs: ProviderMusic[] }> {
   try {
     console.log(`Fetching Enchor API page ${page} (size: ${pageSize}, sort: ${sortDirection})...`);
 
@@ -48,13 +46,12 @@ export async function fetchEnchor(
         'Content-Type': 'application/json',
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:146.0) Gecko/20100101 Firefox/146.0',
       },
-      signal,
       body: JSON.stringify({
         instrument: "bass",
         difficulty: null,
         drumType: null,
         drumsReviewed: false,
-        sort: { type: "modifiedTime", direction: sortDirection },
+        sort: { type: "modifiedTime", direction: sortDirection.toLocaleLowerCase() as 'asc' | 'desc' },
         source: "website",
         name: { value: "", exact: false, exclude: false },
         artist: { value: "", exact: false, exclude: false },
@@ -96,7 +93,7 @@ export async function fetchEnchor(
     }
 
     const json = (await response.json()) as EnchorResponse;
-    const { data, found } = json;
+    const { data } = json;
 
     const results: ProviderMusic[] = data.map((song) => {
       const downloadUrl = `${ENCHOR_BASE_URL}/download?md5=${song.md5}&isSng=false&downloadNovideoVersion=false&filename=${song.drivePath} (${song.charter})`;
@@ -116,7 +113,7 @@ export async function fetchEnchor(
           drums: song.diff_drums === -1 ? undefined : song.diff_drums,
           bass: song.diff_bass === -1 ? undefined : song.diff_bass,
           guitar: song.diff_guitar === -1 ? undefined : song.diff_guitar,
-          prokeys: song.diff_keys === -1 ? undefined : song.diff_keys, // enchor calls it diff_keys
+          prokeys: song.diff_keys === -1 ? undefined : song.diff_keys,
           vocals: song.diff_vocals === -1 ? undefined : song.diff_vocals,
         },
         rawData: song,
@@ -125,18 +122,14 @@ export async function fetchEnchor(
 
     console.log(`Fetched ${results.length} songs from Enchor API page ${page}`);
 
-    if (onProgress) {
-      onProgress(results.length, found);
-    }
-
-    return { songs: results, totalFound: found };
+    return { songs: results };
   } catch (error) {
     console.error('Error fetching Enchor API:', error);
     throw error;
   }
 }
 
-export async function getTotalPages(): Promise<number> {
+export async function getTotalSongs(): Promise<number> {
   try {
     // Make a request for page 1 to get the total count
     const response = await fetch(ENCHOR_API_URL, {
@@ -185,22 +178,12 @@ export async function getTotalPages(): Promise<number> {
         page: 1
       }),
     });
-
-    if (!response.ok) return 1;
-
+    if (!response.ok) throw new Error(`Failed to fetch Enchor API: ${response.status}`);
     const json = (await response.json()) as EnchorResponse;
-    // Assuming 20 items per page? Enchor usually returns 20 or 25.
-    // The payload asked for page 1.
-    // Let's assume a default page size if not returned. 
-    // The response doesn't strictly say "totalPages", but "found".
-    // We can calculate: found / results.length
-
-    if (json.data.length === 0) return 1;
-
-    const itemsPerPage = json.data.length; // Approximate
-    return Math.ceil(json.found / itemsPerPage);
-  } catch {
-    return 1;
+    return json.found;
+  } catch (error) {
+    console.error('Error fetching Enchor API:', error);
+    throw error;
   }
 }
 

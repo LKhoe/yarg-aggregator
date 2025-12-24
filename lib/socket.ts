@@ -15,6 +15,7 @@ const connectedDevices: Map<string, { deviceId: string; deviceName: string; last
 
 export const initSocket = (res: NextApiResponseWithSocket) => {
   if (res.socket.server.io) {
+    ioInstance = res.socket.server.io; // Added to capture existing instance
     return res.socket.server.io;
   }
 
@@ -35,7 +36,7 @@ export const initSocket = (res: NextApiResponseWithSocket) => {
         deviceName,
         lastSeen: new Date(),
       });
-      
+
       // Broadcast updated device list to all clients
       io.emit('devices:update', Array.from(connectedDevices.values()));
       console.log(`Device registered: ${deviceName} (${deviceId})`);
@@ -85,8 +86,25 @@ export const initSocket = (res: NextApiResponseWithSocket) => {
   }, 10000); // Check every 10 seconds
 
   res.socket.server.io = io;
+  ioInstance = io; // Added to capture new instance
   return io;
 };
+
+// Start: Added for server-side usage
+let ioInstance: SocketIOServer | null = null;
+
+export const getIO = () => {
+  if (ioInstance) return ioInstance;
+  // This is a workaround to get the IO instance if it's attached to global 
+  // (which might happen in dev mode or if we attach it manually)
+  // Ideally, we should pass the io instance down, but for service usage, 
+  // we might need a singleton accessor or similar pattern.
+  // For now, let's rely on the fact that initSocket assigns it to res.socket.server.io
+  // We can try to capture it when initSocket is called.
+  return ioInstance;
+};
+
+// End: Added for server-side usage
 
 // Get all connected devices
 export const getConnectedDevices = () => {
