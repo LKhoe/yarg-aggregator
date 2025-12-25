@@ -5,34 +5,34 @@ export interface IProviderStatsDocument extends Omit<IProviderStats, '_id'>, Doc
 
 
 const FiledJobsSchema = new Schema<IFailedJob>(
-    {
-        initIndex: { type: Number, required: true },
-        endIndex: { type: Number, required: true },
-    },
-    { _id: true }
+  {
+    initIndex: { type: Number, required: true },
+    endIndex: { type: Number, required: true },
+  },
+  { _id: true }
 );
 
 const ProviderStatsSchema = new Schema<IProviderStatsDocument>(
-    {
-        source: {
-            type: String,
-            enum: ['enchor', 'rhythmverse'],
-            required: true,
-            unique: true,
-            index: true,
-        },
-        totalFetched: { type: Number, default: 0 },
-        totalAvailable: { type: Number, default: 0 },
-        failedJobs: [FiledJobsSchema],
-        isRunning: { type: Boolean, default: false },
-        lastFetchedAt: { type: Date },
+  {
+    source: {
+      type: String,
+      enum: ['enchor', 'rhythmverse'],
+      required: true,
+      unique: true,
+      index: true,
     },
-    {
-        timestamps: true
-    }
+    totalFetched: { type: Number, default: 0 },
+    totalAvailable: { type: Number, default: 0 },
+    failedJobs: [FiledJobsSchema],
+    isRunning: { type: Boolean, default: false },
+    lastFetchedAt: { type: Date },
+  },
+  {
+    timestamps: true
+  }
 );
 
 const ProviderStats: Model<IProviderStatsDocument> =
-    mongoose.models.ProviderStats || mongoose.model<IProviderStatsDocument>('ProviderStats', ProviderStatsSchema);
+  mongoose.models.ProviderStats || mongoose.model<IProviderStatsDocument>('ProviderStats', ProviderStatsSchema);
 
 export default ProviderStats;

@@ -1,5 +1,7 @@
 'use client';
 
+import { io } from 'socket.io-client';
+
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,9 +44,55 @@ export default function ProviderPanel() {
   const [source, setSource] = useState<ProviderSource>('all');
   const [isRunning, setIsRunning] = useState(false);
   const [recordsToFetch, setRecordsToFetch] = useState(10);
-  const [jobId, setJobId] = useState<string | null>(null);
   const [progress, setProgress] = useState<JobProgress | null>(null);
   const [stats, setStats] = useState<ProviderStat[]>([]);
+
+  useEffect(() => {
+    // Initialize socket route
+    //fetch('/api/socket');
+
+    const socket = io({
+      path: '/api/socket',
+      addTrailingSlash: false,
+    });
+
+    socket.on('connect', () => {
+      console.log('Socket connected', socket.id);
+    });
+
+    socket.on('provider:progress', (data: any) => {
+      setIsRunning(true);
+      const { source, page, count, active, completed, failed, waiting, delayed, total } = data;
+
+      // Calculate percentage based on completed jobs vs total jobs
+      const percent = total > 0 ? Math.round(((completed) / total) * 100) : 0;
+
+      setProgress({
+        status: 'running',
+        progress: percent,
+        currentSource: source,
+        currentPage: page,
+        songsProcessed: count, // This is just for the current chunk, ideally we accumulate or show "Last chunk: X songs"
+        jobsCompleted: completed,
+        jobsTotal: total,
+        totalSaved: completed * 10 + count, // Approximate, or update from BE
+        // We can also use totals to imply "saved" if we assume pageSize. 
+        // Better to rely on the event data if we add 'upsertedCount' to it later?
+        // For now, let's just show job progress.
+      });
+    });
+
+    socket.on('provider:drained', () => {
+      setIsRunning(false);
+      setProgress(prev => prev ? { ...prev, status: 'completed', progress: 100 } : null);
+      toast.success('Provider fetch completed!');
+      fetchStats(); // Refresh stats
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -57,6 +105,28 @@ export default function ProviderPanel() {
       console.error('Error fetching stats:', error);
     }
   }, []);
+
+  // Check for running jobs on load (Late Joiner)
+  useEffect(() => {
+    if (stats.length > 0) {
+      const runningProvider = stats.find(s => s.isRunning);
+      if (runningProvider && (runningProvider as any).queueStats) {
+        setIsRunning(true);
+        const qs = (runningProvider as any).queueStats;
+        const total = qs.total;
+        const completed = qs.completed;
+        const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        setProgress({
+          status: 'running',
+          progress: percent,
+          currentSource: runningProvider.source,
+          jobsCompleted: completed,
+          jobsTotal: total,
+        });
+      }
+    }
+  }, [stats]);
 
   useEffect(() => {
     fetchStats();
@@ -74,7 +144,7 @@ export default function ProviderPanel() {
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const { jobNames } = await response.json();
       } else {
         setIsRunning(false);
         toast.error('Failed to start fetch job');

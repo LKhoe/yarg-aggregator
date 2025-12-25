@@ -3,6 +3,7 @@ import connectDB from '@/lib/db';
 import ProviderStats from '@/models/ProviderStats';
 import Music from '@/models/Music';
 import { getEnchorSongs, getRhythmverseSongs } from '@/services/providers';
+import { providerQueue } from '@/lib/queue';
 
 export async function POST(request: NextRequest) {
   try {
@@ -123,11 +124,9 @@ export async function POST(request: NextRequest) {
       }
     }));
 
-    // Import dynamically to avoid build-time issues if possible, but route.ts is server-only.
-    const { providerQueue } = await import('@/lib/queue');
     await providerQueue.addBulk(jobData);
 
-    return NextResponse.json({ success: true, message: 'Provider fetch started' });
+    return NextResponse.json({ success: true, message: 'Provider fetch started', jobNames: jobData.map(job => job.name) });
   } catch (error) {
     console.error('Error starting provider:', error);
     return NextResponse.json(
@@ -142,7 +141,28 @@ export async function GET(request: NextRequest) {
     await connectDB();
     // Use projection to exclude _id and __v, and lean() for plain JS objects
     const providerData = await ProviderStats.find({}, { _id: 0, __v: 0 }).lean();
-    return NextResponse.json(providerData);
+
+    const activeCount = await providerQueue.getActiveCount();
+    const waitingCount = await providerQueue.getWaitingCount();
+    const completedCount = await providerQueue.getCompletedCount();
+    const failedCount = await providerQueue.getFailedCount();
+    const delayedCount = await providerQueue.getDelayedCount();
+
+    const queueStats = {
+      active: activeCount,
+      waiting: waitingCount,
+      completed: completedCount,
+      failed: failedCount,
+      delayed: delayedCount,
+      total: activeCount + waitingCount + completedCount + failedCount + delayedCount
+    };
+
+    const enrichedData = providerData.map(stat => ({
+      ...stat,
+      queueStats: stat.isRunning ? queueStats : null
+    }));
+
+    return NextResponse.json(enrichedData);
   } catch (error) {
     console.error('Error getting provider status:', error);
     return NextResponse.json(
