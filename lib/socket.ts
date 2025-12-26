@@ -10,12 +10,16 @@ export type NextApiResponseWithSocket = NextApiResponse & {
   };
 };
 
+declare global {
+  var io: SocketIOServer | undefined;
+}
+
 // Store connected devices
-const connectedDevices: Map<string, { deviceId: string; deviceName: string; lastSeen: Date }> = new Map();
+const connectedDevices: Map<string, { deviceId: string; deviceName: string; lastSeen: Date; socketId: string }> = new Map();
 
 export const initSocket = (res: NextApiResponseWithSocket) => {
   if (res.socket.server.io) {
-    ioInstance = res.socket.server.io; // Added to capture existing instance
+    globalThis.io = res.socket.server.io;
     return res.socket.server.io;
   }
 
@@ -35,6 +39,7 @@ export const initSocket = (res: NextApiResponseWithSocket) => {
         deviceId,
         deviceName,
         lastSeen: new Date(),
+        socketId: socket.id, // Store socket ID for direct messaging
       });
 
       // Broadcast updated device list to all clients
@@ -42,11 +47,32 @@ export const initSocket = (res: NextApiResponseWithSocket) => {
       console.log(`Device registered: ${deviceName} (${deviceId})`);
     });
 
+    // Handle sending songs to another user
+    socket.on('songs:send', (payload: { toDeviceId: string; songs: any[] }) => {
+      const { toDeviceId, songs } = payload;
+      const targetDevice = connectedDevices.get(toDeviceId);
+
+      // Find the sender's info using the socket ID (or we could pass it in payload)
+      // Ideally we trust the socket association
+      const senderDevice = Array.from(connectedDevices.values()).find(d => d.socketId === socket.id);
+      const fromDeviceName = senderDevice ? senderDevice.deviceName : 'Unknown User';
+
+      if (targetDevice) {
+        console.log(`Sending ${songs.length} songs from ${fromDeviceName} to ${targetDevice.deviceName}`);
+        io.to(targetDevice.socketId).emit('songs:receive', {
+          fromDeviceName,
+          songs,
+        });
+      } else {
+        console.warn(`Target device ${toDeviceId} not found`);
+      }
+    });
+
     // Handle device disconnection
     socket.on('disconnect', () => {
       // Find and remove the disconnected device
       for (const [deviceId, device] of connectedDevices.entries()) {
-        if (device.deviceId === socket.id) {
+        if (device.deviceId === socket.id || device.socketId === socket.id) { // Check both just in case
           connectedDevices.delete(deviceId);
           // Broadcast updated device list to all clients
           io.emit('devices:update', Array.from(connectedDevices.values()));
@@ -61,6 +87,7 @@ export const initSocket = (res: NextApiResponseWithSocket) => {
       const device = connectedDevices.get(deviceId);
       if (device) {
         device.lastSeen = new Date();
+        device.socketId = socket.id; // Update socket ID just in case of reconnect
         connectedDevices.set(deviceId, device);
       }
     });
@@ -86,25 +113,14 @@ export const initSocket = (res: NextApiResponseWithSocket) => {
   }, 10000); // Check every 10 seconds
 
   res.socket.server.io = io;
-  ioInstance = io; // Added to capture new instance
+  globalThis.io = io;
   return io;
 };
 
-// Start: Added for server-side usage
-let ioInstance: SocketIOServer | null = null;
-
 export const getIO = () => {
-  if (ioInstance) return ioInstance;
-  // This is a workaround to get the IO instance if it's attached to global 
-  // (which might happen in dev mode or if we attach it manually)
-  // Ideally, we should pass the io instance down, but for service usage, 
-  // we might need a singleton accessor or similar pattern.
-  // For now, let's rely on the fact that initSocket assigns it to res.socket.server.io
-  // We can try to capture it when initSocket is called.
-  return ioInstance;
+  if (globalThis.io) return globalThis.io;
+  return null;
 };
-
-// End: Added for server-side usage
 
 // Get all connected devices
 export const getConnectedDevices = () => {

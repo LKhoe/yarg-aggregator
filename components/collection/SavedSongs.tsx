@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -10,9 +9,7 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Trash2, Heart, Music, Download } from 'lucide-react';
-import type { ISavedSong } from '@/types';
 import { useSavedSongs } from '@/context/SavedSongsContext';
 import {
     AlertDialog,

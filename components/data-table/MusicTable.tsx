@@ -12,7 +12,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -32,11 +31,6 @@ import {
   Search,
   Download,
   Music,
-  Drum,
-  Guitar,
-  Mic,
-  Piano,
-  Filter,
   Heart,
 } from 'lucide-react';
 import type { IMusic, PaginatedResponse } from '@/types';

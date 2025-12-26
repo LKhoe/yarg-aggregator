@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import MusicTable from '@/components/data-table/MusicTable';
 import ProviderPanel from '@/components/providers/ProviderPanel';
+import SocialPanel from '@/components/social/SocialPanel';
 import SavedSongs from '@/components/collection/SavedSongs';
 import { SavedSongsProvider } from '@/context/SavedSongsContext';
 import { Button } from '@/components/ui/button';
@@ -122,6 +123,7 @@ export default function HomePage() {
 
             {/* Sidebar */}
             <aside className="space-y-6">
+              <SocialPanel deviceId={deviceId} deviceName={deviceName} />
               <ProviderPanel />
               <SavedSongs
                 deviceId={deviceId}

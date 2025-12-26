@@ -47,53 +47,6 @@ export default function ProviderPanel() {
   const [progress, setProgress] = useState<JobProgress | null>(null);
   const [stats, setStats] = useState<ProviderStat[]>([]);
 
-  useEffect(() => {
-    // Initialize socket route
-    //fetch('/api/socket');
-
-    const socket = io({
-      path: '/api/socket',
-      addTrailingSlash: false,
-    });
-
-    socket.on('connect', () => {
-      console.log('Socket connected', socket.id);
-    });
-
-    socket.on('provider:progress', (data: any) => {
-      setIsRunning(true);
-      const { source, page, count, active, completed, failed, waiting, delayed, total } = data;
-
-      // Calculate percentage based on completed jobs vs total jobs
-      const percent = total > 0 ? Math.round(((completed) / total) * 100) : 0;
-
-      setProgress({
-        status: 'running',
-        progress: percent,
-        currentSource: source,
-        currentPage: page,
-        songsProcessed: count, // This is just for the current chunk, ideally we accumulate or show "Last chunk: X songs"
-        jobsCompleted: completed,
-        jobsTotal: total,
-        totalSaved: completed * 10 + count, // Approximate, or update from BE
-        // We can also use totals to imply "saved" if we assume pageSize. 
-        // Better to rely on the event data if we add 'upsertedCount' to it later?
-        // For now, let's just show job progress.
-      });
-    });
-
-    socket.on('provider:drained', () => {
-      setIsRunning(false);
-      setProgress(prev => prev ? { ...prev, status: 'completed', progress: 100 } : null);
-      toast.success('Provider fetch completed!');
-      fetchStats(); // Refresh stats
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
-
   const fetchStats = useCallback(async () => {
     try {
       const response = await fetch('/api/providers');
@@ -105,6 +58,60 @@ export default function ProviderPanel() {
       console.error('Error fetching stats:', error);
     }
   }, []);
+
+  useEffect(() => {
+    let socket: any;
+
+    const initSocket = async () => {
+      try {
+        await fetch('/api/socket');
+
+        socket = io({
+          path: '/api/socket',
+          addTrailingSlash: false,
+        });
+
+        socket.on('connect', () => {
+          console.log('Socket connected', socket.id);
+        });
+
+        socket.on('provider:progress', (data: any) => {
+          setIsRunning(true);
+          const { source, page, count, active, completed, failed, waiting, delayed, total } = data;
+
+          // Calculate percentage based on completed jobs vs total jobs
+          const percent = total > 0 ? Math.round(((completed) / total) * 100) : 0;
+
+          setProgress({
+            status: 'running',
+            progress: percent,
+            currentSource: source,
+            currentPage: page,
+            songsProcessed: count,
+            jobsCompleted: completed,
+            jobsTotal: total,
+            totalSaved: completed * 10 + count,
+          });
+        });
+
+        socket.on('provider:drained', () => {
+          setProgress(prev => prev ? { ...prev, status: 'completed', progress: 100 } : null);
+          toast.success('Provider fetch completed!');
+          fetchStats(); // Refresh stats
+          setIsRunning(false);
+        });
+
+      } catch (error) {
+        console.error('Failed to initialize socket', error);
+      }
+    };
+
+    initSocket();
+
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, [fetchStats]);
 
   // Check for running jobs on load (Late Joiner)
   useEffect(() => {
@@ -134,7 +141,14 @@ export default function ProviderPanel() {
 
   const startFetch = async () => {
     setIsRunning(true);
-    setProgress(null);
+    // Set initial progress state to show the UI immediately
+    setProgress({
+      status: 'starting',
+      progress: 0,
+      currentSource: source !== 'all' ? source : undefined,
+      jobsCompleted: 0,
+      jobsTotal: 0, // Will be updated by socket
+    });
 
     try {
       const response = await fetch('/api/providers', {
@@ -143,21 +157,22 @@ export default function ProviderPanel() {
         body: JSON.stringify({ source, amount: recordsToFetch }),
       });
 
-      if (response.ok) {
-        const { jobNames } = await response.json();
-      } else {
+      if (!response.ok) {
         setIsRunning(false);
+        setProgress(null);
         toast.error('Failed to start fetch job');
       }
     } catch (error) {
       toast.error(`Failed to start fetch job: ${error}`);
       setIsRunning(false);
+      setProgress(null);
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'running': return 'bg-blue-500';
+      case 'starting': return 'bg-yellow-500';
       case 'completed': return 'bg-green-500';
       case 'failed': return 'bg-red-500';
       default: return 'bg-gray-500';
@@ -268,34 +283,6 @@ export default function ProviderPanel() {
               <div className="flex justify-between text-sm">
                 <span>Current Source</span>
                 <span className="capitalize">{progress.currentSource}</span>
-              </div>
-            )}
-
-            {progress.songsProcessed !== undefined && progress.totalSongs && (
-              <div className="flex justify-between text-sm">
-                <span>Session Records</span>
-                <span>{progress.songsProcessed} / {progress.totalSongs}</span>
-              </div>
-            )}
-
-            {progress.jobsCompleted !== undefined && progress.jobsTotal !== undefined && (
-              <div className="flex justify-between text-sm">
-                <span>Jobs</span>
-                <span>{progress.jobsCompleted} / {progress.jobsTotal}</span>
-              </div>
-            )}
-
-            {progress.totalAvailable !== undefined && (
-              <div className="flex justify-between text-sm">
-                <span>Provider Total</span>
-                <span>{progress.totalAvailable}</span>
-              </div>
-            )}
-
-            {progress.totalSaved !== undefined && (
-              <div className="flex justify-between text-sm font-medium text-primary">
-                <span>Total Saved (Overall)</span>
-                <span>{progress.totalSaved}</span>
               </div>
             )}
 

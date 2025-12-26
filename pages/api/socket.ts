@@ -1,5 +1,4 @@
-import { Server as SocketIOServer } from 'socket.io';
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiRequest } from 'next';
 import type { NextApiResponseWithSocket } from '@/lib/socket';
 import { initSocket } from '@/lib/socket';
 

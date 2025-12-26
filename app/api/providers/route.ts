@@ -31,7 +31,6 @@ export async function POST(request: NextRequest) {
       // Double check with queue if it's really running?
       // For now trusting the DB flag, but user asked: "The isRunning logic inside the providerstats should consider if there is any worker running"
       // Let's check active counts from queue
-      const { providerQueue } = await import('@/lib/queue');
       const activeCount = await providerQueue.getActiveCount();
       const waitingCount = await providerQueue.getWaitingCount();
 
@@ -126,7 +125,7 @@ export async function POST(request: NextRequest) {
 
     await providerQueue.addBulk(jobData);
 
-    return NextResponse.json({ success: true, message: 'Provider fetch started', jobNames: jobData.map(job => job.name) });
+    return NextResponse.json({ success: true, message: 'Provider fetch started' });
   } catch (error) {
     console.error('Error starting provider:', error);
     return NextResponse.json(
