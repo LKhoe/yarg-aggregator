@@ -53,9 +53,10 @@ Ensure you have the following installed:
 4.  **Start Infrastructure:**
     Start the required MongoDB and Redis services using Docker:
     ```bash
-    docker-compose up -d
+    docker compose -f docker-compose-dev.yml up -d
     ```
-    *Note: Ensure you have a `docker-compose.yml` configured for these services, or install them locally.*
+    *Note: For production, use `docker-compose.yml` instead.*
+    *Note2: You'll need to donwload and load the MongoDB image from [MongoDB - Raspberry Pi - Themattman](https://github.com/themattman/mongodb-raspberrypi-docker?tab=readme-ov-file).*
 
 5.  **Run the Application:**
     ```bash

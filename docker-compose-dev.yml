@@ -1,31 +1,26 @@
 services:
-  yarg-aggregator:
+  app:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
     environment:
-      - MONGODB_URI=mongodb://yarg-aggregator-mongo-1:27017/yarg_db
-      - REDIS_HOST=yarg-aggregator-redis-1
+      - MONGODB_URI=mongodb://mongo:27017/yarg_db
+      - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - NEXT_PUBLIC_APP_URL=http://yarg-aggregator.7212.qzz.io:3000
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
     depends_on:
       - mongo
     restart: unless-stopped
-    networks:
-      - yarg-network
-      - tunnel
 
   mongo:
-    image: mongodb-raspberrypi4-unofficial-r7.0.4:latest
+    image: mongo:7
     ports:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
     restart: unless-stopped
-    networks:
-      - yarg-network
 
   redis:
     image: redis:7-alpine
@@ -34,15 +29,7 @@ services:
     volumes:
       - redis_data:/data
     restart: unless-stopped
-    networks:
-      - yarg-network
 
 volumes:
   mongo_data:
   redis_data:
-
-networks:
-  yarg-network:
-    driver: bridge
-  tunnel:
-    external: true
