@@ -1,4 +1,6 @@
 import type { ProviderMusic } from '@/types';
+import fs from 'fs';
+import path from 'path';
 
 const RHYTHMVERSE_BASE_URL = 'https://rhythmverse.co';
 const RHYTHMVERSE_API_URL = 'https://rhythmverse.co/api/yarg/songfiles/list';
@@ -20,7 +22,8 @@ interface RhythmVerseResponse {
   };
 }
 
-interface RhythmVerseSongEntry {
+
+export interface RhythmVerseSongEntry {
   data: {
     song_id: number;
     title: string;
@@ -33,7 +36,7 @@ interface RhythmVerseSongEntry {
     diff_keys: string | null;
     diff_prokeys: string | null;
     update_date: string;
-    charter?: string; // Not typically in 'data' but maybe?
+    charter?: string;
     album_art: string | null;
   };
   file: {
@@ -50,6 +53,39 @@ interface RhythmVerseSongEntry {
       name: string;
     };
   };
+}
+
+export function parseRhythmverseData(songs: RhythmVerseSongEntry[]): ProviderMusic[] {
+  return songs.map((entry) => {
+    const { data, file } = entry;
+    // Prefer file data, fallback to data
+    const name = file.file_title || data.title;
+    const artist = file.file_artist || data.artist;
+    const album = file.file_album || data.album;
+
+    const downloadUrl = file.download_page_url_full;
+    const coverUrl = `${RHYTHMVERSE_BASE_URL}${data.album_art}`;
+
+    return {
+      name,
+      artist,
+      album,
+      coverUrl,
+      downloadUrl,
+      sourceUpdatedAt: !isNaN(Date.parse(data.update_date)) ? new Date(data.update_date) : new Date(),
+      year: file.file_year || undefined,
+      genre: file.file_genre || undefined,
+      charter: file.author?.name || undefined,
+      instruments: {
+        drums: parseDifficulty(data.diff_drums),
+        bass: parseDifficulty(data.diff_bass),
+        guitar: parseDifficulty(data.diff_guitar),
+        prokeys: parseDifficulty(data.diff_prokeys) || parseDifficulty(data.diff_keys),
+        vocals: parseDifficulty(data.diff_vocals),
+      },
+      rawData: entry,
+    };
+  });
 }
 
 export async function fetchRhythmverse(
@@ -87,42 +123,20 @@ export async function fetchRhythmverse(
 
     const json = (await response.json()) as RhythmVerseResponse;
 
+    try {
+      const logPath = path.join(process.cwd(), 'rhythmverse-debug.json');
+      await fs.promises.appendFile(logPath, JSON.stringify(json, null, 2) + '\n\n');
+      console.log(`Logged response to ${logPath}`);
+    } catch (err) {
+      console.error('Failed to write log file:', err);
+    }
+
     if (json.status !== 'success') {
       throw new Error(`RhythmVerse API returned status: ${json.status}`);
     }
 
-    const { songs, records } = json.data;
-
-    const results: ProviderMusic[] = songs.map((entry) => {
-      const { data, file } = entry;
-      // Prefer file data, fallback to data
-      const name = file.file_title || data.title;
-      const artist = file.file_artist || data.artist;
-      const album = file.file_album || data.album;
-
-      const downloadUrl = file.download_page_url_full;
-      const coverUrl = `${RHYTHMVERSE_BASE_URL}${data.album_art}`;
-
-      return {
-        name,
-        artist,
-        album,
-        coverUrl,
-        downloadUrl,
-        sourceUpdatedAt: !isNaN(Date.parse(data.update_date)) ? new Date(data.update_date) : new Date(),
-        year: file.file_year || undefined,
-        genre: file.file_genre || undefined,
-        charter: file.author?.name || undefined,
-        instruments: {
-          drums: parseDifficulty(data.diff_drums),
-          bass: parseDifficulty(data.diff_bass),
-          guitar: parseDifficulty(data.diff_guitar),
-          prokeys: parseDifficulty(data.diff_prokeys) || parseDifficulty(data.diff_keys),
-          vocals: parseDifficulty(data.diff_vocals),
-        },
-        rawData: entry,
-      };
-    });
+    const { songs } = json.data;
+    const results = parseRhythmverseData(songs);
 
     console.log(`Fetched ${results.length} songs from RhythmVerse API page ${page}`);
 

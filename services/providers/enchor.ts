@@ -12,7 +12,8 @@ interface EnchorResponse {
   data: EnchorSong[];
 }
 
-interface EnchorSong {
+
+export interface EnchorSong {
   name: string;
   artist: string;
   album: string;
@@ -30,6 +31,33 @@ interface EnchorSong {
   albumArtMd5: string;
   uploaded_at: string; // "2023-10-27T..."
   drivePath: string;
+}
+
+export function parseEnchorData(songs: EnchorSong[]): ProviderMusic[] {
+  return songs.map((song) => {
+    const downloadUrl = `${ENCHOR_BASE_URL}/download?md5=${song.md5}&isSng=false&downloadNovideoVersion=false&filename=${song.drivePath} (${song.charter})`;
+    const coverUrl = `${ENCHOR_FILES_URL}/${song.albumArtMd5}.jpg`;
+
+    return {
+      name: song.name,
+      artist: song.artist,
+      album: song.album,
+      coverUrl: coverUrl,
+      downloadUrl: downloadUrl,
+      sourceUpdatedAt: !isNaN(Date.parse(song.uploaded_at)) ? new Date(song.uploaded_at) : new Date(),
+      year: parseInt(song.year, 10) || undefined,
+      genre: song.genre,
+      charter: song.charter,
+      instruments: {
+        drums: song.diff_drums === -1 ? undefined : song.diff_drums,
+        bass: song.diff_bass === -1 ? undefined : song.diff_bass,
+        guitar: song.diff_guitar === -1 ? undefined : song.diff_guitar,
+        prokeys: song.diff_keys === -1 ? undefined : song.diff_keys,
+        vocals: song.diff_vocals === -1 ? undefined : song.diff_vocals,
+      },
+      rawData: song,
+    };
+  });
 }
 
 export async function fetchEnchor(
@@ -95,30 +123,7 @@ export async function fetchEnchor(
     const json = (await response.json()) as EnchorResponse;
     const { data } = json;
 
-    const results: ProviderMusic[] = data.map((song) => {
-      const downloadUrl = `${ENCHOR_BASE_URL}/download?md5=${song.md5}&isSng=false&downloadNovideoVersion=false&filename=${song.drivePath} (${song.charter})`;
-      const coverUrl = `${ENCHOR_FILES_URL}/${song.albumArtMd5}.jpg`;
-
-      return {
-        name: song.name,
-        artist: song.artist,
-        album: song.album,
-        coverUrl: coverUrl,
-        downloadUrl: downloadUrl,
-        sourceUpdatedAt: !isNaN(Date.parse(song.uploaded_at)) ? new Date(song.uploaded_at) : new Date(),
-        year: parseInt(song.year, 10) || undefined,
-        genre: song.genre,
-        charter: song.charter,
-        instruments: {
-          drums: song.diff_drums === -1 ? undefined : song.diff_drums,
-          bass: song.diff_bass === -1 ? undefined : song.diff_bass,
-          guitar: song.diff_guitar === -1 ? undefined : song.diff_guitar,
-          prokeys: song.diff_keys === -1 ? undefined : song.diff_keys,
-          vocals: song.diff_vocals === -1 ? undefined : song.diff_vocals,
-        },
-        rawData: song,
-      };
-    });
+    const results = parseEnchorData(data);
 
     console.log(`Fetched ${results.length} songs from Enchor API page ${page}`);
 

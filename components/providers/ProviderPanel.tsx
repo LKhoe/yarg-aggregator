@@ -94,6 +94,22 @@ export default function ProviderPanel() {
           });
         });
 
+        socket.on('provider:failed', (data: any) => {
+          setIsRunning(false);
+          const { source, page, error } = data;
+          setProgress({
+            status: 'failed',
+            progress: 0,
+            currentSource: source,
+            currentPage: page,
+            songsProcessed: 0,
+            jobsCompleted: 0,
+            jobsTotal: 0,
+            totalSaved: 0,
+          });
+          toast.error(`Provider fetch failed for ${source} page ${page}: ${error}`);
+        });
+
         socket.on('provider:drained', () => {
           setProgress(prev => prev ? { ...prev, status: 'completed', progress: 100 } : null);
           toast.success('Provider fetch completed!');
@@ -169,6 +185,38 @@ export default function ProviderPanel() {
     }
   };
 
+  const retryFailedJobs = async (targetSource: string) => {
+    setIsRunning(true);
+    setProgress({
+      status: 'retrying',
+      progress: 0,
+      currentSource: targetSource,
+      jobsCompleted: 0,
+      jobsTotal: 0,
+    });
+
+    try {
+      const response = await fetch('/api/providers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: targetSource, retryFailed: true }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        setIsRunning(false);
+        setProgress(null);
+        toast.error(`Failed to retry jobs: ${errorData.error}`);
+      } else {
+        toast.success(`Retrying failed jobs for ${targetSource}`);
+      }
+    } catch (error) {
+      toast.error(`Failed to retry jobs: ${error}`);
+      setIsRunning(false);
+      setProgress(null);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'running': return 'bg-blue-500';
@@ -196,6 +244,7 @@ export default function ProviderPanel() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Source</label>
               <div className="flex gap-2">
+
                 <Select value={source} onValueChange={(v) => setSource(v as ProviderSource)}>
                   <SelectTrigger className="flex-1">
                     <SelectValue placeholder="Select source" />
@@ -208,15 +257,76 @@ export default function ProviderPanel() {
                 </Select>
               </div>
 
-              {/* Provider Stats Display */}
               <div className="grid grid-cols-2 gap-2 mt-2">
                 {['enchor', 'rhythmverse'].map((src) => {
                   const stat = stats.find((s) => s.source === src);
+                  const hasFailedJobs = stat?.failedJobs && stat.failedJobs.length > 0;
+
                   return (
-                    <div key={src} className="bg-muted/50 p-2 rounded-md border">
-                      <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">
-                        {src === 'enchor' ? 'Enchor.us' : 'Rhythmverse'}
-                      </p>
+                    <div key={src} className="bg-muted/50 p-2 rounded-md border text-sm">
+                      <div className="flex justify-between items-center mb-1">
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground">
+                          {src === 'enchor' ? 'Enchor.us' : 'Rhythmverse'}
+                        </p>
+                        <div className="flex gap-1">
+                          <input
+                            type="file"
+                            id={`upload-${src}`}
+                            className="hidden"
+                            accept=".zip"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const formData = new FormData();
+                                formData.append('file', file);
+                                formData.append('source', src);
+
+                                toast.promise(
+                                  fetch('/api/providers/upload', {
+                                    method: 'POST',
+                                    body: formData,
+                                  }).then(async (res) => {
+                                    if (!res.ok) throw new Error(await res.text());
+                                    return res.json();
+                                  }),
+                                  {
+                                    loading: 'Uploading...',
+                                    success: (data) => {
+                                      fetchStats();
+                                      return data.message;
+                                    },
+                                    error: (err) => `Upload failed: ${err.message}`,
+                                  }
+                                );
+                              }
+                              // Reset the input so the same file can be selected again if needed
+                              e.target.value = '';
+                            }}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5"
+                            onClick={() => document.getElementById(`upload-${src}`)?.click()}
+                            title="Upload Zip"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="w-3 h-3"
+                            >
+                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                              <polyline points="17 8 12 3 7 8" />
+                              <line x1="12" x2="12" y1="3" y2="15" />
+                            </svg>
+                          </Button>
+                        </div>
+                      </div>
                       <div className="flex items-baseline gap-1">
                         <span className="text-sm font-semibold">{stat?.totalFetched || 0}</span>
                         <span className="text-[10px] text-muted-foreground italic">/ {stat?.totalAvailable || 0}</span>
@@ -229,6 +339,18 @@ export default function ProviderPanel() {
                           />
                         </div>
                       ) : null}
+
+                      {hasFailedJobs && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full mt-2 h-6 text-xs bg-red-50 hover:bg-red-100 text-red-600 border-red-200 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:text-red-400 dark:border-red-800"
+                          onClick={() => retryFailedJobs(src)}
+                          disabled={isRunning}
+                        >
+                          Retry {stat.failedJobs.length} Jobs
+                        </Button>
+                      )}
                     </div>
                   );
                 })}
@@ -246,7 +368,7 @@ export default function ProviderPanel() {
               />
             </div>
 
-            <Button onClick={startFetch} disabled={isRunning} className="w-full cursor-pointer">
+            <Button onClick={startFetch} disabled={isRunning || true} className="w-full cursor-pointer">
               {isRunning ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

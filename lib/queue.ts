@@ -45,6 +45,9 @@ export const initProviderWorker = () => {
         const { songs } = await Promise.race([fetchPromise, timeoutPromise]);
 
         let upsertedCount = 0;
+        let updatedCount = 0;
+        let errors = '';
+
         if (songs.length > 0) {
           const operations = songs.map(song => ({
             updateOne: {
@@ -52,22 +55,24 @@ export const initProviderWorker = () => {
                 name: song.name,
                 artist: song.artist,
                 source: source,
+                instruments: song.instruments
               },
               update: { $set: song },
               upsert: true
             }
           }));
 
-          const bulkResult = await Music.bulkWrite(operations);
+          const bulkResult = await Music.bulkWrite(operations, { ordered: false });
           upsertedCount = bulkResult.upsertedCount;
+          updatedCount = bulkResult.modifiedCount;
+          errors = bulkResult.getWriteErrors().map(e => e.errmsg + ' - ' + e.errInfo).join('\n');
         }
 
-        // Update stats
         // Update stats based on actual insertions
         await ProviderStats.updateOne(
           { source },
           {
-            $inc: { totalFetched: upsertedCount },
+            $inc: { totalFetched: songs.length },
             $set: { lastFetchedAt: new Date() }
           }
         );
@@ -94,7 +99,7 @@ export const initProviderWorker = () => {
           });
         }
 
-        return { count: songs.length, upsertedCount };
+        return { songsLength: songs.length, upsertedCount, updatedCount, errors };
 
       } catch (error: any) {
         console.error(`Job failed for ${source} page ${page}:`, error);
@@ -111,6 +116,15 @@ export const initProviderWorker = () => {
             }
           }
         );
+
+        if (io) {
+          io.emit('provider:failed', {
+            source,
+            page,
+            error: error.message
+          });
+        }
+
         throw error;
       }
     },
@@ -125,7 +139,10 @@ export const initProviderWorker = () => {
   );
 
   worker.on('completed', (job) => {
-    console.log(`Job ${job.id} completed! Fetched ${job.returnvalue?.count} songs. Saved ${job.returnvalue?.upsertedCount} new songs.`);
+    console.log(`Job ${job.id} completed! Fetched ${job.returnvalue?.songsLength} songs. Saved ${job.returnvalue?.upsertedCount} new songs. Updated ${job.returnvalue?.updatedCount} songs.`);
+    if (job.returnvalue?.errors) {
+      console.error(`Job ${job.id} Errors: ${job.returnvalue.errors}`);
+    }
   });
 
   worker.on('failed', (job, err) => {

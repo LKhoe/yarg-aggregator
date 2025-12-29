@@ -8,7 +8,7 @@ import { providerQueue } from '@/lib/queue';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { source, amount = 100 } = body;
+    const { source, amount = 100, retryFailed = false } = body;
 
     if (!['enchor', 'rhythmverse'].includes(source)) {
       return NextResponse.json(
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (isNaN(amount) || amount <= 0) {
+    if (!retryFailed && (isNaN(amount) || amount <= 0)) {
       return NextResponse.json({ error: 'Invalid amount. Must be a number greater than 0' }, { status: 400 });
     }
 
@@ -47,6 +47,55 @@ export async function POST(request: NextRequest) {
     } else if (now - last < 60_000) {
       // Provider is taking too long to finish
       // Should be stopped
+    }
+
+    if (retryFailed) {
+      if (!providerData?.failedJobs || providerData.failedJobs.length === 0) {
+        return NextResponse.json(
+          { error: `No failed jobs found for ${source}` },
+          { status: 400 }
+        );
+      }
+
+      const pageSize = source === 'enchor' ? 10 : 25;
+
+      // Determine sortDirection from current DB state or default to desc? 
+      // Ideally we should have stored sortDirection in failedJobs. 
+      // But we can infer or just toggle. Let's infer as before.
+      const localCount = await Music.countDocuments({ source });
+      const totalAvailable = providerData.totalAvailable || localCount; // Fallback
+      const ratio = totalAvailable > 0 ? localCount / totalAvailable : 0;
+      const sortDirection = ratio < 0.5 ? 'asc' : 'desc';
+
+      const jobData = providerData.failedJobs.map((job: any) => {
+        // failedJobs sotres initIndex and endIndex.
+        // page = (initIndex / pageSize) + 1
+        const page = Math.floor(job.initIndex / pageSize) + 1;
+
+        return {
+          name: `fetch-${source}-${page}-retry`,
+          data: {
+            source: source as 'enchor' | 'rhythmverse',
+            page: page,
+            pageSize: pageSize,
+            sortDirection: sortDirection
+          },
+          opts: {
+            removeOnComplete: true,
+            removeOnFail: false
+          }
+        };
+      });
+
+      await providerQueue.addBulk(jobData);
+
+      // Clear failed jobs from DB as they are now in queue?
+      // Or should we wait? If we don't clear, the user can't start normal fetch.
+      // If we clear, and they fail again, they will be re-added.
+      // So clearing is the right move initiated by the retry action.
+      await ProviderStats.updateOne({ source }, { $set: { failedJobs: [], isRunning: true } });
+
+      return NextResponse.json({ success: true, message: `Retrying ${jobData.length} failed jobs for ${source}` });
     }
 
     if ((providerData?.failedJobs?.length ?? 0) > 0) {

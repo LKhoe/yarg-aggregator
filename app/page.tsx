@@ -18,7 +18,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Music, Zap } from 'lucide-react';
-import type { IMusic } from '@/types';
 import { Toaster } from '@/components/ui/sonner';
 
 export default function HomePage() {
@@ -85,7 +84,7 @@ export default function HomePage() {
               <p className="text-xs text-muted-foreground">Music chart library</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 shadow-lg shadow-primary/30">
             <Zap className="h-4 w-4 text-primary" />
             <span className="text-sm text-foreground/80">
               {deviceName || 'Not registered'}

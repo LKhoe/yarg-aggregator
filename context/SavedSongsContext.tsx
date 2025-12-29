@@ -11,6 +11,8 @@ interface SavedSongsContextType {
     removeSong: (musicId: string) => Promise<void>;
     clearSongs: () => Promise<void>;
     refresh: () => Promise<void>;
+    exportSongs: () => Promise<void>;
+    importSongs: (file: File) => Promise<{ imported: number; skipped: number; errors?: string[] }>;
 }
 
 const SavedSongsContext = createContext<SavedSongsContextType | undefined>(undefined);
@@ -149,6 +151,73 @@ export function SavedSongsProvider({
         }
     }, [deviceId, savedSongs]);
 
+    const exportSongs = useCallback(async () => {
+        if (!deviceId) return;
+
+        try {
+            const response = await fetch('/api/songs/export', {
+                headers: { 'x-device-id': deviceId },
+            });
+
+            if (!response.ok) {
+                console.error('Failed to export songs');
+                return;
+            }
+
+            // Get the blob and trigger download
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `saved-songs-${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Error exporting songs:', error);
+        }
+    }, [deviceId]);
+
+    const importSongs = useCallback(async (file: File) => {
+        if (!deviceId) {
+            throw new Error('Device ID not available');
+        }
+
+        try {
+            // Read the file
+            const text = await file.text();
+            const data = JSON.parse(text);
+
+            // Send to import API
+            const response = await fetch('/api/songs/import', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-device-id': deviceId,
+                    'x-device-name': deviceName || 'Unknown Device',
+                },
+                body: JSON.stringify(data),
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to import songs');
+            }
+
+            const result = await response.json();
+
+            // Refresh the saved songs list
+            await fetchSavedSongs();
+
+            return result;
+        } catch (error) {
+            console.error('Error importing songs:', error);
+            throw error;
+        }
+    }, [deviceId, deviceName, fetchSavedSongs]);
+
+
     const value = useMemo(() => ({
         savedSongs,
         savedSongIds,
@@ -156,8 +225,10 @@ export function SavedSongsProvider({
         addSong,
         removeSong,
         clearSongs,
-        refresh: fetchSavedSongs
-    }), [savedSongs, savedSongIds, isLoading, addSong, removeSong, clearSongs, fetchSavedSongs]);
+        refresh: fetchSavedSongs,
+        exportSongs,
+        importSongs
+    }), [savedSongs, savedSongIds, isLoading, addSong, removeSong, clearSongs, fetchSavedSongs, exportSongs, importSongs]);
 
     return (
         <SavedSongsContext.Provider value={value}>
