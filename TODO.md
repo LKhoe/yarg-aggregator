@@ -1,0 +1,11 @@
+- [ ] Fix the providers endpoint (deactivated to publish)
+- [ ] Add a logic to insert the deserialized songs into the database
+    - [ ] Try to check the corresponding song in the database before inserting
+    - [ ] Keep a list of the deserialized songs, so if the user send a new file, we know that the missing songs should be deleted (if there is no corresponding song in the sources) and the new songs should be inserted (and it there is a corresponding song in the sources, we should update it)
+    - [ ] The songs that comes from the deselialization are the ones that are acctualy installed on the game, so we should show it on the list (maybe with a different color)
+    - [ ] Add a filter to the installed songs
+- [ ] Add a fuzzy search to filter the songs
+- [ ] We should do a cleanup and optimization of the code and update the readme
+- [ ] We should add a section to reference (or implement in typescript) the batch extractor from the [nautilus project](https://github.com/trojannemo/Nautilus)
+- [ ] Add reference to the [YARG.Core](https://github.com/YARC-Official/YARG.Core) project, from where we translated the C# code of the deserializer logic to typescript
+- [ ] Add a disclaimer about the site not beeing related to the yarg project, but a community made tool

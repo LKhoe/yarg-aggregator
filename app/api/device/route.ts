@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       { deviceId },
       {
         $setOnInsert: { deviceId },
-        $set: { deviceName },
+        $set: { deviceName, lastSeenAt: new Date() },
       },
       { upsert: true, new: true }
     );
@@ -40,9 +40,41 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Get all online devices (for sharing)
-export async function GET() {
-  // In a real implementation, this would query connected Socket.io clients
-  // For now, return an empty list - the socket handler manages online devices
-  return NextResponse.json({ devices: [] });
+// Get all users with recent access (for sharing)
+export async function GET(request: NextRequest) {
+  try {
+    await connectDB();
+
+    // Get exclude parameter from query string
+    const { searchParams } = new URL(request.url);
+    const excludeDeviceId = searchParams.get('exclude');
+
+    // Find all users (optionally excluding the requesting device)
+    const query = excludeDeviceId ? { deviceId: { $ne: excludeDeviceId } } : {};
+    const users = await User.find(query, { deviceId: 1, deviceName: 1, lastSeenAt: 1 })
+      .sort({ lastSeenAt: -1 }) // Sort by most recent first
+      .limit(5) // Limit to 5 most recent users
+      .lean();
+
+    // Calculate online status based on lastSeenAt (online if within last 60 seconds)
+    const now = new Date();
+    const ONLINE_THRESHOLD_MS = 60000; // 60 seconds
+
+    const devicesWithStatus = users.map(user => ({
+      deviceId: user.deviceId,
+      deviceName: user.deviceName,
+      isOnline: user.lastSeenAt
+        ? (now.getTime() - new Date(user.lastSeenAt).getTime()) < ONLINE_THRESHOLD_MS
+        : false,
+      lastSeenAt: user.lastSeenAt,
+    }));
+
+    return NextResponse.json({ devices: devicesWithStatus });
+  } catch (error) {
+    console.error('Error getting devices:', error);
+    return NextResponse.json(
+      { error: 'Failed to get devices' },
+      { status: 500 }
+    );
+  }
 }

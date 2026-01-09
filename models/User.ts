@@ -1,16 +1,17 @@
 import mongoose, { Schema, Document, Model, Types } from 'mongoose';
 import type { IUser, ISavedSong } from '@/types';
 
-export interface IUserDocument extends Omit<IUser, '_id' | 'savedSongs'>, Document {
+export interface IUserDocument extends Omit<IUser, '_id' | 'savedSongs' | 'lastSeenAt'>, Document {
+  lastSeenAt: Date;
   savedSongs: (ISavedSong & { _id: Types.ObjectId })[];
 }
 
 const SavedSongSchema = new Schema<ISavedSong>(
   {
-    musicId: { 
-      type: Schema.Types.Mixed, 
-      required: true, 
-      ref: 'Music' 
+    musicId: {
+      type: Schema.Types.Mixed,
+      required: true,
+      ref: 'Music'
     },
     name: { type: String, required: true },
     artist: { type: String, required: true },
@@ -23,6 +24,7 @@ const UserSchema = new Schema<IUserDocument>(
   {
     deviceId: { type: String, required: true, unique: true, index: true },
     deviceName: { type: String, required: true },
+    lastSeenAt: { type: Date, default: Date.now, index: true },
     savedSongs: [SavedSongSchema],
   },
   {

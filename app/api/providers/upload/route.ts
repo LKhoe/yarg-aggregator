@@ -47,10 +47,12 @@ export async function POST(request: NextRequest) {
     const zipEntries = zip.getEntries();
     let totalProcessed = 0;
     let totalSaved = 0;
+    let filesProcessed = 0;
     let songsToUpsert: ProviderMusic[] = [];
 
     for (const entry of zipEntries) {
-      if (entry.isDirectory || !entry.name.endsWith('.json')) continue;
+      if (entry.isDirectory || !entry.name.endsWith('.json') || entry.name.startsWith('.')) continue;
+      filesProcessed++;
 
       try {
         const fileContent = entry.getData().toString('utf8');
@@ -63,9 +65,7 @@ export async function POST(request: NextRequest) {
           // Or maybe just the array? Let's try to detect.
 
           let items: EnchorSong[] = [];
-          if (Array.isArray(json)) {
-            items = json;
-          } else if (json.data && Array.isArray(json.data)) {
+          if (json.data && Array.isArray(json.data)) {
             items = json.data;
           } else {
             console.warn(`Skipping invalid Enchor JSON file: ${entry.name}`);
@@ -120,13 +120,13 @@ export async function POST(request: NextRequest) {
         const batch = bulkOps.slice(i, i + batchSize);
         try {
           const res = await Music.bulkWrite(batch, { ordered: false });
-          totalSaved += (res.upsertedCount + res.modifiedCount);
+          totalSaved += (res.insertedCount + res.upsertedCount);
         } catch (error: any) {
           // Handle duplicate key errors gracefully
           if (error.code === 11000 && error.result) {
             // Some operations succeeded, count them
-            totalSaved += (error.result.nUpserted + error.result.nModified);
-            console.log(`Batch ${i / batchSize + 1}: Processed with ${error.writeErrors?.length || 0} duplicate(s)`);
+            totalSaved += (error.result.insertedCount + error.result.upsertedCount);
+            console.log(`Batch ${i / batchSize + 1}: Processed with ${batch.length - error.writeErrors?.length || 0} duplicate(s)`);
           } else {
             // Re-throw if it's not a duplicate key error
             throw error;
@@ -135,10 +135,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    console.log(`Processed ${totalProcessed} songs from ${filesProcessed} files, saved ${totalSaved} new songs`);
+
     return NextResponse.json({
       success: true,
-      message: `Processed ${totalProcessed} songs, saved/updated ${totalSaved}.`,
-      count: totalSaved
+      message: `Processed ${totalProcessed} songs from ${filesProcessed} files, saved ${totalSaved} new songs.`,
+      count: totalSaved,
     });
 
   } catch (error) {

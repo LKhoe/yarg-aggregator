@@ -1,16 +1,14 @@
 'use client';
 
-import { io } from 'socket.io-client';
-
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Play, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import { NumberInput } from '@/components/ui/number-input';
 
 type ProviderSource = 'all' | 'enchor' | 'rhythmverse';
 
@@ -38,12 +36,19 @@ interface ProviderStat {
   lastFetchedAt?: string;
   isRunning: boolean;
   failedJobs: any[];
+  queueStats?: {
+    active: number;
+    waiting: number;
+    completed: number;
+    failed: number;
+    delayed: number;
+    total: number;
+  };
 }
 
 export default function ProviderPanel() {
   const [source, setSource] = useState<ProviderSource>('all');
-  const [isRunning, setIsRunning] = useState(false);
-  const [recordsToFetch, setRecordsToFetch] = useState(10);
+  const [runningSources, setRunningSources] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<JobProgress | null>(null);
   const [stats, setStats] = useState<ProviderStat[]>([]);
 
@@ -53,140 +58,122 @@ export default function ProviderPanel() {
       if (response.ok) {
         const data = await response.json();
         setStats(data);
+
+        // Update running sources based on stats
+        const currentlyRunning: Set<string> = new Set(
+          data
+            .filter((s: ProviderStat) => s.isRunning)
+            .map((s: ProviderStat) => s.source as string)
+        );
+        setRunningSources(currentlyRunning);
+
+        // Update progress based on running sources
+        const runningProvider = data.find((s: ProviderStat) => s.isRunning && s.queueStats);
+
+        if (runningProvider && runningProvider.queueStats) {
+          const qs = runningProvider.queueStats;
+          const total = qs.total;
+          const completed = qs.completed;
+
+          // If there are no more jobs in the queue, mark as complete
+          if (total === 0 || (qs.active === 0 && qs.waiting === 0 && qs.delayed === 0)) {
+            setRunningSources(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(runningProvider.source);
+              return newSet;
+            });
+            if (progress?.status === 'running') {
+              setProgress(prev => prev ? { ...prev, status: 'completed', progress: 100 } : null);
+              toast.success('Provider fetch completed!');
+            }
+          } else {
+            const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+            setProgress({
+              status: 'running',
+              progress: percent,
+              currentSource: runningProvider.source,
+              jobsCompleted: completed,
+              jobsTotal: total,
+            });
+          }
+        } else if (!data.some((s: ProviderStat) => s.isRunning)) {
+          // No providers are running
+          if (runningSources.size > 0) {
+            setRunningSources(new Set());
+            if (progress?.status === 'running') {
+              setProgress(prev => prev ? { ...prev, status: 'completed', progress: 100 } : null);
+              toast.success('Provider fetch completed!');
+            }
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
-  }, []);
+  }, [progress, runningSources.size]);
 
+  // Initial fetch only
   useEffect(() => {
-    let socket: any;
-
-    const initSocket = async () => {
-      try {
-        await fetch('/api/socket');
-
-        socket = io({
-          path: '/api/socket',
-          addTrailingSlash: false,
-        });
-
-        socket.on('connect', () => {
-          console.log('Socket connected', socket.id);
-        });
-
-        socket.on('provider:progress', (data: any) => {
-          setIsRunning(true);
-          const { source, page, count, active, completed, failed, waiting, delayed, total } = data;
-
-          // Calculate percentage based on completed jobs vs total jobs
-          const percent = total > 0 ? Math.round(((completed) / total) * 100) : 0;
-
-          setProgress({
-            status: 'running',
-            progress: percent,
-            currentSource: source,
-            currentPage: page,
-            songsProcessed: count,
-            jobsCompleted: completed,
-            jobsTotal: total,
-            totalSaved: completed * 10 + count,
-          });
-        });
-
-        socket.on('provider:failed', (data: any) => {
-          setIsRunning(false);
-          const { source, page, error } = data;
-          setProgress({
-            status: 'failed',
-            progress: 0,
-            currentSource: source,
-            currentPage: page,
-            songsProcessed: 0,
-            jobsCompleted: 0,
-            jobsTotal: 0,
-            totalSaved: 0,
-          });
-          toast.error(`Provider fetch failed for ${source} page ${page}: ${error}`);
-        });
-
-        socket.on('provider:drained', () => {
-          setProgress(prev => prev ? { ...prev, status: 'completed', progress: 100 } : null);
-          toast.success('Provider fetch completed!');
-          fetchStats(); // Refresh stats
-          setIsRunning(false);
-        });
-
-      } catch (error) {
-        console.error('Failed to initialize socket', error);
-      }
-    };
-
-    initSocket();
-
-    return () => {
-      if (socket) socket.disconnect();
-    };
-  }, [fetchStats]);
-
-  // Check for running jobs on load (Late Joiner)
-  useEffect(() => {
-    if (stats.length > 0) {
-      const runningProvider = stats.find(s => s.isRunning);
-      if (runningProvider && (runningProvider as any).queueStats) {
-        setIsRunning(true);
-        const qs = (runningProvider as any).queueStats;
-        const total = qs.total;
-        const completed = qs.completed;
-        const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-        setProgress({
-          status: 'running',
-          progress: percent,
-          currentSource: runningProvider.source,
-          jobsCompleted: completed,
-          jobsTotal: total,
-        });
-      }
-    }
-  }, [stats]);
-
-  useEffect(() => {
+    // Initial fetch
     fetchStats();
   }, [fetchStats]);
 
   const startFetch = async () => {
-    setIsRunning(true);
-    // Set initial progress state to show the UI immediately
+    // Determine which sources to fetch
+    const sourcesToFetch = source === 'all' 
+      ? ['enchor', 'rhythmverse'] 
+      : [source];
+
+    // Filter out already running sources
+    const availableSources = sourcesToFetch.filter(src => !runningSources.has(src));
+
+    if (availableSources.length === 0) {
+      toast.error('Selected sources are already running');
+      return;
+    }
+
+    // Set initial progress state
     setProgress({
       status: 'starting',
       progress: 0,
-      currentSource: source !== 'all' ? source : undefined,
+      currentSource: source !== 'all' ? source : 'multiple',
       jobsCompleted: 0,
-      jobsTotal: 0, // Will be updated by socket
+      jobsTotal: 0,
     });
 
-    try {
-      const response = await fetch('/api/providers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source, amount: recordsToFetch }),
-      });
+    // Start fetch for each available source
+    for (const src of availableSources) {
+      try {
+        const response = await fetch('/api/providers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source: src }),
+        });
 
-      if (!response.ok) {
-        setIsRunning(false);
-        setProgress(null);
-        toast.error('Failed to start fetch job');
+        if (!response.ok) {
+          const errorData = await response.json();
+          toast.error(`Failed to start fetch for ${src}: ${errorData.error}`);
+        } else {
+          toast.success(`Started fetch for ${src}`);
+          // Add to running sources immediately
+          setRunningSources(prev => new Set([...prev, src]));
+        }
+      } catch (error) {
+        toast.error(`Failed to start fetch for ${src}: ${error}`);
       }
-    } catch (error) {
-      toast.error(`Failed to start fetch job: ${error}`);
-      setIsRunning(false);
-      setProgress(null);
     }
+
+    // Refresh stats after starting all fetches
+    await fetchStats();
   };
 
   const retryFailedJobs = async (targetSource: string) => {
-    setIsRunning(true);
+    if (runningSources.has(targetSource)) {
+      toast.error(`${targetSource} is already running`);
+      return;
+    }
+
     setProgress({
       status: 'retrying',
       progress: 0,
@@ -204,16 +191,13 @@ export default function ProviderPanel() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        setIsRunning(false);
-        setProgress(null);
-        toast.error(`Failed to retry jobs: ${errorData.error}`);
+        toast.error(`Failed to retry jobs for ${targetSource}: ${errorData.error}`);
       } else {
         toast.success(`Retrying failed jobs for ${targetSource}`);
+        setRunningSources(prev => new Set([...prev, targetSource]));
       }
     } catch (error) {
-      toast.error(`Failed to retry jobs: ${error}`);
-      setIsRunning(false);
-      setProgress(null);
+      toast.error(`Failed to retry jobs for ${targetSource}: ${error}`);
     }
   };
 
@@ -227,8 +211,29 @@ export default function ProviderPanel() {
     }
   };
 
+  const formatLastFetchTime = (lastFetchedAt?: string | Date) => {
+    if (!lastFetchedAt) return 'Never fetched';
+    
+    const date = typeof lastFetchedAt === 'string' ? new Date(lastFetchedAt) : lastFetchedAt;
+    if (isNaN(date.getTime())) return 'Invalid date';
+    
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    
+    return date.toLocaleDateString();
+  };
+
   return (
-    <Card className="w-full">
+    <TooltipProvider>
+      <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <RefreshCw className="h-5 w-5" />
@@ -327,18 +332,23 @@ export default function ProviderPanel() {
                           </Button>
                         </div>
                       </div>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-sm font-semibold">{stat?.totalFetched || 0}</span>
-                        <span className="text-[10px] text-muted-foreground italic">/ {stat?.totalAvailable || 0}</span>
+                      <div className="flex items-center gap-2">
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Badge
+                              variant={runningSources.has(src) ? "default" : "secondary"}
+                              className="text-xs h-4"
+                            >
+                              {runningSources.has(src) ? 'Running' : 'Idle'}
+                            </Badge>
+                          </TooltipTrigger>
+                          {!runningSources.has(src) && (
+                            <TooltipContent>
+                              <p>Last fetch: {formatLastFetchTime(stat?.lastFetchedAt)}</p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
                       </div>
-                      {stat?.totalAvailable ? (
-                        <div className="w-full bg-secondary h-1 rounded-full mt-1 overflow-hidden">
-                          <div
-                            className="bg-primary h-full transition-all duration-500"
-                            style={{ width: `${Math.min(100, (stat.totalFetched / stat.totalAvailable) * 100)}%` }}
-                          />
-                        </div>
-                      ) : null}
 
                       {hasFailedJobs && (
                         <Button
@@ -346,7 +356,7 @@ export default function ProviderPanel() {
                           size="sm"
                           className="w-full mt-2 h-6 text-xs bg-red-50 hover:bg-red-100 text-red-600 border-red-200 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:text-red-400 dark:border-red-800"
                           onClick={() => retryFailedJobs(src)}
-                          disabled={isRunning}
+                          disabled={runningSources.has(src)}
                         >
                           Retry {stat.failedJobs.length} Jobs
                         </Button>
@@ -357,19 +367,8 @@ export default function ProviderPanel() {
               </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Records to Fetch</label>
-              <NumberInput
-                value={recordsToFetch}
-                min={1}
-                max={100}
-                defaultValue={10}
-                onValueChange={(v) => setRecordsToFetch(v || 1)}
-              />
-            </div>
-
-            <Button onClick={startFetch} disabled={isRunning || true} className="w-full cursor-pointer">
-              {isRunning ? (
+            <Button onClick={startFetch} disabled={runningSources.size > 0} className="w-full cursor-pointer">
+              {runningSources.size > 0 ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Fetching...
@@ -425,6 +424,7 @@ export default function ProviderPanel() {
         )}
       </CardContent>
     </Card>
+    </TooltipProvider>
   );
 }
 

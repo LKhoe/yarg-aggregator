@@ -29,8 +29,8 @@ export interface EnchorSong {
   chartId: number;
   md5: string;
   albumArtMd5: string;
-  uploaded_at: string; // "2023-10-27T..."
   drivePath: string;
+  modifiedTime: string; // "2018-06-10T23:15:40.717Z"
 }
 
 export function parseEnchorData(songs: EnchorSong[]): ProviderMusic[] {
@@ -38,24 +38,27 @@ export function parseEnchorData(songs: EnchorSong[]): ProviderMusic[] {
     const downloadUrl = `${ENCHOR_BASE_URL}/download?md5=${song.md5}&isSng=false&downloadNovideoVersion=false&filename=${song.drivePath} (${song.charter})`;
     const coverUrl = `${ENCHOR_FILES_URL}/${song.albumArtMd5}.jpg`;
 
+    if (!song.modifiedTime){
+      console.log('Missing modifiedTime for song:', song.name, song.artist);
+    }
+
     return {
       name: song.name,
       artist: song.artist,
       album: song.album,
       coverUrl: coverUrl,
       downloadUrl: downloadUrl,
-      sourceUpdatedAt: !isNaN(Date.parse(song.uploaded_at)) ? new Date(song.uploaded_at) : new Date(),
+      sourceUpdatedAt: song.modifiedTime ? new Date(song.modifiedTime) : new Date(),
       year: parseInt(song.year, 10) || undefined,
       genre: song.genre,
       charter: song.charter,
       instruments: {
-        drums: song.diff_drums === -1 ? undefined : song.diff_drums,
-        bass: song.diff_bass === -1 ? undefined : song.diff_bass,
-        guitar: song.diff_guitar === -1 ? undefined : song.diff_guitar,
-        prokeys: song.diff_keys === -1 ? undefined : song.diff_keys,
-        vocals: song.diff_vocals === -1 ? undefined : song.diff_vocals,
+        ...(song.diff_drums !== -1 && { drums: song.diff_drums }),
+        ...(song.diff_bass !== -1 && { bass: song.diff_bass }),
+        ...(song.diff_guitar !== -1 && { guitar: song.diff_guitar }),
+        ...(song.diff_keys !== -1 && { prokeys: song.diff_keys }),
+        ...(song.diff_vocals !== -1 && { vocals: song.diff_vocals }),
       },
-      rawData: song,
     };
   });
 }
@@ -64,7 +67,8 @@ export async function fetchEnchor(
   page: number,
   pageSize: number,
   sortDirection: 'asc' | 'desc',
-): Promise<{ songs: ProviderMusic[] }> {
+  latestSourceUpdatedAt?: Date,
+): Promise<{ songs: ProviderMusic[]; shouldStop: boolean }> {
   try {
     console.log(`Fetching Enchor API page ${page} (size: ${pageSize}, sort: ${sortDirection})...`);
 
@@ -125,9 +129,19 @@ export async function fetchEnchor(
 
     const results = parseEnchorData(data);
 
-    console.log(`Fetched ${results.length} songs from Enchor API page ${page}`);
+    // Check if we should stop fetching based on sourceUpdatedAt
+    let shouldStop = false;
+    if (latestSourceUpdatedAt && sortDirection === 'desc') {
+      // When sorting descending, check if any song is older or equal to latestSourceUpdatedAt
+      const oldestSongInPage = results[results.length - 1];
+      if (oldestSongInPage && oldestSongInPage.sourceUpdatedAt) {
+        shouldStop = oldestSongInPage.sourceUpdatedAt <= latestSourceUpdatedAt;
+      }
+    }
 
-    return { songs: results };
+    console.log(`Fetched ${results.length} songs from Enchor API page ${page}, shouldStop: ${shouldStop}`);
+
+    return { songs: results, shouldStop };
   } catch (error) {
     console.error('Error fetching Enchor API:', error);
     throw error;

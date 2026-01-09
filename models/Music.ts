@@ -27,7 +27,6 @@ const MusicSchema = new Schema<IMusicDocument>(
     genre: { type: String, index: true },
     year: { type: Number },
     charter: { type: String },
-    rawData: { type: Schema.Types.Mixed },
   },
   {
     timestamps: true,

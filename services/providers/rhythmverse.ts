@@ -1,6 +1,4 @@
 import type { ProviderMusic } from '@/types';
-import fs from 'fs';
-import path from 'path';
 
 const RHYTHMVERSE_BASE_URL = 'https://rhythmverse.co';
 const RHYTHMVERSE_API_URL = 'https://rhythmverse.co/api/yarg/songfiles/list';
@@ -35,9 +33,9 @@ export interface RhythmVerseSongEntry {
     diff_vocals: string | null;
     diff_keys: string | null;
     diff_prokeys: string | null;
-    update_date: string;
     charter?: string;
     album_art: string | null;
+    record_updated: string; // timestamp
   };
   file: {
     file_title: string;
@@ -49,6 +47,8 @@ export interface RhythmVerseSongEntry {
     file_url: string;
     download_page_url_full: string;
     download_url: string;
+    record_updated: string; // "2023-01-06 22:14:46"
+    update_date: string; // "2023-01-06 22:14:46"
     author?: {
       name: string;
     };
@@ -66,24 +66,31 @@ export function parseRhythmverseData(songs: RhythmVerseSongEntry[]): ProviderMus
     const downloadUrl = file.download_page_url_full;
     const coverUrl = `${RHYTHMVERSE_BASE_URL}${data.album_art}`;
 
+    
+    // Parse difficulties once to avoid duplicate function calls
+    const drums = parseDifficulty(data.diff_drums);
+    const bass = parseDifficulty(data.diff_bass);
+    const guitar = parseDifficulty(data.diff_guitar);
+    const prokeys = parseDifficulty(data.diff_prokeys) || parseDifficulty(data.diff_keys);
+    const vocals = parseDifficulty(data.diff_vocals);
+
     return {
       name,
       artist,
       album,
       coverUrl,
       downloadUrl,
-      sourceUpdatedAt: !isNaN(Date.parse(data.update_date)) ? new Date(data.update_date) : new Date(),
+      sourceUpdatedAt: file.record_updated ? new Date(file.record_updated) : new Date(),
       year: file.file_year || undefined,
       genre: file.file_genre || undefined,
       charter: file.author?.name || undefined,
       instruments: {
-        drums: parseDifficulty(data.diff_drums),
-        bass: parseDifficulty(data.diff_bass),
-        guitar: parseDifficulty(data.diff_guitar),
-        prokeys: parseDifficulty(data.diff_prokeys) || parseDifficulty(data.diff_keys),
-        vocals: parseDifficulty(data.diff_vocals),
+        ...(drums !== undefined && { drums }),
+        ...(bass !== undefined && { bass }),
+        ...(guitar !== undefined && { guitar }),
+        ...(prokeys !== undefined && { prokeys }),
+        ...(vocals !== undefined && { vocals }),
       },
-      rawData: entry,
     };
   });
 }
@@ -92,7 +99,8 @@ export async function fetchRhythmverse(
   page: number,
   pageSize: number,
   sortDirection: 'asc' | 'desc',
-): Promise<{ songs: ProviderMusic[] }> {
+  latestSourceUpdatedAt?: Date,
+): Promise<{ songs: ProviderMusic[]; shouldStop: boolean }> {
   try {
     console.log(`Fetching RhythmVerse API page ${page} (size: ${pageSize}, sort: ${sortDirection})...`);
 
@@ -123,14 +131,6 @@ export async function fetchRhythmverse(
 
     const json = (await response.json()) as RhythmVerseResponse;
 
-    try {
-      const logPath = path.join(process.cwd(), 'rhythmverse-debug.json');
-      await fs.promises.appendFile(logPath, JSON.stringify(json, null, 2) + '\n\n');
-      console.log(`Logged response to ${logPath}`);
-    } catch (err) {
-      console.error('Failed to write log file:', err);
-    }
-
     if (json.status !== 'success') {
       throw new Error(`RhythmVerse API returned status: ${json.status}`);
     }
@@ -138,9 +138,19 @@ export async function fetchRhythmverse(
     const { songs } = json.data;
     const results = parseRhythmverseData(songs);
 
-    console.log(`Fetched ${results.length} songs from RhythmVerse API page ${page}`);
+    // Check if we should stop fetching based on sourceUpdatedAt
+    let shouldStop = false;
+    if (latestSourceUpdatedAt && sortDirection === 'desc') {
+      // When sorting descending, check if any song is older or equal to latestSourceUpdatedAt
+      const oldestSongInPage = results[results.length - 1];
+      if (oldestSongInPage && oldestSongInPage.sourceUpdatedAt) {
+        shouldStop = oldestSongInPage.sourceUpdatedAt <= latestSourceUpdatedAt;
+      }
+    }
 
-    return { songs: results };
+    console.log(`Fetched ${results.length} songs from RhythmVerse API page ${page}, shouldStop: ${shouldStop}`);
+
+    return { songs: results, shouldStop };
   } catch (error) {
     console.error('Error fetching RhythmVerse API:', error);
     throw error;

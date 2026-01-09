@@ -3,6 +3,43 @@ import connectDB from '@/lib/db';
 import Music from '@/models/Music';
 import type { SearchParams, PaginatedResponse, IMusic } from '@/types';
 
+export async function POST(request: NextRequest) {
+  try {
+    await connectDB();
+
+    const body = await request.json();
+    const { musicIds } = body;
+
+    if (!musicIds || !Array.isArray(musicIds)) {
+      return NextResponse.json(
+        { error: 'musicIds must be an array' },
+        { status: 400 }
+      );
+    }
+
+    if (musicIds.length === 0) {
+      return NextResponse.json([]);
+    }
+
+    // Limit the number of IDs to prevent excessive database queries
+    const limitedIds = musicIds.slice(0, 100);
+    if (musicIds.length > 100) {
+      console.warn(`Batch request limited to 100 items (requested ${musicIds.length})`);
+    }
+
+    // Find all music documents by their IDs
+    const musicData = await Music.find({ _id: { $in: limitedIds } }).lean();
+
+    return NextResponse.json(musicData);
+  } catch (error) {
+    console.error('Error fetching batch music:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch music data' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -24,6 +61,7 @@ export async function GET(request: NextRequest) {
         ? parseInt(searchParams.get('maxDifficulty')!, 10)
         : undefined,
       source: (searchParams.get('source') as SearchParams['source']) || undefined,
+      savedIds: searchParams.get('savedIds')?.split(',').filter(Boolean) || undefined,
     };
 
     // Build query
@@ -44,6 +82,11 @@ export async function GET(request: NextRequest) {
 
     if (params.source) {
       query.source = params.source;
+    }
+
+    // Filter by saved song IDs
+    if (params.savedIds && params.savedIds.length > 0) {
+      query._id = { $in: params.savedIds };
     }
 
     // Filter by multiple instruments (existence)

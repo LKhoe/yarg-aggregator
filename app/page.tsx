@@ -6,6 +6,7 @@ import MusicTable from '@/components/data-table/MusicTable';
 import ProviderPanel from '@/components/providers/ProviderPanel';
 import SocialPanel from '@/components/social/SocialPanel';
 import SavedSongs from '@/components/collection/SavedSongs';
+import CacheDeserializer from '@/components/cache/CacheDeserializer';
 import { SavedSongsProvider } from '@/context/SavedSongsContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +25,7 @@ export default function HomePage() {
   const [deviceId, setDeviceId] = useState<string>('');
   const [deviceName, setDeviceName] = useState('');
   const [showDeviceDialog, setShowDeviceDialog] = useState(false);
+  const [totalSongs, setTotalSongs] = useState(0);
 
   useEffect(() => {
     // Get or generate device ID
@@ -72,21 +74,21 @@ export default function HomePage() {
 
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b border-primary/20 bg-background/80 backdrop-blur-md">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-primary via-accent to-primary/60 text-primary-foreground shadow-lg shadow-primary/30">
-              <Music className="h-6 w-6" />
+        <div className="container mx-auto flex h-16 items-center justify-between px-2 sm:px-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-to-br from-primary via-accent to-primary/60 text-primary-foreground shadow-lg shadow-primary/30">
+              <Music className="h-4 w-4 sm:h-6 sm:w-6" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+            <div className="hidden sm:block">
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
                 YARG Aggregator
               </h1>
-              <p className="text-xs text-muted-foreground">Music chart library</p>
+              <p className="text-xs text-muted-foreground hidden lg:block">Music chart library</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 shadow-lg shadow-primary/30">
-            <Zap className="h-4 w-4 text-primary" />
-            <span className="text-sm text-foreground/80">
+          <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-primary/10 border border-primary/20 shadow-lg shadow-primary/30">
+            <Zap className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+            <span className="text-xs sm:text-sm text-foreground/80 truncate max-w-[80px] sm:max-w-none">
               {deviceName || 'Not registered'}
             </span>
           </div>
@@ -94,19 +96,24 @@ export default function HomePage() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto py-8 px-4 relative z-10">
+      <main className="container mx-auto py-4 sm:py-8 px-2 sm:px-4 relative z-10">
         <SavedSongsProvider deviceId={deviceId} deviceName={deviceName}>
-          <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+          <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
             {/* Main Content Area */}
-            <div className="space-y-8">
+            <div className="space-y-6">
               {/* Hero Section */}
-              <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-primary/20 via-accent/10 to-primary/5 p-6 border border-primary/20">
+              <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-primary/20 via-accent/10 to-primary/5 p-4 sm:p-6 border border-primary/20">
                 <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent" />
                 <div className="relative">
-                  <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                  <h2 className="text-xl sm:text-2xl font-bold mb-2 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
                     Welcome to YARG Aggregator
+                    {totalSongs > 0 && (
+                      <span className="text-sm sm:text-base font-normal text-muted-foreground ml-2">
+                        ({totalSongs.toLocaleString()} songs filtered)
+                      </span>
+                    )}
                   </h2>
-                  <p className="text-muted-foreground max-w-2xl">
+                  <p className="text-sm sm:text-base text-muted-foreground">
                     Browse, search, and download music charts from Enchor.us and Rhythmverse.
                     Create collections and share them with other users in real-time.
                   </p>
@@ -117,11 +124,13 @@ export default function HomePage() {
               <MusicTable
                 deviceId={deviceId}
                 deviceName={deviceName}
+                onTotalChange={setTotalSongs}
               />
             </div>
 
             {/* Sidebar */}
-            <aside className="space-y-6">
+            <aside className="space-y-4 lg:space-y-6">
+              <CacheDeserializer />
               <SocialPanel deviceId={deviceId} deviceName={deviceName} />
               <ProviderPanel />
               <SavedSongs
@@ -133,9 +142,9 @@ export default function HomePage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-primary/20 py-6 mt-12 relative z-10">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>YARG Aggregator — Built for the YARG community</p>
+      <footer className="border-t border-primary/20 py-4 sm:py-6 mt-8 sm:mt-12 relative z-10">
+        <div className="container mx-auto px-2 sm:px-4 text-center text-xs sm:text-sm text-muted-foreground">
+          <p>YARG Aggregator — Built for YARG community</p>
         </div>
       </footer>
 

@@ -6,19 +6,20 @@ import { getEnchorSongs, getRhythmverseSongs } from '@/services/providers';
 import { providerQueue } from '@/lib/queue';
 
 export async function POST(request: NextRequest) {
+  return NextResponse.json(
+    { error: 'Not implemented yet.' },
+    { status: 501 }
+  );
+
   try {
     const body = await request.json();
-    const { source, amount = 100, retryFailed = false } = body;
+    const { source, retryFailed = false } = body;
 
     if (!['enchor', 'rhythmverse'].includes(source)) {
       return NextResponse.json(
         { error: 'Invalid source. Must be enchor or rhythmverse' },
         { status: 400 }
       );
-    }
-
-    if (!retryFailed && (isNaN(amount) || amount <= 0)) {
-      return NextResponse.json({ error: 'Invalid amount. Must be a number greater than 0' }, { status: 400 });
     }
 
     await connectDB();
@@ -49,6 +50,21 @@ export async function POST(request: NextRequest) {
       // Should be stopped
     }
 
+    if ((providerData?.failedJobs?.length ?? 0) > 0 && !retryFailed) {
+      return NextResponse.json(
+        { error: `Provider has failed jobs for ${source}. Please run failed jobs first.` },
+        { status: 400 }
+      );
+    }
+
+    // Get the latest sourceUpdatedAt from database
+    const latestSong = await Music.findOne({ source })
+      .sort({ sourceUpdatedAt: -1 })
+      .select('sourceUpdatedAt')
+      .lean();
+
+    const latestSourceUpdatedAt = latestSong?.sourceUpdatedAt;
+
     if (retryFailed) {
       if (!providerData?.failedJobs || providerData.failedJobs.length === 0) {
         return NextResponse.json(
@@ -57,70 +73,34 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const pageSize = source === 'enchor' ? 10 : 25;
-
-      // Determine sortDirection from current DB state or default to desc? 
-      // Ideally we should have stored sortDirection in failedJobs. 
-      // But we can infer or just toggle. Let's infer as before.
-      const localCount = await Music.countDocuments({ source });
-      const totalAvailable = providerData.totalAvailable || localCount; // Fallback
-      const ratio = totalAvailable > 0 ? localCount / totalAvailable : 0;
-      const sortDirection = ratio < 0.5 ? 'asc' : 'desc';
-
-      const jobData = providerData.failedJobs.map((job: any) => {
-        // failedJobs sotres initIndex and endIndex.
-        // page = (initIndex / pageSize) + 1
-        const page = Math.floor(job.initIndex / pageSize) + 1;
-
-        return {
-          name: `fetch-${source}-${page}-retry`,
-          data: {
-            source: source as 'enchor' | 'rhythmverse',
-            page: page,
-            pageSize: pageSize,
-            sortDirection: sortDirection
+      // For retry, we create a new job with the same logic
+      await ProviderStats.findOneAndUpdate(
+        { source },
+        {
+          $set: {
+            isRunning: true,
+            lastFetchedAt: new Date(),
+            failedJobs: [] // Clear failed jobs when retrying
           },
-          opts: {
-            removeOnComplete: true,
-            removeOnFail: false
-          }
-        };
-      });
-
-      await providerQueue.addBulk(jobData);
-
-      // Clear failed jobs from DB as they are now in queue?
-      // Or should we wait? If we don't clear, the user can't start normal fetch.
-      // If we clear, and they fail again, they will be re-added.
-      // So clearing is the right move initiated by the retry action.
-      await ProviderStats.updateOne({ source }, { $set: { failedJobs: [], isRunning: true } });
-
-      return NextResponse.json({ success: true, message: `Retrying ${jobData.length} failed jobs for ${source}` });
-    }
-
-    if ((providerData?.failedJobs?.length ?? 0) > 0) {
-      return NextResponse.json(
-        { error: `Provider has failed jobs for ${source}. Please run failed jobs first.` },
-        { status: 400 }
+        },
+        { new: true }
       );
-    }
 
-    if (providerData?.totalAvailable && amount > providerData?.totalAvailable) {
-      return NextResponse.json(
-        { error: `Amount is greater than total available for ${source}` },
-        { status: 400 }
-      );
-    }
+      const retryJobData = {
+        name: `retry-${source}`,
+        data: {
+          source: source as 'enchor' | 'rhythmverse',
+          latestSourceUpdatedAt, // Use the same latestSourceUpdatedAt logic
+        },
+        opts: {
+          removeOnComplete: true,
+          removeOnFail: false
+        }
+      };
 
-    const getTotalSongsFn = source === 'enchor' ? getEnchorSongs : getRhythmverseSongs;
-    const totalAvailable = await getTotalSongsFn();
-    const localCount = await Music.countDocuments({ source });
+      await providerQueue.add(retryJobData.name, retryJobData.data, retryJobData.opts);
 
-    if (localCount === totalAvailable) {
-      return NextResponse.json(
-        { error: `All songs are already fetched for ${source}` },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: true, message: `Retrying failed jobs for ${source}` });
     }
 
     await ProviderStats.findOneAndUpdate(
@@ -128,51 +108,29 @@ export async function POST(request: NextRequest) {
       {
         $setOnInsert: {
           source,
-          totalFetched: localCount,
         },
         $set: {
           isRunning: true,
-          totalAvailable,
           lastFetchedAt: new Date(),
         },
       },
       { upsert: true, new: true }
     );
 
-    const pageSize = source === 'enchor' ? 10 : 25;
-    const pagesToRequest = Math.ceil(amount / pageSize);
-
-    const half = Math.floor(totalAvailable / 2);
-    const ratio = totalAvailable > 0 ? localCount / totalAvailable : 0;
-
-    const sortDirection = ratio < 0.5 ? 'asc' : 'desc';
-    const effectiveFetched = sortDirection === 'asc' ? localCount : Math.max(0, localCount - half);
-    const startPage = Math.floor(effectiveFetched / pageSize) + 1;
-
-    const paramsList: { page: number, pageSize: number, sortDirection: 'asc' | 'desc' }[] = Array.from({ length: pagesToRequest }, (_, i) => {
-      const take = (i === pagesToRequest - 1) ? (amount % pageSize || pageSize) : pageSize;
-      return {
-        page: startPage + i,
-        pageSize: take,
-        sortDirection,
-      };
-    });
-
-    const jobData = paramsList.map(param => ({
-      name: `fetch-${source}-${param.page}`,
+    // Create a single job for this source
+    const jobData = {
+      name: `fetch-${source}`,
       data: {
         source: source as 'enchor' | 'rhythmverse',
-        page: param.page,
-        pageSize: param.pageSize,
-        sortDirection: param.sortDirection
+        latestSourceUpdatedAt,
       },
       opts: {
         removeOnComplete: true,
         removeOnFail: false
       }
-    }));
+    };
 
-    await providerQueue.addBulk(jobData);
+    await providerQueue.add(jobData.name, jobData.data, jobData.opts);
 
     return NextResponse.json({ success: true, message: 'Provider fetch started' });
   } catch (error) {

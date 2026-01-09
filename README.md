@@ -7,7 +7,7 @@ The **YARG Content Aggregator** is a modern, high-performance web platform desig
 *   **Unified Search**: Browse and filter music charts from multiple sources in one place.
 *   **Advanced Filtering**: Filter by instrument difficulty, genre, artist, and more.
 *   **Provider Integration**: Direct API integration with Enchor and Rhythmverse to fetch the latest charts.
-*   **Real-time Sharing**: Create collections and share them instantly with other devices on the network using **Socket.io**.
+*   **Device-to-Device Sharing**: Create collections and share them with other devices via REST API.
 *   **Modern UI**: built with **Next.js**, **Tailwind CSS**, and **Shadcn UI** for a responsive and premium experience.
 
 ## 🛠️ Tech Stack
@@ -16,7 +16,7 @@ The **YARG Content Aggregator** is a modern, high-performance web platform desig
 *   **Language:** [TypeScript](https://www.typescriptlang.org/)
 *   **Styling:** [Tailwind CSS](https://tailwindcss.com/) + [Shadcn UI](https://ui.shadcn.com/)
 *   **Database:** [MongoDB](https://www.mongodb.com/) (Data persistence)
-*   **Real-time:** [Socket.io](https://socket.io/) (Device-to-device sharing)
+*   **API:** REST APIs for data retrieval and sharing
 *   **Containerization:** Docker & Docker Compose
 
 ## 📋 Prerequisites
@@ -96,7 +96,7 @@ Ensure you have the following installed:
 │   │   ├── providers       # Provider control panel
 │   │   ├── data-table      # Song list implementation
 │   │   └── collection      # Collection management & sharing
-│   ├── lib                 # Utilities (DB, Redis, socket)
+│   ├── lib                 # Utilities (DB, Queue)
 │   ├── models              # Mongoose Schemas
 │   ├── services            # Business Logic
 │   │   ├── providers       # API Clients (Enchor, Rhythmverse)

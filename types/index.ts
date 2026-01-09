@@ -18,7 +18,6 @@ export interface IMusic {
   genre?: string;
   year?: number;
   charter?: string;
-  rawData?: any;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,6 +34,7 @@ export interface IUser {
   _id?: string;
   deviceId: string;
   deviceName: string;
+  lastSeenAt?: Date;
   savedSongs: ISavedSong[];
   createdAt: Date;
   updatedAt: Date;
@@ -67,6 +67,7 @@ export interface SearchParams {
   minDifficulty?: number;
   maxDifficulty?: number;
   source?: 'enchor' | 'rhythmverse';
+  savedIds?: string[];
 }
 
 export interface PaginatedResponse<T> {
@@ -107,7 +108,6 @@ export interface ProviderMusic {
   genre?: string;
   year?: number;
   charter?: string;
-  rawData?: any;
 }
 
 // Socket Types
