@@ -247,7 +247,7 @@ export default function MusicTable({ deviceId, deviceName, onSavedSongsChange, o
                   Song <SortIcon column="name" />
                 </Button>
               </TableHead>
-              <TableHead className="min-w-[80px] hidden xs:table-cell">
+              <TableHead className="hidden sm:table-cell min-w-[80px]">
                 <Button variant="ghost" onClick={() => handleSort('artist')} className="p-0 hover:bg-transparent text-xs sm:text-sm">
                   Artist <SortIcon column="artist" />
                 </Button>
@@ -264,7 +264,7 @@ export default function MusicTable({ deviceId, deviceName, onSavedSongsChange, o
           </TableHeader>
           <TableBody>
             {loading ? (
-              Array.from({ length: 5 }).map((_, i) => (
+              Array.from({ length: 20 }).map((_, i) => (
                 <TableRow key={i}>
                   <TableCell><Skeleton className="h-8 w-8 rounded-full" /></TableCell>
                   <TableCell><Skeleton className="h-8 w-8 sm:h-12 sm:w-12 rounded" /></TableCell>

@@ -40,19 +40,12 @@ export interface IUser {
   updatedAt: Date;
 }
 
-export interface IFailedJob {
+export interface IProvider {
   _id?: string;
-  initIndex: number;
-  endIndex: number;
-}
-
-export interface IProviderStats {
-  source: 'enchor' | 'rhythmverse';
-  totalFetched: number;
-  totalAvailable: number;
-  failedJobs: IFailedJob[];
-  isRunning: boolean;
-  lastFetchedAt: Date;
+  name: 'enchor' | 'rhythmverse';
+  lastSuccessfulFetch?: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // API Types

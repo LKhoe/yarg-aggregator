@@ -83,6 +83,12 @@ export async function GET(request: NextRequest) {
       .sort({ createdAt: -1 })
       .lean();
 
+    // Update lastSeenAt for the polling device
+    await User.findOneAndUpdate(
+      { deviceId },
+      { $set: { lastSeenAt: new Date() } }
+    );
+
     // Get sender information for each share
     const sharesWithSenderInfo = await Promise.all(
       pendingShares.map(async (share) => {

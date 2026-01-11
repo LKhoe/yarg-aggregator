@@ -98,11 +98,10 @@ export function parseRhythmverseData(songs: RhythmVerseSongEntry[]): ProviderMus
 export async function fetchRhythmverse(
   page: number,
   pageSize: number,
-  sortDirection: 'asc' | 'desc',
   latestSourceUpdatedAt?: Date,
 ): Promise<{ songs: ProviderMusic[]; shouldStop: boolean }> {
   try {
-    console.log(`Fetching RhythmVerse API page ${page} (size: ${pageSize}, sort: ${sortDirection})...`);
+    console.log(`Fetching RhythmVerse API page ${page} (size: ${pageSize})...`);
 
     const body = new URLSearchParams();
     body.append('instrument[]', 'bass');
@@ -110,7 +109,7 @@ export async function fetchRhythmverse(
     body.append('instrument[]', 'guitar');
     body.append('instrument[]', 'vocals');
     body.append('sort[0][sort_by]', 'update_date');
-    body.append('sort[0][sort_order]', sortDirection.toUpperCase());
+    body.append('sort[0][sort_order]', 'DESC');
     body.append('data_type', 'full');
     body.append('page', page.toString());
     body.append('records', pageSize.toString());
@@ -140,8 +139,7 @@ export async function fetchRhythmverse(
 
     // Check if we should stop fetching based on sourceUpdatedAt
     let shouldStop = false;
-    if (latestSourceUpdatedAt && sortDirection === 'desc') {
-      // When sorting descending, check if any song is older or equal to latestSourceUpdatedAt
+    if (latestSourceUpdatedAt) {
       const oldestSongInPage = results[results.length - 1];
       if (oldestSongInPage && oldestSongInPage.sourceUpdatedAt) {
         shouldStop = oldestSongInPage.sourceUpdatedAt <= latestSourceUpdatedAt;

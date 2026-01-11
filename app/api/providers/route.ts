@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
-import ProviderStats from '@/models/ProviderStats';
+import Provider from '@/models/Provider';
 import Music from '@/models/Music';
 import { getEnchorSongs, getRhythmverseSongs } from '@/services/providers';
 import { providerQueue } from '@/lib/queue';
+import Redis from 'ioredis';
+import { IProvider } from '@/types';
+
+const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
+const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6379', 10);
+const redis = new Redis({
+  host: REDIS_HOST,
+  port: REDIS_PORT,
+});
 
 export async function POST(request: NextRequest) {
-  return NextResponse.json(
-    { error: 'Not implemented yet.' },
-    { status: 501 }
-  );
+  // return NextResponse.json(
+  //   { error: 'Not implemented yet.' },
+  //   { status: 501 }
+  // );
 
   try {
     const body = await request.json();
@@ -22,75 +31,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await connectDB();
-    const providerData = await ProviderStats.findOne({ source });
-
-    const now = Date.now();
-    const last = providerData?.lastFetchedAt?.getTime() || 0;
-
-    if (providerData?.isRunning) {
-      // Double check with queue if it's really running?
-      // For now trusting the DB flag, but user asked: "The isRunning logic inside the providerstats should consider if there is any worker running"
-      // Let's check active counts from queue
-      const activeCount = await providerQueue.getActiveCount();
-      const waitingCount = await providerQueue.getWaitingCount();
-
-      if (activeCount > 0 || waitingCount > 0) {
-        return NextResponse.json(
-          { error: `Provider is already running for ${source}` },
-          { status: 400 }
-        );
-      } else {
-        // If DB says running but queue is empty, maybe we should reset?
-        // Continuing execution will effectively restart it.
-        console.log(`Provider ${source} marked as running but queue is empty. Restarting.`);
-      }
-    } else if (now - last < 60_000) {
-      // Provider is taking too long to finish
-      // Should be stopped
-    }
-
-    if ((providerData?.failedJobs?.length ?? 0) > 0 && !retryFailed) {
+    // Check if provider is currently running using Redis
+    const isRunning = await redis.get(`provider:${source}:running`);
+    if (isRunning === 'true') {
       return NextResponse.json(
-        { error: `Provider has failed jobs for ${source}. Please run failed jobs first.` },
+        { error: `Provider is already running for ${source}` },
         { status: 400 }
       );
     }
+    
+    await connectDB();
+    const providerData = await Provider.findOne(
+      { name: source },
+      'lastSuccessfulFetch',
+    ).lean();
+    const latestSourceUpdatedAt = providerData?.lastSuccessfulFetch;
 
-    // Get the latest sourceUpdatedAt from database
-    const latestSong = await Music.findOne({ source })
-      .sort({ sourceUpdatedAt: -1 })
-      .select('sourceUpdatedAt')
-      .lean();
-
-    const latestSourceUpdatedAt = latestSong?.sourceUpdatedAt;
+    console.log('Starting job: ', source, latestSourceUpdatedAt);
 
     if (retryFailed) {
-      if (!providerData?.failedJobs || providerData.failedJobs.length === 0) {
-        return NextResponse.json(
-          { error: `No failed jobs found for ${source}` },
-          { status: 400 }
-        );
-      }
-
-      // For retry, we create a new job with the same logic
-      await ProviderStats.findOneAndUpdate(
-        { source },
-        {
-          $set: {
-            isRunning: true,
-            lastFetchedAt: new Date(),
-            failedJobs: [] // Clear failed jobs when retrying
-          },
-        },
-        { new: true }
-      );
-
+      // For retry, we just create a new job with the same logic
       const retryJobData = {
         name: `retry-${source}`,
         data: {
           source: source as 'enchor' | 'rhythmverse',
-          latestSourceUpdatedAt, // Use the same latestSourceUpdatedAt logic
+          latestSourceUpdatedAt,
         },
         opts: {
           removeOnComplete: true,
@@ -102,20 +67,6 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({ success: true, message: `Retrying failed jobs for ${source}` });
     }
-
-    await ProviderStats.findOneAndUpdate(
-      { source },
-      {
-        $setOnInsert: {
-          source,
-        },
-        $set: {
-          isRunning: true,
-          lastFetchedAt: new Date(),
-        },
-      },
-      { upsert: true, new: true }
-    );
 
     // Create a single job for this source
     const jobData = {
@@ -142,12 +93,71 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function DELETE(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { source } = body;
+
+    if (!['enchor', 'rhythmverse'].includes(source)) {
+      return NextResponse.json(
+        { error: 'Invalid source. Must be enchor or rhythmverse' },
+        { status: 400 }
+      );
+    }
+
+    // Check if provider is currently running
+    const isRunning = await redis.get(`provider:${source}:running`);
+    if (isRunning !== 'true') {
+      return NextResponse.json(
+        { error: `Provider is not running for ${source}` },
+        { status: 400 }
+      );
+    }
+
+    // Clear the running flag in Redis
+    await redis.del(`provider:${source}:running`);
+
+    // Get and remove active jobs for this source
+    const activeJobs = await providerQueue.getActive();
+    for (const job of activeJobs) {
+      if (job.data.source === source) {
+        await job.remove();
+      }
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      message: `Provider ${source} stopped successfully` 
+    });
+
+  } catch (error) {
+    console.error('Error stopping provider:', error);
+    return NextResponse.json(
+      { error: 'Failed to stop provider' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
-    // Use projection to exclude _id and __v, and lean() for plain JS objects
-    const providerData = await ProviderStats.find({}, { _id: 0, __v: 0 }).lean();
+    
+    // Get all providers from database
+    const providers = await Provider.find({}, { _id: 0, __v: 0 }).lean();
+    
+    // Check running status from Redis for each provider
+    const enrichedProviders = await Promise.all(
+      providers.map(async (provider) => {
+        const isRunning = await redis.get(`provider:${provider.name}:running`) === 'true';
+        return {
+          ...provider,
+          isRunning
+        };
+      })
+    );
 
+    // Get queue stats
     const activeCount = await providerQueue.getActiveCount();
     const waitingCount = await providerQueue.getWaitingCount();
     const completedCount = await providerQueue.getCompletedCount();
@@ -163,9 +173,9 @@ export async function GET(request: NextRequest) {
       total: activeCount + waitingCount + completedCount + failedCount + delayedCount
     };
 
-    const enrichedData = providerData.map(stat => ({
-      ...stat,
-      queueStats: stat.isRunning ? queueStats : null
+    const enrichedData = enrichedProviders.map(provider => ({
+      ...provider,
+      queueStats: provider.isRunning ? queueStats : null
     }));
 
     return NextResponse.json(enrichedData);

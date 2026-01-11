@@ -69,11 +69,21 @@ export async function GET(request: NextRequest) {
     const query: any = {};
 
     if (params.query) {
-      query.$or = [
-        { name: { $regex: params.query, $options: 'i' } },
-        { artist: { $regex: params.query, $options: 'i' } },
-        { album: { $regex: params.query, $options: 'i' } },
-      ];
+      // Split query by spaces to allow "fuzzy" matching (matching all terms)
+      const terms = params.query.trim().split(/\s+/).filter(Boolean);
+      
+      if (terms.length > 0) {
+        // Create an AND condition for all terms
+        const termConditions = terms.map(term => ({
+          $or: [
+            { name: { $regex: term, $options: 'i' } },
+            { artist: { $regex: term, $options: 'i' } },
+            { album: { $regex: term, $options: 'i' } },
+          ]
+        }));
+        
+        query.$and = termConditions;
+      }
     }
 
     if (params.genre) {

@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Users, Send, Download, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSavedSongs } from '@/context/SavedSongsContext';
-import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '../ui/badge';
 
 interface ConnectedDevice {
   deviceId: string;
   deviceName: string;
-  isOnline: boolean;
   lastSeenAt: string;
 }
 
@@ -30,6 +30,19 @@ interface SharedMusicItem {
 interface SocialPanelProps {
   deviceId: string;
   deviceName: string;
+}
+
+function formatLastSeen(dateString: string): string {
+  if (!dateString) return 'Unknown';
+
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffInSeconds < 60) return 'Just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+  return `${Math.floor(diffInSeconds / 86400)}d ago`;
 }
 
 export default function SocialPanel({ deviceId, deviceName }: SocialPanelProps) {
@@ -57,72 +70,11 @@ export default function SocialPanel({ deviceId, deviceName }: SocialPanelProps) 
     setIsRefreshing(false);
   };
 
-  // Poll for incoming shared music
-  const checkForSharedMusic = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/social/shared?deviceId=${deviceId}`);
-      if (response.ok) {
-        const data = await response.json();
-        const shares: SharedMusicItem[] = data.shares || [];
-
-        // Show toast for each new share
-        shares.forEach((share) => {
-          toast(
-            <div className="flex flex-col gap-2 w-full">
-              <p className="font-semibold">Received {share.songs.length} songs from {share.fromDeviceName}</p>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  className="w-full"
-                  onClick={async () => {
-                    let added = 0;
-                    for (const song of share.songs) {
-                      await addSong({
-                        _id: song.musicId,
-                        name: song.name,
-                        artist: song.artist,
-                        // Fill dummy values for required fields
-                        downloadUrl: '',
-                        source: 'enchor',
-                        instruments: {}
-                      } as any);
-                      added++;
-                    }
-
-                    // Mark as accepted
-                    await fetch('/api/social/shared', {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ shareId: share._id, status: 'accepted' }),
-                    });
-
-                    toast.success(`Imported ${added} songs to your collection`);
-                  }}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Import All
-                </Button>
-              </div>
-            </div>,
-            {
-              duration: 10000,
-            }
-          );
-        });
-      }
-    } catch (error) {
-      console.error('Failed to check for shared music:', error);
-    }
-  }, [deviceId, addSong]);
-
-  // Initial fetch only
+  // Initial fetch
   useEffect(() => {
     if (!deviceId || !deviceName) return;
-
-    // Initial fetch
     fetchUsers();
-    checkForSharedMusic();
-  }, [deviceId, deviceName, fetchUsers, checkForSharedMusic]);
+  }, [deviceId, deviceName, fetchUsers]);
 
   const sendSongs = async (targetDeviceId: string, targetDeviceName: string) => {
     if (savedSongs.length === 0) {
@@ -194,10 +146,10 @@ export default function SocialPanel({ deviceId, deviceName }: SocialPanelProps) 
                     <span className="font-medium text-xs sm:text-sm truncate">{user.deviceName}</span>
                     <div className="flex items-center gap-1">
                       <Badge
-                        variant={user.isOnline ? "default" : "secondary"}
+                        variant="secondary"
                         className="text-xs h-4 px-2"
                       >
-                        {user.isOnline ? 'Online' : 'Offline'}
+                        {formatLastSeen(user.lastSeenAt)}
                       </Badge>
                     </div>
                   </div>

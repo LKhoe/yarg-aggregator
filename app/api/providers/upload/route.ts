@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import Music from '@/models/Music';
+import Provider from '@/models/Provider';
 import AdmZip from 'adm-zip';
 import { parseEnchorData, EnchorSong } from '@/services/providers/enchor';
 import { parseRhythmverseData, RhythmVerseSongEntry } from '@/services/providers/rhythmverse';
@@ -121,6 +122,7 @@ export async function POST(request: NextRequest) {
         try {
           const res = await Music.bulkWrite(batch, { ordered: false });
           totalSaved += (res.insertedCount + res.upsertedCount);
+          console.log(`Batch ${i / batchSize + 1}: Inserted ${res.insertedCount}, upserted ${res.upsertedCount}`);
         } catch (error: any) {
           // Handle duplicate key errors gracefully
           if (error.code === 11000 && error.result) {
@@ -132,6 +134,22 @@ export async function POST(request: NextRequest) {
             throw error;
           }
         }
+      }
+    }
+
+    // Update provider's lastSuccessfulFetch with the highest sourceUpdatedAt
+    if (totalSaved > 0) {
+      const latestSong = await Music.findOne({ source: validatedSource })
+        .sort({ sourceUpdatedAt: -1 })
+        .select('sourceUpdatedAt')
+        .lean();
+
+      if (latestSong?.sourceUpdatedAt) {
+        await Provider.updateOne(
+          { name: validatedSource },
+          { $set: { lastSuccessfulFetch: latestSong.sourceUpdatedAt } },
+          { upsert: true }
+        );
       }
     }
 

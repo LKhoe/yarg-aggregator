@@ -66,11 +66,10 @@ export function parseEnchorData(songs: EnchorSong[]): ProviderMusic[] {
 export async function fetchEnchor(
   page: number,
   pageSize: number,
-  sortDirection: 'asc' | 'desc',
   latestSourceUpdatedAt?: Date,
 ): Promise<{ songs: ProviderMusic[]; shouldStop: boolean }> {
   try {
-    console.log(`Fetching Enchor API page ${page} (size: ${pageSize}, sort: ${sortDirection})...`);
+    console.log(`Fetching Enchor API page ${page} (size: ${pageSize})...`);
 
     const response = await fetch(ENCHOR_API_URL, {
       method: 'POST',
@@ -83,7 +82,7 @@ export async function fetchEnchor(
         difficulty: null,
         drumType: null,
         drumsReviewed: false,
-        sort: { type: "modifiedTime", direction: sortDirection.toLocaleLowerCase() as 'asc' | 'desc' },
+        sort: { type: "modifiedTime", direction: 'desc' },
         source: "website",
         name: { value: "", exact: false, exclude: false },
         artist: { value: "", exact: false, exclude: false },
@@ -116,7 +115,7 @@ export async function fetchEnchor(
         hasVideoBackground: null,
         modchart: null,
         page: page,
-        pageSize: pageSize
+        per_page: pageSize
       }),
     });
 
@@ -131,10 +130,10 @@ export async function fetchEnchor(
 
     // Check if we should stop fetching based on sourceUpdatedAt
     let shouldStop = false;
-    if (latestSourceUpdatedAt && sortDirection === 'desc') {
-      // When sorting descending, check if any song is older or equal to latestSourceUpdatedAt
+    if (latestSourceUpdatedAt) {
       const oldestSongInPage = results[results.length - 1];
       if (oldestSongInPage && oldestSongInPage.sourceUpdatedAt) {
+        console.log('Checking if should stop for page', page, 'oldestSongInPage', oldestSongInPage.sourceUpdatedAt.toISOString(), 'latestSourceUpdatedAt', latestSourceUpdatedAt.toISOString(), 'shouldStop', oldestSongInPage.sourceUpdatedAt <= latestSourceUpdatedAt);
         shouldStop = oldestSongInPage.sourceUpdatedAt <= latestSourceUpdatedAt;
       }
     }

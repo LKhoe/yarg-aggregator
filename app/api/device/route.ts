@@ -56,16 +56,9 @@ export async function GET(request: NextRequest) {
       .limit(5) // Limit to 5 most recent users
       .lean();
 
-    // Calculate online status based on lastSeenAt (online if within last 60 seconds)
-    const now = new Date();
-    const ONLINE_THRESHOLD_MS = 60000; // 60 seconds
-
     const devicesWithStatus = users.map(user => ({
       deviceId: user.deviceId,
       deviceName: user.deviceName,
-      isOnline: user.lastSeenAt
-        ? (now.getTime() - new Date(user.lastSeenAt).getTime()) < ONLINE_THRESHOLD_MS
-        : false,
       lastSeenAt: user.lastSeenAt,
     }));
 

@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Play, RefreshCw } from 'lucide-react';
+import { Loader2, Play, RefreshCw, Square } from 'lucide-react';
 import { toast } from 'sonner';
 
 type ProviderSource = 'all' | 'enchor' | 'rhythmverse';
@@ -30,12 +30,11 @@ interface JobProgress {
 }
 
 interface ProviderStat {
-  source: string;
-  totalFetched: number;
-  totalAvailable: number;
-  lastFetchedAt?: string;
+  name: string;
+  lastSuccessfulFetch?: string;
   isRunning: boolean;
-  failedJobs: any[];
+  createdAt?: string;
+  updatedAt?: string;
   queueStats?: {
     active: number;
     waiting: number;
@@ -51,6 +50,7 @@ export default function ProviderPanel() {
   const [runningSources, setRunningSources] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<JobProgress | null>(null);
   const [stats, setStats] = useState<ProviderStat[]>([]);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -63,7 +63,7 @@ export default function ProviderPanel() {
         const currentlyRunning: Set<string> = new Set(
           data
             .filter((s: ProviderStat) => s.isRunning)
-            .map((s: ProviderStat) => s.source as string)
+            .map((s: ProviderStat) => s.name as string)
         );
         setRunningSources(currentlyRunning);
 
@@ -79,20 +79,23 @@ export default function ProviderPanel() {
           if (total === 0 || (qs.active === 0 && qs.waiting === 0 && qs.delayed === 0)) {
             setRunningSources(prev => {
               const newSet = new Set(prev);
-              newSet.delete(runningProvider.source);
+              newSet.delete(runningProvider.name);
               return newSet;
             });
-            if (progress?.status === 'running') {
-              setProgress(prev => prev ? { ...prev, status: 'completed', progress: 100 } : null);
-              toast.success('Provider fetch completed!');
-            }
+            setProgress(prev => {
+              if (prev?.status === 'running') {
+                toast.success('Provider fetch completed!');
+                return { ...prev, status: 'completed', progress: 100 };
+              }
+              return prev;
+            });
           } else {
             const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
 
             setProgress({
               status: 'running',
               progress: percent,
-              currentSource: runningProvider.source,
+              currentSource: runningProvider.name,
               jobsCompleted: completed,
               jobsTotal: total,
             });
@@ -101,23 +104,78 @@ export default function ProviderPanel() {
           // No providers are running
           if (runningSources.size > 0) {
             setRunningSources(new Set());
-            if (progress?.status === 'running') {
-              setProgress(prev => prev ? { ...prev, status: 'completed', progress: 100 } : null);
-              toast.success('Provider fetch completed!');
-            }
+            setProgress(prev => {
+              if (prev?.status === 'running') {
+                toast.success('Provider fetch completed!');
+                return { ...prev, status: 'completed', progress: 100 };
+              }
+              return prev;
+            });
           }
         }
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
-  }, [progress, runningSources.size]);
+  }, []);
 
-  // Initial fetch only
+  // Initial fetch and polling setup
   useEffect(() => {
     // Initial fetch
     fetchStats();
   }, [fetchStats]);
+
+  // Set up polling when providers are running
+  useEffect(() => {
+    if (runningSources.size > 0) {
+      // Start polling every 2 seconds
+      pollingIntervalRef.current = setInterval(fetchStats, 2000);
+    } else {
+      // Stop polling when no providers are running
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, [runningSources.size, fetchStats]);
+
+  const stopProvider = async (source: string) => {
+    try {
+      const response = await fetch('/api/providers', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        toast.error(`Failed to stop ${source}: ${errorData.error}`);
+      } else {
+        toast.success(`Stopped ${source}`);
+        // Remove from running sources immediately
+        setRunningSources(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(source);
+          return newSet;
+        });
+        // Clear progress if this was the only running provider
+        if (runningSources.size === 1) {
+          setProgress(null);
+        }
+        // Refresh stats
+        await fetchStats();
+      }
+    } catch (error) {
+      toast.error(`Failed to stop ${source}: ${error}`);
+    }
+  };
 
   const startFetch = async () => {
     // Determine which sources to fetch
@@ -168,39 +226,6 @@ export default function ProviderPanel() {
     await fetchStats();
   };
 
-  const retryFailedJobs = async (targetSource: string) => {
-    if (runningSources.has(targetSource)) {
-      toast.error(`${targetSource} is already running`);
-      return;
-    }
-
-    setProgress({
-      status: 'retrying',
-      progress: 0,
-      currentSource: targetSource,
-      jobsCompleted: 0,
-      jobsTotal: 0,
-    });
-
-    try {
-      const response = await fetch('/api/providers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: targetSource, retryFailed: true }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        toast.error(`Failed to retry jobs for ${targetSource}: ${errorData.error}`);
-      } else {
-        toast.success(`Retrying failed jobs for ${targetSource}`);
-        setRunningSources(prev => new Set([...prev, targetSource]));
-      }
-    } catch (error) {
-      toast.error(`Failed to retry jobs for ${targetSource}: ${error}`);
-    }
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'running': return 'bg-blue-500';
@@ -211,10 +236,10 @@ export default function ProviderPanel() {
     }
   };
 
-  const formatLastFetchTime = (lastFetchedAt?: string | Date) => {
+  const formatLastFetchTime = (lastFetchedAt?: string) => {
     if (!lastFetchedAt) return 'Never fetched';
-    
-    const date = typeof lastFetchedAt === 'string' ? new Date(lastFetchedAt) : lastFetchedAt;
+
+    const date = new Date(lastFetchedAt);
     if (isNaN(date.getTime())) return 'Invalid date';
     
     const now = new Date();
@@ -264,8 +289,7 @@ export default function ProviderPanel() {
 
               <div className="grid grid-cols-2 gap-2 mt-2">
                 {['enchor', 'rhythmverse'].map((src) => {
-                  const stat = stats.find((s) => s.source === src);
-                  const hasFailedJobs = stat?.failedJobs && stat.failedJobs.length > 0;
+                  const stat = stats.find((s) => s.name === src);
 
                   return (
                     <div key={src} className="bg-muted/50 p-2 rounded-md border text-sm">
@@ -344,23 +368,30 @@ export default function ProviderPanel() {
                           </TooltipTrigger>
                           {!runningSources.has(src) && (
                             <TooltipContent>
-                              <p>Last fetch: {formatLastFetchTime(stat?.lastFetchedAt)}</p>
+                              <p>Last fetch: {formatLastFetchTime(stat?.lastSuccessfulFetch)}</p>
                             </TooltipContent>
                           )}
                         </Tooltip>
+                        {runningSources.has(src) && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-5 w-5 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                onClick={() => stopProvider(src)}
+                                title={`Stop ${src}`}
+                              >
+                                <Square className="w-3 h-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Stop {src}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                       </div>
 
-                      {hasFailedJobs && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full mt-2 h-6 text-xs bg-red-50 hover:bg-red-100 text-red-600 border-red-200 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:text-red-400 dark:border-red-800"
-                          onClick={() => retryFailedJobs(src)}
-                          disabled={runningSources.has(src)}
-                        >
-                          Retry {stat.failedJobs.length} Jobs
-                        </Button>
-                      )}
                     </div>
                   );
                 })}
