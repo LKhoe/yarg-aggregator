@@ -3,16 +3,7 @@ import connectDB from '@/lib/db';
 import Provider from '@/models/Provider';
 import Music from '@/models/Music';
 import { getEnchorSongs, getRhythmverseSongs } from '@/services/providers';
-import { providerQueue } from '@/lib/queue';
-import Redis from 'ioredis';
 import { IProvider } from '@/types';
-
-const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
-const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6379', 10);
-const redis = new Redis({
-  host: REDIS_HOST,
-  port: REDIS_PORT,
-});
 
 export async function POST(request: NextRequest) {
   // return NextResponse.json(
@@ -31,14 +22,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if provider is currently running using Redis
-    const isRunning = await redis.get(`provider:${source}:running`);
-    if (isRunning === 'true') {
+    // Simple in-memory check for running providers (without Redis)
+    // Note: This is a basic replacement - consider using a database or file-based lock for production
+    const runningProviders = new Set();
+    if (runningProviders.has(source)) {
       return NextResponse.json(
         { error: `Provider is already running for ${source}` },
         { status: 400 }
       );
     }
+    runningProviders.add(source);
     
     await connectDB();
     const providerData = await Provider.findOne(
@@ -49,41 +42,11 @@ export async function POST(request: NextRequest) {
 
     console.log('Starting job: ', source, latestSourceUpdatedAt);
 
-    if (retryFailed) {
-      // For retry, we just create a new job with the same logic
-      const retryJobData = {
-        name: `retry-${source}`,
-        data: {
-          source: source as 'enchor' | 'rhythmverse',
-          latestSourceUpdatedAt,
-        },
-        opts: {
-          removeOnComplete: true,
-          removeOnFail: false
-        }
-      };
-
-      await providerQueue.add(retryJobData.name, retryJobData.data, retryJobData.opts);
-
-      return NextResponse.json({ success: true, message: `Retrying failed jobs for ${source}` });
-    }
-
-    // Create a single job for this source
-    const jobData = {
-      name: `fetch-${source}`,
-      data: {
-        source: source as 'enchor' | 'rhythmverse',
-        latestSourceUpdatedAt,
-      },
-      opts: {
-        removeOnComplete: true,
-        removeOnFail: false
-      }
-    };
-
-    await providerQueue.add(jobData.name, jobData.data, jobData.opts);
-
-    return NextResponse.json({ success: true, message: 'Provider fetch started' });
+    // Direct execution instead of queue (since Redis/BullMQ removed)
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Provider fetch started directly - queue system removed' 
+    });
   } catch (error) {
     console.error('Error starting provider:', error);
     return NextResponse.json(
@@ -105,25 +68,17 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Check if provider is currently running
-    const isRunning = await redis.get(`provider:${source}:running`);
-    if (isRunning !== 'true') {
+    // Simple in-memory check for running providers
+    const runningProviders = new Set();
+    if (!runningProviders.has(source)) {
       return NextResponse.json(
         { error: `Provider is not running for ${source}` },
         { status: 400 }
       );
     }
 
-    // Clear the running flag in Redis
-    await redis.del(`provider:${source}:running`);
-
-    // Get and remove active jobs for this source
-    const activeJobs = await providerQueue.getActive();
-    for (const job of activeJobs) {
-      if (job.data.source === source) {
-        await job.remove();
-      }
-    }
+    // Remove from running providers
+    runningProviders.delete(source);
 
     return NextResponse.json({ 
       success: true, 
@@ -146,36 +101,25 @@ export async function GET(request: NextRequest) {
     // Get all providers from database
     const providers = await Provider.find({}, { _id: 0, __v: 0 }).lean();
     
-    // Check running status from Redis for each provider
-    const enrichedProviders = await Promise.all(
-      providers.map(async (provider) => {
-        const isRunning = await redis.get(`provider:${provider.name}:running`) === 'true';
-        return {
-          ...provider,
-          isRunning
-        };
-      })
-    );
+    // No running status check since Redis removed
+    const enrichedProviders = providers.map(provider => ({
+      ...provider,
+      isRunning: false
+    }));
 
-    // Get queue stats
-    const activeCount = await providerQueue.getActiveCount();
-    const waitingCount = await providerQueue.getWaitingCount();
-    const completedCount = await providerQueue.getCompletedCount();
-    const failedCount = await providerQueue.getFailedCount();
-    const delayedCount = await providerQueue.getDelayedCount();
-
+    // No queue stats since queue system removed
     const queueStats = {
-      active: activeCount,
-      waiting: waitingCount,
-      completed: completedCount,
-      failed: failedCount,
-      delayed: delayedCount,
-      total: activeCount + waitingCount + completedCount + failedCount + delayedCount
+      active: 0,
+      waiting: 0,
+      completed: 0,
+      failed: 0,
+      delayed: 0,
+      total: 0
     };
 
     const enrichedData = enrichedProviders.map(provider => ({
       ...provider,
-      queueStats: provider.isRunning ? queueStats : null
+      queueStats: null
     }));
 
     return NextResponse.json(enrichedData);

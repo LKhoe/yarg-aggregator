@@ -12,7 +12,7 @@ const MusicSchema = new Schema<IMusicDocument>(
     downloadUrl: { type: String, required: true },
     source: {
       type: String,
-      enum: ['enchor', 'rhythmverse'],
+      enum: ['enchor', 'rhythmverse', 'yarg-cache'],
       required: true,
       index: true
     },
@@ -27,6 +27,10 @@ const MusicSchema = new Schema<IMusicDocument>(
     genre: { type: String, index: true },
     year: { type: Number },
     charter: { type: String },
+    hash: { type: String, index: true, sparse: true },
+    metadata: { type: Schema.Types.Mixed },
+    deviceId: { type: String, index: true },
+    isInstalled: { type: Boolean, default: false },
   },
   {
     timestamps: true,

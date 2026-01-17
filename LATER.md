@@ -1,0 +1,2 @@
+- [ ] We should add a section to reference (or implement in typescript) the batch extractor from the [nautilus project](https://github.com/trojannemo/Nautilus)
+- [ ] Add reference to the [YARG.Core](https://github.com/YARC-Official/YARG.Core) project, from where we translated the C# code of the deserializer logic to typescript

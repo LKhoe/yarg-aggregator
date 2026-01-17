@@ -6,7 +6,7 @@ export interface IMusic {
   album: string;
   coverUrl: string;
   downloadUrl: string;
-  source: 'enchor' | 'rhythmverse';
+  source: 'enchor' | 'rhythmverse' | 'yarg-cache';
   sourceUpdatedAt?: Date;
   instruments: {
     drums?: number;
@@ -18,6 +18,10 @@ export interface IMusic {
   genre?: string;
   year?: number;
   charter?: string;
+  hash?: string;
+  metadata?: any;
+  deviceId?: string;
+  isInstalled?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

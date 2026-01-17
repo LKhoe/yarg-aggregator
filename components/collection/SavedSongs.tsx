@@ -135,7 +135,7 @@ export default function SavedSongs({
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 sm:space-y-4">
-                <div className="space-y-2 max-h-[50vh] sm:max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20">
+                <div className="space-y-2 max-h-[50vh] sm:max-h-[60vh] overflow-y-auto scrollbar-styled">
                     {savedSongs.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-6 sm:py-8 text-center space-y-2 opacity-50">
                             <Music className="h-6 w-6 sm:h-8 sm:w-8" />

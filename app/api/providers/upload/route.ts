@@ -7,6 +7,7 @@ import AdmZip from 'adm-zip';
 import { parseEnchorData, EnchorSong } from '@/services/providers/enchor';
 import { parseRhythmverseData, RhythmVerseSongEntry } from '@/services/providers/rhythmverse';
 import { ProviderMusic } from '@/types';
+import { processSongsForDeduplication } from '@/services/songDeduplication';
 
 // Disable body parsing for multipart forms? Next.js App Router handles FormData slightly differently
 // We need to read the FormData from the request
@@ -100,38 +101,52 @@ export async function POST(request: NextRequest) {
     if (totalProcessed > 0) {
       await connectDB();
 
-      const bulkOps = songsToUpsert.map((song) => ({
-        updateOne: {
-          filter: {
-            source: validatedSource,
-            name: song.name,
-            artist: song.artist,
-            instruments: song.instruments
-          },
-          update: {
-            $set: { ...song, source: validatedSource, sourceUpdatedAt: song.sourceUpdatedAt || new Date() }
-          },
-          upsert: true,
-        },
-      }));
+      // Process songs for deduplication
+      const { songsToSave, duplicateInfo } = await processSongsForDeduplication(songsToUpsert, validatedSource);
+      
+      console.log(`Deduplication results: ${songsToSave.length} songs to save out of ${totalProcessed} processed`);
+      
+      // Log duplicate decisions for debugging
+      duplicateInfo.forEach((info, index) => {
+        if (info.found) {
+          console.log(`Song "${info.song.name}" by ${info.song.artist}: ${info.decision} - ${info.reason}`);
+        }
+      });
 
-      // Batch write with ordered: false to continue processing despite duplicates
-      const batchSize = 500;
-      for (let i = 0; i < bulkOps.length; i += batchSize) {
-        const batch = bulkOps.slice(i, i + batchSize);
-        try {
-          const res = await Music.bulkWrite(batch, { ordered: false });
-          totalSaved += (res.insertedCount + res.upsertedCount);
-          console.log(`Batch ${i / batchSize + 1}: Inserted ${res.insertedCount}, upserted ${res.upsertedCount}`);
-        } catch (error: any) {
-          // Handle duplicate key errors gracefully
-          if (error.code === 11000 && error.result) {
-            // Some operations succeeded, count them
-            totalSaved += (error.result.insertedCount + error.result.upsertedCount);
-            console.log(`Batch ${i / batchSize + 1}: Processed with ${batch.length - error.writeErrors?.length || 0} duplicate(s)`);
-          } else {
-            // Re-throw if it's not a duplicate key error
-            throw error;
+      if (songsToSave.length > 0) {
+        const bulkOps = songsToSave.map((song) => ({
+          updateOne: {
+            filter: {
+              source: validatedSource,
+              name: song.name,
+              artist: song.artist,
+              instruments: song.instruments
+            },
+            update: {
+              $set: { ...song, source: validatedSource, sourceUpdatedAt: song.sourceUpdatedAt || new Date() }
+            },
+            upsert: true,
+          },
+        }));
+
+        // Batch write with ordered: false to continue processing despite duplicates
+        const batchSize = 500;
+        for (let i = 0; i < bulkOps.length; i += batchSize) {
+          const batch = bulkOps.slice(i, i + batchSize);
+          try {
+            const res = await Music.bulkWrite(batch, { ordered: false });
+            totalSaved += (res.insertedCount + res.upsertedCount);
+            console.log(`Batch ${i / batchSize + 1}: Inserted ${res.insertedCount}, upserted ${res.upsertedCount}`);
+          } catch (error: any) {
+            // Handle duplicate key errors gracefully
+            if (error.code === 11000 && error.result) {
+              // Some operations succeeded, count them
+              totalSaved += (error.result.insertedCount + error.result.upsertedCount);
+              console.log(`Batch ${i / batchSize + 1}: Processed with ${batch.length - error.writeErrors?.length || 0} duplicate(s)`);
+            } else {
+              // Re-throw if it's not a duplicate key error
+              throw error;
+            }
           }
         }
       }
@@ -153,12 +168,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`Processed ${totalProcessed} songs from ${filesProcessed} files, saved ${totalSaved} new songs`);
+    console.log(`Processed ${totalProcessed} songs from ${filesProcessed} files, saved ${totalSaved} new songs after deduplication`);
 
     return NextResponse.json({
       success: true,
-      message: `Processed ${totalProcessed} songs from ${filesProcessed} files, saved ${totalSaved} new songs.`,
+      message: `Processed ${totalProcessed} songs from ${filesProcessed} files, saved ${totalSaved} new songs after deduplication.`,
       count: totalSaved,
+      processed: totalProcessed,
+      duplicates: totalProcessed - totalSaved,
     });
 
   } catch (error) {

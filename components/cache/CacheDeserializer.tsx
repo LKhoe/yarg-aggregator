@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import { Upload, FileText, Music, AlertCircle, CheckCircle } from 'lucide-react';
+import { Upload, FileText, Music, AlertCircle, CheckCircle, Database } from 'lucide-react';
 import { toast } from 'sonner';
 import { SongEntry } from '@/services/cache-reader/Song/Entries/SongEntry';
 import deserializeCache from '@/services/cache-reader/deserializer';
@@ -16,7 +16,21 @@ export default function CacheDeserializer() {
   const [isLoading, setIsLoading] = useState(false);
   const [songs, setSongs] = useState<SongEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [deviceId, setDeviceId] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState<{ message: string; progress?: number } | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Get device ID from localStorage
+    let id = localStorage.getItem('deviceId');
+    if (!id) {
+      // Generate a new device ID if none exists
+      id = 'device-' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('deviceId', id);
+    }
+    setDeviceId(id);
+  }, []);
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -54,6 +68,51 @@ export default function CacheDeserializer() {
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSaveToDatabase = async () => {
+    if (songs.length === 0) {
+      toast.error('No songs to save');
+      return;
+    }
+
+    if (!deviceId) {
+      toast.error('Device ID is required');
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveProgress({ message: 'Starting to save songs to database...' });
+
+    try {
+      const response = await fetch('/api/songs/deserialized', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          songs,
+          deviceId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save songs');
+      }
+
+      const data = await response.json();
+      toast.success(data.message);
+      setSaveProgress({ message: data.message });
+
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save songs';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      setSaveProgress({ message: errorMessage });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -123,12 +182,41 @@ export default function CacheDeserializer() {
 
         {/* Success Display */}
         {songs.length > 0 && !error && (
-          <Alert>
-            <CheckCircle className="h-4 w-4" />
-            <AlertDescription>
-              Successfully loaded {songs.length} songs from the cache file.
-            </AlertDescription>
-          </Alert>
+          <div className="space-y-3">
+            <Alert>
+              <CheckCircle className="h-4 w-4" />
+              <AlertDescription>
+                Successfully loaded {songs.length} songs from the cache file.
+              </AlertDescription>
+            </Alert>
+            
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleSaveToDatabase} 
+                disabled={isSaving || songs.length === 0}
+                className="flex-1"
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Database className="h-4 w-4 mr-2" />
+                    Save to Database
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {saveProgress && (
+              <Alert>
+                <Database className="h-4 w-4" />
+                <AlertDescription>{saveProgress.message}</AlertDescription>
+              </Alert>
+            )}
+          </div>
         )}
 
         {/* Songs List */}

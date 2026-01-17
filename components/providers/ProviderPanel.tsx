@@ -35,14 +35,6 @@ interface ProviderStat {
   isRunning: boolean;
   createdAt?: string;
   updatedAt?: string;
-  queueStats?: {
-    active: number;
-    waiting: number;
-    completed: number;
-    failed: number;
-    delayed: number;
-    total: number;
-  };
 }
 
 export default function ProviderPanel() {
@@ -50,7 +42,6 @@ export default function ProviderPanel() {
   const [runningSources, setRunningSources] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<JobProgress | null>(null);
   const [stats, setStats] = useState<ProviderStat[]>([]);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -67,39 +58,16 @@ export default function ProviderPanel() {
         );
         setRunningSources(currentlyRunning);
 
-        // Update progress based on running sources
-        const runningProvider = data.find((s: ProviderStat) => s.isRunning && s.queueStats);
+        // Update progress based on running sources (simplified since queue system removed)
+        const runningProvider = data.find((s: ProviderStat) => s.isRunning);
 
-        if (runningProvider && runningProvider.queueStats) {
-          const qs = runningProvider.queueStats;
-          const total = qs.total;
-          const completed = qs.completed;
-
-          // If there are no more jobs in the queue, mark as complete
-          if (total === 0 || (qs.active === 0 && qs.waiting === 0 && qs.delayed === 0)) {
-            setRunningSources(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(runningProvider.name);
-              return newSet;
-            });
-            setProgress(prev => {
-              if (prev?.status === 'running') {
-                toast.success('Provider fetch completed!');
-                return { ...prev, status: 'completed', progress: 100 };
-              }
-              return prev;
-            });
-          } else {
-            const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-            setProgress({
-              status: 'running',
-              progress: percent,
-              currentSource: runningProvider.name,
-              jobsCompleted: completed,
-              jobsTotal: total,
-            });
-          }
+        if (runningProvider) {
+          // Simple progress indication since no queue stats available
+          setProgress({
+            status: 'running',
+            progress: 50, // Generic progress since we can't track queue
+            currentSource: runningProvider.name,
+          });
         } else if (!data.some((s: ProviderStat) => s.isRunning)) {
           // No providers are running
           if (runningSources.size > 0) {
@@ -119,32 +87,10 @@ export default function ProviderPanel() {
     }
   }, []);
 
-  // Initial fetch and polling setup
+  // Initial fetch
   useEffect(() => {
-    // Initial fetch
     fetchStats();
   }, [fetchStats]);
-
-  // Set up polling when providers are running
-  useEffect(() => {
-    if (runningSources.size > 0) {
-      // Start polling every 2 seconds
-      pollingIntervalRef.current = setInterval(fetchStats, 2000);
-    } else {
-      // Stop polling when no providers are running
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-    }
-
-    // Cleanup on unmount
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
-    };
-  }, [runningSources.size, fetchStats]);
 
   const stopProvider = async (source: string) => {
     try {
@@ -197,13 +143,21 @@ export default function ProviderPanel() {
       progress: 0,
       currentSource: source !== 'all' ? source : 'multiple',
       jobsCompleted: 0,
-      jobsTotal: 0,
+      jobsTotal: availableSources.length,
     });
 
-    // Start fetch for each available source
+    // Process each source sequentially
     for (const src of availableSources) {
       try {
-        const response = await fetch('/api/providers', {
+        setRunningSources(prev => new Set([...prev, src]));
+        setProgress(prev => ({
+          ...prev,
+          status: 'running',
+          currentSource: src,
+          progress: 0,
+        }));
+
+        const response = await fetch('/api/providers/stream', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ source: src }),
@@ -211,19 +165,108 @@ export default function ProviderPanel() {
 
         if (!response.ok) {
           const errorData = await response.json();
-          toast.error(`Failed to start fetch for ${src}: ${errorData.error}`);
-        } else {
-          toast.success(`Started fetch for ${src}`);
-          // Add to running sources immediately
-          setRunningSources(prev => new Set([...prev, src]));
+          throw new Error(errorData.error || 'Failed to start fetch');
         }
-      } catch (error) {
-        toast.error(`Failed to start fetch for ${src}: ${error}`);
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+
+        if (!reader) {
+          throw new Error('No response body');
+        }
+
+        let totalPages = 0;
+        let completedPages = 0;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                
+                switch (data.type) {
+                  case 'start':
+                    toast.success(`Started fetching ${src}`);
+                    break;
+                  case 'progress':
+                    console.log(data.message);
+                    break;
+                  case 'page_complete':
+                    totalPages = Math.max(totalPages, data.page);
+                    completedPages = data.page;
+                    const progress = totalPages > 0 ? Math.round((completedPages / totalPages) * 100) : 0;
+                    setProgress(prev => ({
+                      ...prev,
+                      progress,
+                      currentPage: data.page,
+                      totalPages: totalPages,
+                      songsProcessed: data.totalSongsProcessed,
+                      status: 'running',
+                    }));
+                    break;
+                  case 'complete':
+                    toast.success(`Completed fetching ${src}: ${data.totalSongsProcessed} songs processed`);
+                    setProgress(prev => ({
+                      ...prev,
+                      status: 'completed',
+                      progress: 100,
+                      songsProcessed: data.totalSongsProcessed,
+                    }));
+                    break;
+                  case 'error':
+                    toast.error(`Error fetching ${src}: ${data.message}`);
+                    setProgress(prev => ({
+                      ...prev,
+                      status: 'error',
+                      errors: [data.message],
+                      progress: prev?.progress || 0,
+                    }));
+                    break;
+                  case 'retry':
+                    console.log(`Retrying page ${data.page} for ${src}`);
+                    break;
+                }
+              } catch (e) {
+                console.error('Error parsing SSE data:', e);
+              }
+            }
+          }
+        }
+
+        // Refresh stats after completion
+        await fetchStats();
+
+      } catch (error: any) {
+        console.error(`Error fetching ${src}:`, error);
+        toast.error(`Failed to fetch ${src}: ${error.message}`);
+        setProgress(prev => ({ 
+          ...prev, 
+          status: 'error', 
+          errors: prev?.errors ? [...prev.errors, error.message] : [error.message],
+          progress: prev?.progress || 0,
+        }));
+      } finally {
+        setRunningSources(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(src);
+          return newSet;
+        });
       }
     }
 
-    // Refresh stats after starting all fetches
-    await fetchStats();
+    // Final completion
+    setProgress(prev => {
+      if (prev?.status !== 'error') {
+        return { ...prev, status: 'completed', progress: 100 };
+      }
+      return prev;
+    });
   };
 
   const getStatusColor = (status: string) => {
@@ -310,23 +353,108 @@ export default function ProviderPanel() {
                                 formData.append('file', file);
                                 formData.append('source', src);
 
-                                toast.promise(
-                                  fetch('/api/providers/upload', {
-                                    method: 'POST',
-                                    body: formData,
-                                  }).then(async (res) => {
-                                    if (!res.ok) throw new Error(await res.text());
-                                    return res.json();
-                                  }),
-                                  {
-                                    loading: 'Uploading...',
-                                    success: (data) => {
-                                      fetchStats();
-                                      return data.message;
-                                    },
-                                    error: (err) => `Upload failed: ${err.message}`,
+                                // Start progress tracking
+                                setProgress({
+                                  status: 'starting',
+                                  progress: 0,
+                                  currentSource: src,
+                                  jobsCompleted: 0,
+                                  jobsTotal: 1,
+                                });
+
+                                // Start streaming upload
+                                fetch('/api/providers/upload/stream', {
+                                  method: 'POST',
+                                  body: formData,
+                                }).then(async (response) => {
+                                  if (!response.ok) {
+                                    throw new Error('Upload failed');
                                   }
-                                );
+
+                                  const reader = response.body?.getReader();
+                                  const decoder = new TextDecoder();
+
+                                  if (!reader) {
+                                    throw new Error('No response body');
+                                  }
+
+                                  let totalBatches = 0;
+                                  let completedBatches = 0;
+
+                                  while (true) {
+                                    const { done, value } = await reader.read();
+                                    if (done) break;
+
+                                    const chunk = decoder.decode(value);
+                                    const lines = chunk.split('\n');
+
+                                    for (const line of lines) {
+                                      if (line.startsWith('data: ')) {
+                                        try {
+                                          const data = JSON.parse(line.slice(6));
+                                          
+                                          switch (data.type) {
+                                            case 'start':
+                                              setProgress(prev => ({
+                                                ...prev,
+                                                status: 'running',
+                                                progress: 0,
+                                              }));
+                                              break;
+                                            case 'progress':
+                                              console.log(data.message);
+                                              break;
+                                            case 'batch_complete':
+                                              totalBatches = Math.max(totalBatches, data.totalBatches);
+                                              completedBatches = data.batch;
+                                              const progress = totalBatches > 0 ? Math.round((completedBatches / totalBatches) * 100) : 0;
+                                              setProgress(prev => ({
+                                                ...prev,
+                                                progress,
+                                                currentPage: data.batch,
+                                                totalPages: totalBatches,
+                                                songsProcessed: data.totalSaved,
+                                                status: 'running',
+                                              }));
+                                              break;
+                                            case 'complete':
+                                              toast.success(data.message);
+                                              setProgress(prev => ({
+                                                ...prev,
+                                                status: 'completed',
+                                                progress: 100,
+                                                songsProcessed: data.totalSaved,
+                                              }));
+                                              fetchStats(); // Refresh stats after upload
+                                              break;
+                                            case 'error':
+                                              toast.error(`Upload error: ${data.message}`);
+                                              setProgress(prev => ({
+                                                ...prev,
+                                                status: 'error',
+                                                errors: [data.message],
+                                                progress: prev?.progress || 0,
+                                              }));
+                                              break;
+                                            case 'warning':
+                                              console.warn(data.message);
+                                              break;
+                                          }
+                                        } catch (e) {
+                                          console.error('Error parsing SSE data:', e);
+                                        }
+                                      }
+                                    }
+                                  }
+                                }).catch((error) => {
+                                  toast.error(`Upload failed: ${error.message}`);
+                                  setProgress(prev => ({
+                                    ...prev,
+                                    status: 'error',
+                                    errors: [error.message],
+                                    progress: prev?.progress || 0,
+                                  }));
+                                });
                               }
                               // Reset the input so the same file can be selected again if needed
                               e.target.value = '';
@@ -398,19 +526,29 @@ export default function ProviderPanel() {
               </div>
             </div>
 
-            <Button onClick={startFetch} disabled={runningSources.size > 0} className="w-full cursor-pointer">
-              {runningSources.size > 0 ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Fetching...
-                </>
-              ) : (
-                <>
-                  <Play className="mr-2 h-4 w-4" />
-                  Start Fetch
-                </>
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={startFetch} disabled={runningSources.size > 0} className="flex-1 cursor-pointer">
+                {runningSources.size > 0 ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Fetching...
+                  </>
+                ) : (
+                  <>
+                    <Play className="mr-2 h-4 w-4" />
+                    Start Fetch
+                  </>
+                )}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={fetchStats}
+                disabled={runningSources.size > 0}
+                className="cursor-pointer"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Table,
   TableBody,
@@ -59,10 +59,11 @@ const INSTRUMENTS = ['bass', 'guitar', 'drums', 'vocals', 'prokeys'] as const;
 export default function MusicTable({ deviceId, deviceName, onSavedSongsChange, onTotalChange }: MusicTableProps) {
   const [data, setData] = useState<IMusic[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [nextCursor, setNextCursor] = useState<string | undefined>();
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
   const [limit] = useState(20);
-  const [totalPages, setTotalPages] = useState(1);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [sortBy, setSortBy] = useState<string>('name');
@@ -70,56 +71,89 @@ export default function MusicTable({ deviceId, deviceName, onSavedSongsChange, o
   const [source, setSource] = useState<string>('');
   const [instruments, setInstruments] = useState<string[]>([]);
   const [showSavedOnly, setShowSavedOnly] = useState(false);
+  const [showInstalledOnly, setShowInstalledOnly] = useState(false);
   const { savedSongIds, addSong, removeSong } = useSavedSongs();
+  
+  // Ref for intersection observer
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLTableRowElement | null>(null);
 
   // Debounce search query
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(query);
-      setPage(1);
+      // Reset data when query changes
+      setData([]);
+      setNextCursor(undefined);
+      setHasMore(true);
     }, 300);
     return () => clearTimeout(timer);
   }, [query]);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (reset = false) => {
+    if (reset) {
+      setLoading(true);
+      setData([]);
+      setNextCursor(undefined);
+      setHasMore(true);
+    } else {
+      setLoadingMore(true);
+    }
+    
     try {
       const params = new URLSearchParams({
-        page: page.toString(),
         limit: limit.toString(),
         sortBy,
         sortOrder,
+        useCursor: 'true',
       });
+      
+      if (nextCursor && !reset) {
+        params.set('cursor', nextCursor);
+      }
+      
       if (debouncedQuery) params.set('query', debouncedQuery);
       if (source) params.set('source', source);
       if (instruments.length > 0) params.set('instruments', instruments.join(','));
+      if (showInstalledOnly) params.set('installedOnly', 'true');
       if (showSavedOnly) {
-        // If showing saved songs only, we need to filter by saved song IDs
         const savedIdsArray = Array.from(savedSongIds);
         if (savedIdsArray.length > 0) {
           params.set('savedIds', savedIdsArray.join(','));
         } else {
-          // If no saved songs, return empty result
           setData([]);
-          setTotal(0);
-          setTotalPages(0);
+          setHasMore(false);
           setLoading(false);
+          setLoadingMore(false);
           return;
         }
       }
 
       const response = await fetch(`/api/music?${params}`);
       if (response.ok) {
-        const result: PaginatedResponse<IMusic> = await response.json();
-        setData(result.data);
-        setTotal(result.total);
-        setTotalPages(result.totalPages);
+        const result = await response.json();
+        
+        if (reset) {
+          setData(result.data);
+        } else {
+          // Ensure no duplicates by filtering out existing songs
+          setData(prev => {
+            const existingIds = new Set(prev.map(song => song._id));
+            const newSongs = result.data.filter((song: IMusic) => !existingIds.has(song._id));
+            return [...prev, ...newSongs];
+          });
+        }
+        
+        setNextCursor(result.nextCursor);
+        setHasMore(result.hasMore);
+        setTotal(prev => prev + result.data.length);
       }
     } catch (error) {
       console.error('Error fetching music:', error);
     }
     setLoading(false);
-  }, [page, limit, sortBy, sortOrder, debouncedQuery, source, instruments, showSavedOnly]);
+    setLoadingMore(false);
+  }, [limit, sortBy, sortOrder, debouncedQuery, source, instruments, showInstalledOnly, showSavedOnly, savedSongIds, nextCursor]);
 
   useEffect(() => {
     fetchData();
@@ -128,9 +162,38 @@ export default function MusicTable({ deviceId, deviceName, onSavedSongsChange, o
   // Refetch data when saved songs change and "Saved Only" filter is active
   useEffect(() => {
     if (showSavedOnly) {
-      fetchData();
+      fetchData(true);
     }
   }, [savedSongIds, showSavedOnly, fetchData]);
+
+  // Setup intersection observer for infinite scroll
+  useEffect(() => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+          fetchData(false);
+        }
+      },
+      {
+        threshold: 0.1,
+        rootMargin: '100px',
+      }
+    );
+
+    if (loadMoreRef.current) {
+      observerRef.current.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [hasMore, loading, loadingMore, fetchData]);
 
   // Notify parent when total changes
   useEffect(() => {
@@ -144,6 +207,10 @@ export default function MusicTable({ deviceId, deviceName, onSavedSongsChange, o
       setSortBy(column);
       setSortOrder('asc');
     }
+    // Reset data when sort changes
+    setData([]);
+    setNextCursor(undefined);
+    setHasMore(true);
   };
 
   const SortIcon = ({ column }: { column: string }) => {
@@ -184,7 +251,9 @@ export default function MusicTable({ deviceId, deviceName, onSavedSongsChange, o
               values={instruments}
               onValuesChange={(val) => {
                 setInstruments(val);
-                setPage(1);
+                setData([]);
+                setNextCursor(undefined);
+                setHasMore(true);
               }}
             >
               <MultiSelectTrigger className="h-[36px] w-full text-sm">
@@ -205,9 +274,14 @@ export default function MusicTable({ deviceId, deviceName, onSavedSongsChange, o
             </MultiSelect>
           </div>
           
-          {/* Source and Saved filters - same row on desktop, separate on mobile */}
+          {/* Source and Saved/Installed filters - same row on desktop, separate on mobile */}
           <div className="flex gap-2 w-full sm:w-auto">
-            <Select value={source || 'all'} onValueChange={(v) => setSource(v === 'all' ? '' : v)}>
+            <Select value={source || 'all'} onValueChange={(v) => {
+              setSource(v === 'all' ? '' : v);
+              setData([]);
+              setNextCursor(undefined);
+              setHasMore(true);
+            }}>
               <SelectTrigger className="flex-1 sm:w-[150px] h-9">
                 <SelectValue placeholder="All Sources" />
               </SelectTrigger>
@@ -215,6 +289,7 @@ export default function MusicTable({ deviceId, deviceName, onSavedSongsChange, o
                 <SelectItem value="all">All Sources</SelectItem>
                 <SelectItem value="enchor">Enchor.us</SelectItem>
                 <SelectItem value="rhythmverse">Rhythmverse</SelectItem>
+                <SelectItem value="yarg-cache">YARG Cache</SelectItem>
               </SelectContent>
             </Select>
             <Button
@@ -222,13 +297,30 @@ export default function MusicTable({ deviceId, deviceName, onSavedSongsChange, o
               size="sm"
               onClick={() => {
                 setShowSavedOnly(!showSavedOnly);
-                setPage(1);
+                setData([]);
+                setNextCursor(undefined);
+                setHasMore(true);
               }}
               className="flex items-center gap-2 h-9 flex-1 sm:flex-none"
             >
               <Heart className={`h-4 w-4 ${showSavedOnly ? 'fill-current' : ''}`} />
               <span className="hidden sm:inline">Saved Only</span>
               <span className="sm:hidden">Saved</span>
+            </Button>
+            <Button
+              variant={showInstalledOnly ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setShowInstalledOnly(!showInstalledOnly);
+                setData([]);
+                setNextCursor(undefined);
+                setHasMore(true);
+              }}
+              className="flex items-center gap-2 h-9 flex-1 sm:flex-none"
+            >
+              <div className={`w-4 h-4 rounded-full border-2 ${showInstalledOnly ? 'bg-green-500 border-green-500' : 'border-current'}`} />
+              <span className="hidden sm:inline">Installed Only</span>
+              <span className="sm:hidden">Installed</span>
             </Button>
           </div>
         </div>
@@ -288,7 +380,10 @@ export default function MusicTable({ deviceId, deviceName, onSavedSongsChange, o
               </TableRow>
             ) : (
               data.map((music) => (
-                <TableRow key={music._id}>
+                <TableRow 
+                  key={music._id}
+                  className={music.isInstalled ? 'bg-green-50 dark:bg-green-950/20' : ''}
+                >
                   <TableCell>
                     <Button
                       variant="ghost"
@@ -390,9 +485,14 @@ export default function MusicTable({ deviceId, deviceName, onSavedSongsChange, o
                     </div>
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
-                    <Badge variant="outline" className="capitalize text-xs">
-                      {music.source}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {music.isInstalled && (
+                        <div className="w-2 h-2 bg-green-500 rounded-full" title="Installed" />
+                      )}
+                      <Badge variant="outline" className="capitalize text-xs">
+                        {music.source}
+                      </Badge>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Button
@@ -410,52 +510,28 @@ export default function MusicTable({ deviceId, deviceName, onSavedSongsChange, o
                 </TableRow>
               ))
             )}
+            
+            {/* Load more trigger row */}
+            {!loading && hasMore && data.length > 0 && (
+              <TableRow ref={loadMoreRef}>
+                <TableCell colSpan={8} className="h-16 text-center">
+                  {loadingMore && (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      <span className="text-sm text-muted-foreground">Loading more songs...</span>
+                    </div>
+                  )}
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
 
-      {/* Pagination */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+      {/* Status */}
+      <div className="flex items-center justify-center">
         <div className="text-sm text-muted-foreground">
-          Page {page} of {totalPages}
-        </div>
-        <div className="flex items-center gap-1 sm:gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setPage(1)}
-            disabled={page === 1 || loading}
-            className="h-8 w-8 sm:h-9 sm:w-9"
-          >
-            <ChevronsLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1 || loading}
-            className="h-8 w-8 sm:h-9 sm:w-9"
-          >
-            <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages || loading}
-            className="h-8 w-8 sm:h-9 sm:w-9"
-          >
-            <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setPage(totalPages)}
-            disabled={page === totalPages || loading}
-            className="h-8 w-8 sm:h-9 sm:w-9"
-          >
-            <ChevronsRight className="h-3 w-3 sm:h-4 sm:w-4" />
-          </Button>
+          {loading ? 'Loading songs...' : `${total} songs loaded${hasMore ? ' (scroll for more)' : ''}`}
         </div>
       </div>
     </div>
