@@ -420,7 +420,7 @@ export default function MusicTable({
                           className="size-4 sm:size-5"
                         />
                         <span className="text-sm">
-                          {t(`table.instrumentsObj.${inst}` as any)}
+                          {t(`table.instrumentsObj.${inst}`)}
                         </span>
                       </div>
                     </MultiSelectItem>
@@ -476,7 +476,6 @@ export default function MusicTable({
               </SelectContent>
             </Select>
           </div>
-
         </div>
       </div>
 
@@ -575,10 +574,11 @@ export default function MusicTable({
                   key={
                     music.id ?? getNormalizedSongKey(music.name, music.artist)
                   }
-                  className={`cursor-pointer ${music.installed
-                    ? "bg-green-500/5 hover:bg-green-500/10"
-                    : ""
-                    }`}
+                  className={`cursor-pointer ${
+                    music.installed
+                      ? "bg-green-500/5 hover:bg-green-500/10"
+                      : ""
+                  }`}
                   onClick={() => onSongSelect?.(music)}
                 >
                   <TableCell className="hidden sm:table-cell">
@@ -790,21 +790,31 @@ export default function MusicTable({
                           onAddToList={addSongToList}
                         />
                       )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        asChild
-                        disabled={!music.downloadUrls?.length}
-                        className="h-8 w-8 sm:h-10 sm:w-10"
-                      >
-                        <a
-                          href={music.downloadUrls?.[0]?.url || "#"}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                      {music.downloadUrls?.length ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          asChild
+                          className="h-8 w-8 sm:h-10 sm:w-10"
+                        >
+                          <a
+                            href={music.downloadUrls[0].url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Download className="h-3 w-3 sm:h-4 sm:w-4" />
+                          </a>
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          disabled
+                          className="h-8 w-8 sm:h-10 sm:w-10"
                         >
                           <Download className="h-3 w-3 sm:h-4 sm:w-4" />
-                        </a>
-                      </Button>
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

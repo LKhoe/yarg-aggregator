@@ -9,15 +9,21 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "**.enchor.us",
+        hostname: "files.enchor.us",
+        port: "",
+        pathname: "/**",
       },
       {
         protocol: "https",
-        hostname: "**.rhythmverse.co",
+        hostname: "rhythmverse.co",
+        port: "",
+        pathname: "/assets/**",
       },
       {
         protocol: "https",
         hostname: "**.googleusercontent.com",
+        port: "",
+        pathname: "/a/**",
       },
     ],
   },

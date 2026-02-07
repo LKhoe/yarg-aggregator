@@ -71,10 +71,9 @@ export function SongActions({
             className="h-8 w-8 sm:h-10 sm:w-10"
           >
             <Heart
-              className={`h-3 w-3 sm:h-4 sm:w-4 transition-colors ${isFavorited
-                  ? "fill-red-500 text-red-500"
-                  : "text-muted-foreground"
-                }`}
+              className={`h-3 w-3 sm:h-4 sm:w-4 transition-colors ${
+                isFavorited ? "fill-red-500 text-red-500" : "text-foreground"
+              }`}
             />
           </Button>
         </TooltipTrigger>
@@ -95,7 +94,7 @@ export function SongActions({
                   size="icon"
                   className="h-8 w-8 sm:h-10 sm:w-10"
                 >
-                  <ListPlus className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+                  <ListPlus className="h-3 w-3 sm:h-4 sm:w-4 text-foreground" />
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>

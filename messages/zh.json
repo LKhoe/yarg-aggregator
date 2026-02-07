@@ -319,7 +319,14 @@
     "noSongs": "此列表中还没有歌曲。",
     "songRemoved": "歌曲已从列表中移除。",
     "songRemoveError": "移除歌曲失败。",
-    "by": "创建者："
+    "by": "创建者：",
+    "downloadAll": "全部下载",
+    "downloadAllConfirm": "下载所有歌曲？",
+    "downloadAllDescription": "这将在浏览器中打开{count}个标签页来下载所有歌曲。如果提示，请允许弹出窗口。",
+    "downloading": "正在打开下载...",
+    "downloadAllBlocked": "弹出窗口被阻止。请允许此网站的弹出窗口，然后重试。",
+    "downloadAllNoLinks": "部分歌曲没有下载链接",
+    "confirm": "确认"
   },
   "installationSelector": {
     "selectPlaceholder": "选择安装...",

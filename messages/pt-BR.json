@@ -324,7 +324,14 @@
     "noSongs": "Ainda não há músicas nesta lista.",
     "songRemoved": "Música removida da lista.",
     "songRemoveError": "Falha ao remover a música.",
-    "by": "por"
+    "by": "por",
+    "downloadAll": "Baixar Tudo",
+    "downloadAllConfirm": "Baixar todas as músicas?",
+    "downloadAllDescription": "Isso abrirá {count} abas no seu navegador para baixar todas as músicas. Permita popups se solicitado.",
+    "downloading": "Abrindo downloads...",
+    "downloadAllBlocked": "Popups bloqueados. Permita popups para este site e tente novamente.",
+    "downloadAllNoLinks": "Algumas músicas não possuem links de download",
+    "confirm": "Confirmar"
   },
   "admin": {
     "dashboard": "Painel Admin",

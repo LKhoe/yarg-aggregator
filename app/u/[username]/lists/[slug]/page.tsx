@@ -10,10 +10,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Music, ArrowLeft, User } from "lucide-react";
+import { toast } from "sonner";
+import { Music, ArrowLeft, User, Download } from "lucide-react";
 import Link from "next/link";
 
 interface PublicList {
@@ -30,6 +42,7 @@ interface PublicList {
     artist: string;
     album: string | null;
     addedAt: string;
+    downloadUrls: { url: string; source: string }[];
   }[];
 }
 
@@ -42,6 +55,7 @@ export default function PublicListPage() {
   const [list, setList] = useState<PublicList | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     async function fetchList() {
@@ -68,6 +82,34 @@ export default function PublicListPage() {
 
     fetchList();
   }, [username, slug]);
+
+  const allSongsHaveDownloads = list
+    ? list.songs.length > 0 && list.songs.every((song) => song.downloadUrls.length > 0)
+    : false;
+
+  const downloadUrls = list
+    ? list.songs
+        .filter((song) => song.downloadUrls.length > 0)
+        .map((song) => song.downloadUrls[0].url)
+    : [];
+
+  const handleDownloadAll = async () => {
+    setIsDownloading(true);
+
+    const firstWindow = window.open(downloadUrls[0], "_blank");
+    if (!firstWindow) {
+      toast.error(t("lists.downloadAllBlocked"));
+      setIsDownloading(false);
+      return;
+    }
+
+    for (let i = 1; i < downloadUrls.length; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      window.open(downloadUrls[i], "_blank");
+    }
+
+    setIsDownloading(false);
+  };
 
   if (isLoading) {
     return (
@@ -132,10 +174,40 @@ export default function PublicListPage() {
                 </Link>
               </CardDescription>
             </div>
-            <Badge variant="secondary" className="text-lg px-3 py-1">
-              {list.songs.length}{" "}
-              {list.songs.length === 1 ? t("lists.song") : t("lists.songs")}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-lg px-3 py-1">
+                {list.songs.length}{" "}
+                {list.songs.length === 1 ? t("lists.song") : t("lists.songs")}
+              </Badge>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    disabled={!allSongsHaveDownloads || isDownloading}
+                    title={!allSongsHaveDownloads ? t("lists.downloadAllNoLinks") : undefined}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    {isDownloading ? t("lists.downloading") : t("lists.downloadAll")}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      {t("lists.downloadAllConfirm")}
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t("lists.downloadAllDescription").replace("{count}", String(downloadUrls.length))}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>{t("lists.cancel")}</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDownloadAll}>
+                      {t("lists.confirm")}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

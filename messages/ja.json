@@ -319,7 +319,14 @@
     "noSongs": "このリストにはまだ曲がありません。",
     "songRemoved": "曲をリストから削除しました。",
     "songRemoveError": "曲の削除に失敗しました。",
-    "by": "作成者："
+    "by": "作成者：",
+    "downloadAll": "すべてダウンロード",
+    "downloadAllConfirm": "すべての曲をダウンロードしますか？",
+    "downloadAllDescription": "ブラウザで{count}個のタブを開いてすべての曲をダウンロードします。ポップアップの許可を求められた場合は許可してください。",
+    "downloading": "ダウンロードを開いています...",
+    "downloadAllBlocked": "ポップアップがブロックされました。このサイトのポップアップを許可してから再試行してください。",
+    "downloadAllNoLinks": "ダウンロードリンクがない曲があります",
+    "confirm": "確認"
   },
   "installationSelector": {
     "selectPlaceholder": "インストールを選択...",

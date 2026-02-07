@@ -47,6 +47,7 @@ export async function GET(
           artist: item.song.artist.name,
           album: item.song.album?.name ?? null,
           addedAt: item.addedAt,
+          downloadUrls: item.song.downloadUrls,
         })),
       });
     }

@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { songList, songListItem, song, artist, album } from "@/lib/db/schema";
+import { songList, songListItem, song, artist, album, downloadUrl } from "@/lib/db/schema";
 import { eq, and, sql, or, desc, inArray, ne } from "drizzle-orm";
 import type { SongList, SongListItem, Song } from "@/lib/db/schema";
 
@@ -12,6 +12,7 @@ export type ListWithItems = SongList & {
     song: Song & {
       artist: { name: string };
       album: { name: string } | null;
+      downloadUrls: { url: string; source: string }[];
     };
   })[];
 };
@@ -107,10 +108,21 @@ export class ListService {
       ? await db.select().from(album).where(inArray(album.id, albumIds))
       : [];
 
+    // Get download URLs for all songs
+    const downloadUrls = songIds.length > 0
+      ? await db.select().from(downloadUrl).where(inArray(downloadUrl.songId, songIds))
+      : [];
+
     // Create lookup maps
     const artistMap = new Map(artists.map(a => [a.id, a]));
     const albumMap = new Map(albums.map(a => [a.id, a]));
     const songMap = new Map(songs.map(s => [s.id, s]));
+    const downloadUrlMap = new Map<string, { url: string; source: string }[]>();
+    for (const dl of downloadUrls) {
+      const existing = downloadUrlMap.get(dl.songId) ?? [];
+      existing.push({ url: dl.url, source: dl.source });
+      downloadUrlMap.set(dl.songId, existing);
+    }
 
     // Assemble the final result
     const transformedItems = itemsResult.map(item => {
@@ -126,6 +138,7 @@ export class ListService {
           ...songData,
           artist: artistData ? { name: artistData.name } : { name: 'Unknown' },
           album: albumData ? { name: albumData.name } : null,
+          downloadUrls: downloadUrlMap.get(item.songId) ?? [],
         },
       };
     }).filter(Boolean);
@@ -172,10 +185,21 @@ export class ListService {
       ? await db.select().from(album).where(inArray(album.id, albumIds))
       : [];
 
+    // Get download URLs for all songs
+    const downloadUrls = songIds.length > 0
+      ? await db.select().from(downloadUrl).where(inArray(downloadUrl.songId, songIds))
+      : [];
+
     // Create lookup maps
     const artistMap = new Map(artists.map(a => [a.id, a]));
     const albumMap = new Map(albums.map(a => [a.id, a]));
     const songMap = new Map(songs.map(s => [s.id, s]));
+    const downloadUrlMap = new Map<string, { url: string; source: string }[]>();
+    for (const dl of downloadUrls) {
+      const existing = downloadUrlMap.get(dl.songId) ?? [];
+      existing.push({ url: dl.url, source: dl.source });
+      downloadUrlMap.set(dl.songId, existing);
+    }
 
     // Assemble the final result
     const transformedItems = itemsResult.map(item => {
@@ -191,6 +215,7 @@ export class ListService {
           ...songData,
           artist: artistData ? { name: artistData.name } : { name: 'Unknown' },
           album: albumData ? { name: albumData.name } : null,
+          downloadUrls: downloadUrlMap.get(item.songId) ?? [],
         },
       };
     }).filter(Boolean);

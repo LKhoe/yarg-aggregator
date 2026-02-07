@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { ArrowLeft, Heart, Trash2, Globe, Lock } from "lucide-react";
+import { ArrowLeft, Heart, Trash2, Globe, Lock, Download } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import Link from "next/link";
 import Image from "next/image";
@@ -41,6 +41,7 @@ interface ListItem {
     artist: string;
     album: string | null;
     albumImageUrl: string | null;
+    downloadUrls: { url: string; source: string }[];
   };
 }
 
@@ -65,6 +66,7 @@ function ListDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [editName, setEditName] = useState("");
   const [editPublic, setEditPublic] = useState(true);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const fetchList = useCallback(async () => {
     try {
@@ -158,6 +160,36 @@ function ListDetailContent({ params }: { params: Promise<{ id: string }> }) {
     } catch {
       toast.error(t("lists.songRemoveError"));
     }
+  };
+
+  const allSongsHaveDownloads = list
+    ? list.items.length > 0 && list.items.every((item) => item.song.downloadUrls.length > 0)
+    : false;
+
+  const downloadUrls = list
+    ? list.items
+        .filter((item) => item.song.downloadUrls.length > 0)
+        .map((item) => item.song.downloadUrls[0].url)
+    : [];
+
+  const handleDownloadAll = async () => {
+    setIsDownloading(true);
+
+    // Test popup blocker with first URL
+    const firstWindow = window.open(downloadUrls[0], "_blank");
+    if (!firstWindow) {
+      toast.error(t("lists.downloadAllBlocked"));
+      setIsDownloading(false);
+      return;
+    }
+
+    // Open remaining URLs with staggered delay
+    for (let i = 1; i < downloadUrls.length; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      window.open(downloadUrls[i], "_blank");
+    }
+
+    setIsDownloading(false);
   };
 
   if (isLoading) {
@@ -287,10 +319,38 @@ function ListDetailContent({ params }: { params: Promise<{ id: string }> }) {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>
             {t("lists.songs")} ({list.items.length})
           </CardTitle>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                size="sm"
+                disabled={!allSongsHaveDownloads || isDownloading}
+                title={!allSongsHaveDownloads ? t("lists.downloadAllNoLinks") : undefined}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {isDownloading ? t("lists.downloading") : t("lists.downloadAll")}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {t("lists.downloadAllConfirm")}
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  {t("lists.downloadAllDescription").replace("{count}", String(downloadUrls.length))}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t("lists.cancel")}</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDownloadAll}>
+                  {t("lists.confirm")}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </CardHeader>
         <CardContent>
           {list.items.length === 0 ? (

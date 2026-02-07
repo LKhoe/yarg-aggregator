@@ -319,7 +319,14 @@
     "noSongs": "Noch keine Lieder in dieser Liste.",
     "songRemoved": "Lied aus Liste entfernt.",
     "songRemoveError": "Lied konnte nicht entfernt werden.",
-    "by": "von"
+    "by": "von",
+    "downloadAll": "Alle herunterladen",
+    "downloadAllConfirm": "Alle Lieder herunterladen?",
+    "downloadAllDescription": "Dies öffnet {count} Tabs in Ihrem Browser, um alle Lieder herunterzuladen. Bitte erlauben Sie Popups, wenn Sie dazu aufgefordert werden.",
+    "downloading": "Downloads werden geöffnet...",
+    "downloadAllBlocked": "Popups blockiert. Bitte erlauben Sie Popups für diese Seite und versuchen Sie es erneut.",
+    "downloadAllNoLinks": "Einige Lieder haben keine Download-Links",
+    "confirm": "Bestätigen"
   },
   "installationSelector": {
     "selectPlaceholder": "Installation auswählen...",

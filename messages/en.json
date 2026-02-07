@@ -324,7 +324,14 @@
     "noSongs": "No songs in this list yet.",
     "songRemoved": "Song removed from list.",
     "songRemoveError": "Failed to remove song.",
-    "by": "by"
+    "by": "by",
+    "downloadAll": "Download All",
+    "downloadAllConfirm": "Download all songs?",
+    "downloadAllDescription": "This will open {count} tabs in your browser to download all songs. Please allow popups if prompted.",
+    "downloading": "Opening downloads...",
+    "downloadAllBlocked": "Popups blocked. Please allow popups for this site and try again.",
+    "downloadAllNoLinks": "Some songs don't have download links",
+    "confirm": "Confirm"
   },
   "admin": {
     "dashboard": "Admin Dashboard",

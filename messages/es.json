@@ -319,7 +319,14 @@
     "noSongs": "Aún no hay canciones en esta lista.",
     "songRemoved": "Canción eliminada de la lista.",
     "songRemoveError": "Error al eliminar la canción.",
-    "by": "por"
+    "by": "por",
+    "downloadAll": "Descargar Todo",
+    "downloadAllConfirm": "¿Descargar todas las canciones?",
+    "downloadAllDescription": "Esto abrirá {count} pestañas en tu navegador para descargar todas las canciones. Permite las ventanas emergentes si se te solicita.",
+    "downloading": "Abriendo descargas...",
+    "downloadAllBlocked": "Ventanas emergentes bloqueadas. Permite las ventanas emergentes para este sitio e inténtalo de nuevo.",
+    "downloadAllNoLinks": "Algunas canciones no tienen enlaces de descarga",
+    "confirm": "Confirmar"
   },
   "installationSelector": {
     "selectPlaceholder": "Selecciona instalación...",
