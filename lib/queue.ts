@@ -1,12 +1,12 @@
-import { Queue, Worker, Job } from 'bullmq';
-import Redis from 'ioredis';
-import { fetchEnchor, fetchRhythmverse } from '@/services/providers';
-import Music from '@/models/Music';
-import Provider from '@/models/Provider';
-import connectDB from '@/lib/db';
+import { Queue, Worker, Job } from "bullmq";
+import Redis from "ioredis";
+import { fetchEnchor } from "@/services/providers/enchor";
+import { fetchRhythmverse } from "@/services/providers/rhythmverse";
+import { processSongs } from "@/services/songs/index";
+import { ProviderService } from "@/lib/services/provider";
 
-const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
-const REDIS_PORT = parseInt(process.env.REDIS_PORT || '6379', 10);
+const REDIS_HOST = process.env.REDIS_HOST || "localhost";
+const REDIS_PORT = parseInt(process.env.REDIS_PORT || "6379", 10);
 
 const connection = new Redis({
   host: REDIS_HOST,
@@ -14,180 +14,148 @@ const connection = new Redis({
   maxRetriesPerRequest: null, // Required for BullMQ
 });
 
-export const providerQueue = new Queue('provider-fetch', { connection });
+export const providerQueue = new Queue("provider-fetch", { connection });
 
 interface FetchJobData {
-  source: 'enchor' | 'rhythmverse';
-  latestSourceUpdatedAt: string;
+  source: "enchor" | "rhythmverse";
+  latestSourceUpdatedAt: string | null;
 }
+
+const PAGE_SIZE = 100;
 
 export const initProviderWorker = () => {
   const worker = new Worker<FetchJobData>(
-    'provider-fetch',
+    "provider-fetch",
     async (job: Job<FetchJobData>) => {
-      await connectDB();
-      const { source, latestSourceUpdatedAt: latestDate } = job.data;
-      const latestSourceUpdatedAt = new Date(latestDate);
+      const { source, latestSourceUpdatedAt } = job.data;
+      const latestDate = latestSourceUpdatedAt
+        ? new Date(latestSourceUpdatedAt)
+        : undefined;
 
-      // Set provider as running in Redis when job starts
-      await connection.set(`provider:${source}:running`, 'true', 'EX', 3600); // 1 hour expiry
+      await connection.set(`provider:${source}:running`, "true", "EX", 3600);
+
+      const fetchFn = source === "enchor" ? fetchEnchor : fetchRhythmverse;
+
+      let page = 1;
+      let allSongs: Awaited<ReturnType<typeof fetchFn>>["songs"] = [];
+      let shouldStop = false;
 
       try {
-        const fetchFn = source === 'enchor' ? fetchEnchor : fetchRhythmverse;
-        const pageSize = source === 'enchor' ? 10 : 25;
+        while (!shouldStop) {
+          const result = await fetchFn(page, PAGE_SIZE, latestDate);
+          allSongs = allSongs.concat(result.songs);
+          shouldStop = result.shouldStop || result.songs.length < PAGE_SIZE;
 
-        let page = 1;
-        let totalSongsProcessed = 0;
-        let shouldContinue = true;
-        let totalUpserted = 0;
-        let totalUpdated = 0;
-        let lastSuccessfulFetchCandidate: Date | null = null;
-        let allPagesSuccessful = true;
-        const maxRetries = 3;
-        const baseBackoffMs = 5000; // 5 seconds base backoff
-
-        while (shouldContinue) {
-          console.log(`Processing ${source} page ${page}...`);
-
-          // Add delay between requests (except for first page)
-          if (page > 1) {
-            await new Promise(resolve => setTimeout(resolve, 2000)); // 2-second delay
-          }
-
-          let retryCount = 0;
-          let pageSuccess = false;
-
-          // Retry logic for pages > 1
-          while (!pageSuccess && retryCount < maxRetries) {
-            try {
-              // Timeout wrapper for each page
-              const timeoutPromise = new Promise<{ songs: any[]; shouldStop: boolean }>((_, reject) => {
-                setTimeout(() => reject(new Error('Task timed out')), 30000); // 30 seconds
-              });
-              const fetchPromise = fetchFn(page, pageSize, latestSourceUpdatedAt);
-              const { songs, shouldStop } = await Promise.race([fetchPromise, timeoutPromise]);
-
-              if (page === 1 && songs.length > 0) {
-                lastSuccessfulFetchCandidate = songs[0]?.sourceUpdatedAt;
-              }
-
-              if (songs.length > 0) {
-                const operations = songs.map(song => ({
-                  updateOne: {
-                    filter: {
-                      name: song.name,
-                      artist: song.artist,
-                      source: source,
-                      instruments: song.instruments
-                    },
-                    update: { $set: song },
-                    upsert: true
-                  }
-                }));
-
-                const bulkResult = await Music.bulkWrite(operations, { ordered: false });
-                totalUpserted += bulkResult.upsertedCount;
-                totalUpdated += bulkResult.modifiedCount;
-                totalSongsProcessed += songs.length;
-
-                // Log any errors
-                const errors = bulkResult.getWriteErrors();
-                if (errors.length > 0) {
-                  console.error(`Bulk write errors for ${source} page ${page}:`, errors);
-                }
-              }
-
-              console.log(`Processed ${source} page ${page}: ${songs.length} songs, total: ${totalSongsProcessed}, oldest song: ${songs[0]?.sourceUpdatedAt.toISOString()}`);
-
-              pageSuccess = true;
-
-              // Check if we should stop
-              if (shouldStop || songs.length === 0) {
-                shouldContinue = false;
-                console.log(`Stopping fetch for ${source} at page ${page}. shouldStop: ${shouldStop}, noSongs: ${songs.length === 0}`);
-              } else {
-                page++;
-              }
-
-            } catch (error: any) {
-              retryCount++;
-
-              // Implement retry with backoff
-              if (retryCount <= maxRetries) {
-                const backoffMs = baseBackoffMs * Math.pow(2, retryCount - 1); // Exponential backoff
-                console.log(`Page ${page} failed for ${source} (attempt ${retryCount}/${maxRetries}), retrying in ${backoffMs}ms:`, error.message);
-                await new Promise(resolve => setTimeout(resolve, backoffMs));
-              } else {
-                console.error(`Page ${page} failed for ${source} after ${maxRetries} retries, aborting:`, error);
-                allPagesSuccessful = false;
-                throw error;
-              }
-            }
-          }
-        }
-
-        // Only update provider status if all pages were processed successfully
-        if (allPagesSuccessful && lastSuccessfulFetchCandidate) {
-          await Provider.updateOne(
-            { name: source },
-            { $set: { lastSuccessfulFetch: lastSuccessfulFetchCandidate } },
-            { upsert: true }
+          // Store progress in Redis
+          await connection.set(
+            `provider:${source}:progress`,
+            JSON.stringify({
+              page,
+              songsFetched: allSongs.length,
+              phase: "fetching",
+            }),
+            "EX",
+            3600,
           );
+
+          page++;
+
+          // Rate limit between pages
+          if (!shouldStop) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
         }
 
-        return {
-          totalSongsProcessed,
-          upsertedCount: totalUpserted,
-          updatedCount: totalUpdated,
-          totalPagesProcessed: page - 1
-        };
+        // Process all fetched songs
+        await connection.set(
+          `provider:${source}:progress`,
+          JSON.stringify({
+            page: page - 1,
+            songsFetched: allSongs.length,
+            phase: "processing",
+          }),
+          "EX",
+          3600,
+        );
 
-      } catch (error: any) {
-        console.error(`Job failed for ${source}:`, error);
+        const stats = await processSongs(allSongs, source, (data) => {
+          connection.set(
+            `provider:${source}:progress`,
+            JSON.stringify({
+              page: page - 1,
+              songsFetched: allSongs.length,
+              phase: data.phase,
+              progress: data.progress,
+              stats: data.stats,
+            }),
+            "EX",
+            3600,
+          );
+        });
 
-        // Clear running status in Redis on failure
-        await connection.del(`provider:${source}:running`);
+        // Update last successful fetch timestamp
+        await ProviderService.updateLastSuccessfulFetch(source);
+
+        // Store completion stats
+        await connection.set(
+          `provider:${source}:progress`,
+          JSON.stringify({
+            page: page - 1,
+            songsFetched: allSongs.length,
+            phase: "completed",
+            progress: 100,
+            stats,
+          }),
+          "EX",
+          300, // Keep completion data for 5 minutes
+        );
+
+        console.log(
+          `Provider ${source} fetch completed: ${allSongs.length} songs fetched, stats:`,
+          stats,
+        );
+      } catch (error) {
+        console.error(`Provider ${source} fetch failed:`, error);
+        await connection.set(
+          `provider:${source}:progress`,
+          JSON.stringify({
+            page: page - 1,
+            songsFetched: allSongs.length,
+            phase: "failed",
+            error: error instanceof Error ? error.message : "Unknown error",
+          }),
+          "EX",
+          300,
+        );
         throw error;
       }
     },
     {
       connection,
-      concurrency: 1, // Process 1 job at a time (since each job handles its own paging)
+      concurrency: 1,
       limiter: {
         max: 1,
-        duration: 2000 // Rate limit to 1 job per 2 seconds minimum
-      }
-    }
+        duration: 2000,
+      },
+    },
   );
 
-  worker.on('completed', async (job) => {
-    const result = job.returnvalue;
-    console.log(`Job ${job.id} completed for ${job.data.source}!`);
-    console.log(`Total songs processed: ${result?.totalSongsProcessed}`);
-    console.log(`New songs added: ${result?.upsertedCount}`);
-    console.log(`Songs updated: ${result?.updatedCount}`);
-    console.log(`Total pages processed: ${result?.totalPagesProcessed}`);
-
-    // Clear running status in Redis on completion
+  worker.on("completed", async (job) => {
     await connection.del(`provider:${job.data.source}:running`);
   });
 
-  worker.on('failed', async (job, err) => {
-    console.error(`Job ${job?.id} failed with ${err.message}`);
-    // Clear running status in Redis on failure
+  worker.on("failed", async (job, err) => {
     if (job?.data?.source) {
       await connection.del(`provider:${job.data.source}:running`);
     }
   });
 
-  worker.on('drained', async () => {
-    console.log('Queue drained! No more jobs.');
-    // Clear all running statuses in Redis when queue is drained
-    const providers = ['enchor', 'rhythmverse'];
+  worker.on("drained", async () => {
+    const providers = ["enchor", "rhythmverse"];
     for (const provider of providers) {
       await connection.del(`provider:${provider}:running`);
     }
   });
 
-  console.log('Provider worker started');
+  console.log("Provider worker started");
 };

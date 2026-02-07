@@ -1,9 +1,10 @@
-import type { ProviderMusic } from '@/types';
+import type { ProviderMusic } from "@/types";
+import { decode } from "he";
 
-const RHYTHMVERSE_BASE_URL = 'https://rhythmverse.co';
-const RHYTHMVERSE_API_URL = 'https://rhythmverse.co/api/yarg/songfiles/list';
+const RHYTHMVERSE_BASE_URL = "https://rhythmverse.co";
+const RHYTHMVERSE_API_URL = "https://rhythmverse.co/api/yarg/songfiles/list";
 
-interface RhythmVerseResponse {
+export interface RhythmVerseResponse {
   status: string;
   data: {
     records: {
@@ -19,7 +20,6 @@ interface RhythmVerseResponse {
     songs: RhythmVerseSongEntry[];
   };
 }
-
 
 export interface RhythmVerseSongEntry {
   data: {
@@ -55,23 +55,27 @@ export interface RhythmVerseSongEntry {
   };
 }
 
-export function parseRhythmverseData(songs: RhythmVerseSongEntry[]): ProviderMusic[] {
+export function parseRhythmverseData(
+  songs: RhythmVerseSongEntry[],
+): ProviderMusic[] {
   return songs.map((entry) => {
     const { data, file } = entry;
     // Prefer file data, fallback to data
-    const name = file.file_title || data.title;
-    const artist = file.file_artist || data.artist;
-    const album = file.file_album || data.album;
+    const name = decode(file.file_title || data.title);
+    const artist = decode(file.file_artist || data.artist);
+    const album = decode(file.file_album || data.album || "") || null;
+    const genre = decode(file.file_genre || "") || null;
+    const charter = decode(file.author?.name || "") || null;
 
     const downloadUrl = file.download_page_url_full;
     const coverUrl = `${RHYTHMVERSE_BASE_URL}${data.album_art}`;
 
-    
     // Parse difficulties once to avoid duplicate function calls
     const drums = parseDifficulty(data.diff_drums);
     const bass = parseDifficulty(data.diff_bass);
     const guitar = parseDifficulty(data.diff_guitar);
-    const prokeys = parseDifficulty(data.diff_prokeys) || parseDifficulty(data.diff_keys);
+    const keys =
+      parseDifficulty(data.diff_prokeys) ?? parseDifficulty(data.diff_keys);
     const vocals = parseDifficulty(data.diff_vocals);
 
     return {
@@ -79,17 +83,19 @@ export function parseRhythmverseData(songs: RhythmVerseSongEntry[]): ProviderMus
       artist,
       album,
       coverUrl,
-      downloadUrl,
-      sourceUpdatedAt: file.record_updated ? new Date(file.record_updated) : new Date(),
-      year: file.file_year || undefined,
-      genre: file.file_genre || undefined,
-      charter: file.author?.name || undefined,
+      downloadUrls: [{ url: downloadUrl, source: "rhythmverse" }],
+      sourceUpdatedAt: file.record_updated
+        ? new Date(file.record_updated)
+        : null,
+      year: file.file_year || null,
+      genre,
+      charter,
       instruments: {
-        ...(drums !== undefined && { drums }),
-        ...(bass !== undefined && { bass }),
-        ...(guitar !== undefined && { guitar }),
-        ...(prokeys !== undefined && { prokeys }),
-        ...(vocals !== undefined && { vocals }),
+        drums,
+        bass,
+        guitar,
+        keys,
+        vocals,
       },
     };
   });
@@ -104,22 +110,23 @@ export async function fetchRhythmverse(
     console.log(`Fetching RhythmVerse API page ${page} (size: ${pageSize})...`);
 
     const body = new URLSearchParams();
-    body.append('instrument[]', 'bass');
-    body.append('instrument[]', 'drums');
-    body.append('instrument[]', 'guitar');
-    body.append('instrument[]', 'vocals');
-    body.append('sort[0][sort_by]', 'update_date');
-    body.append('sort[0][sort_order]', 'DESC');
-    body.append('data_type', 'full');
-    body.append('page', page.toString());
-    body.append('records', pageSize.toString());
+    body.append("instrument[]", "bass");
+    body.append("instrument[]", "drums");
+    body.append("instrument[]", "guitar");
+    body.append("instrument[]", "vocals");
+    body.append("sort[0][sort_by]", "update_date");
+    body.append("sort[0][sort_order]", "DESC");
+    body.append("data_type", "full");
+    body.append("page", page.toString());
+    body.append("records", pageSize.toString());
 
     const response = await fetch(RHYTHMVERSE_API_URL, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:146.0) Gecko/20100101 Firefox/146.0',
-        'X-Requested-With': 'XMLHttpRequest',
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:146.0) Gecko/20100101 Firefox/146.0",
+        "X-Requested-With": "XMLHttpRequest",
       },
       body: body.toString(),
     });
@@ -130,7 +137,7 @@ export async function fetchRhythmverse(
 
     const json = (await response.json()) as RhythmVerseResponse;
 
-    if (json.status !== 'success') {
+    if (json.status !== "success") {
       throw new Error(`RhythmVerse API returned status: ${json.status}`);
     }
 
@@ -146,55 +153,20 @@ export async function fetchRhythmverse(
       }
     }
 
-    console.log(`Fetched ${results.length} songs from RhythmVerse API page ${page}, shouldStop: ${shouldStop}`);
+    console.log(
+      `Fetched ${results.length} songs from RhythmVerse API page ${page}, shouldStop: ${shouldStop}`,
+    );
 
     return { songs: results, shouldStop };
   } catch (error) {
-    console.error('Error fetching RhythmVerse API:', error);
+    console.error("Error fetching RhythmVerse API:", error);
     throw error;
   }
 }
 
-function parseDifficulty(diff: string | null | number): number | undefined {
-  if (diff === null || diff === undefined) return undefined;
-  if (typeof diff === 'number') return diff === -1 ? undefined : diff;
+function parseDifficulty(diff: string | null | number): number | null {
+  if (diff === null || diff === undefined) return null;
+  if (typeof diff === "number") return diff === -1 ? null : diff;
   const parsed = parseInt(diff, 10);
-  return isNaN(parsed) || parsed === -1 ? undefined : parsed;
+  return isNaN(parsed) || parsed === -1 ? null : parsed;
 }
-
-export async function getTotalSongs(): Promise<number> {
-  try {
-    const body = new URLSearchParams();
-    body.append('instrument[]', 'bass');
-    body.append('instrument[]', 'drums');
-    body.append('instrument[]', 'guitar');
-    body.append('instrument[]', 'vocals');
-    body.append('sort[0][sort_by]', 'update_date');
-    body.append('sort[0][sort_order]', 'ASC');
-    body.append('data_type', 'full');
-    body.append('page', '1');
-    body.append('records', '25');
-
-    const response = await fetch(RHYTHMVERSE_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:146.0) Gecko/20100101 Firefox/146.0',
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      body: body.toString(),
-    });
-
-    if (!response.ok) return 1;
-
-    const json = (await response.json()) as RhythmVerseResponse;
-    if (json.status !== 'success') return 1;
-
-    const totalFiltered = json.data.records.total_filtered;
-
-    return totalFiltered;
-  } catch {
-    return 1;
-  }
-}
-

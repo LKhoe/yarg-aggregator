@@ -1,7 +1,7 @@
-import { FixedArray, FixedArrayStream } from '../../IO/FixedArray';
-import { CacheReadStrings } from './CacheReadStrings';
-import { CacheLoopable } from './CacheLoopable';
-import { AbridgedFileInfo } from '../../IO/AbridgedFileInfo';
+import { FixedArray, FixedArrayStream } from "../../IO/FixedArray";
+import { CacheReadStrings } from "./CacheReadStrings";
+import { CacheLoopable } from "./CacheLoopable";
+import { AbridgedFileInfo } from "../../IO/AbridgedFileInfo";
 import {
   SongEntry,
   SngEntry,
@@ -9,9 +9,9 @@ import {
   PackedRBCONEntry,
   UnpackedRBCONEntry,
   PackedRBProUpgrade,
-  UnpackedRBProUpgrade
-} from '../Entries/EntrySkeletons';
-import { UnpackedIniEntry } from '../Entries/UnpackedIniEntry';
+  UnpackedRBProUpgrade,
+} from "../Entries/EntrySkeletons";
+import { UnpackedIniEntry } from "../Entries/UnpackedIniEntry";
 
 export class ScanProgressTracker {
   public Stage: number = 0;
@@ -31,9 +31,16 @@ export class CacheHandler {
     return this._progress;
   }
 
-  public static async QuickScan(handler: CacheHandler, cacheLocation: File, fullDirectoryPlaylists: boolean): Promise<boolean> {
+  public static async QuickScan(
+    handler: CacheHandler,
+    cacheLocation: File,
+    fullDirectoryPlaylists: boolean,
+  ): Promise<boolean> {
     try {
-      const cacheFile = await CacheHandler.LoadCacheToMemory(cacheLocation, fullDirectoryPlaylists);
+      const cacheFile = await CacheHandler.LoadCacheToMemory(
+        cacheLocation,
+        fullDirectoryPlaylists,
+      );
       if (cacheFile != null) {
         // _progress.Stage = ScanStage.LoadingCache;
         handler.Deserialize_Quick(cacheFile);
@@ -49,7 +56,10 @@ export class CacheHandler {
     return true;
   }
 
-  private static async LoadCacheToMemory(cacheLocation: File, fullDirectoryPlaylists: boolean): Promise<FixedArray | null> {
+  private static async LoadCacheToMemory(
+    cacheLocation: File,
+    fullDirectoryPlaylists: boolean,
+  ): Promise<FixedArray | null> {
     // File object - check if it exists and has content
     if (cacheLocation.size === 0) {
       console.log("Cache file is empty");
@@ -62,7 +72,11 @@ export class CacheHandler {
 
     // Check version
     // We need to read the first 4 bytes as int
-    const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+    const view = new DataView(
+      buffer.buffer,
+      buffer.byteOffset,
+      buffer.byteLength,
+    );
     const version = view.getInt32(0, true);
 
     if (version !== CacheHandler.CACHE_VERSION) {
@@ -119,7 +133,10 @@ export class CacheHandler {
 
       const mods = this.GetQuickCONMods(name);
       // Lock handled by JS single thread
-      if (!mods.UpdateDirectoryAndDtaLastWrite || mods.UpdateDirectoryAndDtaLastWrite.LastWriteTime < root.LastWriteTime) {
+      if (
+        !mods.UpdateDirectoryAndDtaLastWrite ||
+        mods.UpdateDirectoryAndDtaLastWrite.LastWriteTime < root.LastWriteTime
+      ) {
         mods.UpdateDirectoryAndDtaLastWrite = root;
         mods.UpdateMidi = midiLastWrite;
       }
@@ -155,11 +172,18 @@ export class CacheHandler {
     }
   }
 
-  private QuickReadIniDirectory(stream: FixedArrayStream, strings: CacheReadStrings): void {
+  private QuickReadIniDirectory(
+    stream: FixedArrayStream,
+    strings: CacheReadStrings,
+  ): void {
     const directory = stream.ReadString();
     const loop1 = new CacheLoopable(stream);
     for (const node of loop1) {
-      const entry = UnpackedIniEntry.ForceDeserialize(directory, node.Slice, strings);
+      const entry = UnpackedIniEntry.ForceDeserialize(
+        directory,
+        node.Slice,
+        strings,
+      );
       this.AddEntry(entry);
     }
     const loop2 = new CacheLoopable(stream);
@@ -168,7 +192,10 @@ export class CacheHandler {
     }
   }
 
-  private QuickReadCONGroup(stream: FixedArrayStream, strings: CacheReadStrings): void {
+  private QuickReadCONGroup(
+    stream: FixedArrayStream,
+    strings: CacheReadStrings,
+  ): void {
     const root = AbridgedFileInfo.FromStream(stream);
     const packed = stream.ReadBoolean();
 
@@ -177,19 +204,28 @@ export class CacheHandler {
       listings = this.GetCacheCONListings(root.FullName);
     }
 
-    
     const loop = new CacheLoopable(stream);
     for (const node of loop) {
       const name = node.Slice.ReadString();
       const index = node.Slice.ReadByte();
-      
+
       const entry = packed
-        ? PackedRBCONEntry.ForceDeserialize(listings, root, name, node.Slice, strings)
+        ? PackedRBCONEntry.ForceDeserialize(
+            listings,
+            root,
+            name,
+            node.Slice,
+            strings,
+          )
         : UnpackedRBCONEntry.ForceDeserialize(root, name, node.Slice, strings);
 
       const mods = this.cacheCONModifications.get(name);
       if (mods) {
-        entry.UpdateInfo(mods.UpdateDirectoryAndDtaLastWrite, mods.UpdateMidi, mods.Upgrade);
+        entry.UpdateInfo(
+          mods.UpdateDirectoryAndDtaLastWrite,
+          mods.UpdateMidi,
+          mods.Upgrade,
+        );
       }
       this.AddEntry(entry);
     }

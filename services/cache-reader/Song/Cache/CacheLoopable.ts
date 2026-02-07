@@ -1,6 +1,9 @@
-import { FixedArrayStream } from '../../IO/FixedArray';
+import { FixedArrayStream } from "../../IO/FixedArray";
 
-export class CacheLoopable implements Iterable<{ Slice: FixedArrayStream, Index: number }> {
+export class CacheLoopable implements Iterable<{
+  Slice: FixedArrayStream;
+  Index: number;
+}> {
   private stream: FixedArrayStream;
   public Count: number;
 
@@ -9,7 +12,7 @@ export class CacheLoopable implements Iterable<{ Slice: FixedArrayStream, Index:
     this.Count = count ?? stream.ReadInt32();
   }
 
-  *[Symbol.iterator](): Iterator<{ Slice: FixedArrayStream, Index: number }> {
+  *[Symbol.iterator](): Iterator<{ Slice: FixedArrayStream; Index: number }> {
     for (let i = 0; i < this.Count; i++) {
       const length = this.stream.ReadInt32();
       const slice = this.stream.Slice(length);

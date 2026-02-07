@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Copy source files
 COPY . .
@@ -22,10 +22,17 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Copy necessary files from builder
+# Copy package files and install production dependencies
+COPY package*.json ./
+RUN npm install --production
+
+# Copy build output
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/.next ./.next
+
+# Copy and setup entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Expose port
 EXPOSE 3000
@@ -33,5 +40,6 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Start the application
-CMD ["node", "server.js"]
+# Set entrypoint and command
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["npm", "start"]

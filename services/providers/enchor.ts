@@ -1,17 +1,15 @@
-import type { ProviderMusic } from '@/types';
+import type { ProviderMusic } from "@/types";
 
-const ENCHOR_BASE_URL = 'https://www.enchor.us';
-const ENCHOR_API_URL = 'https://api.enchor.us/search/advanced';
-const ENCHOR_FILES_URL = 'https://files.enchor.us'
+const ENCHOR_BASE_URL = "https://www.enchor.us";
+const ENCHOR_API_URL = "https://api.enchor.us/search/advanced";
+const ENCHOR_FILES_URL = "https://files.enchor.us";
 
-
-interface EnchorResponse {
+export interface EnchorResponse {
   found: number;
   out_of: number;
   page: number;
   data: EnchorSong[];
 }
-
 
 export interface EnchorSong {
   name: string;
@@ -37,27 +35,30 @@ export function parseEnchorData(songs: EnchorSong[]): ProviderMusic[] {
   return songs.map((song) => {
     const downloadUrl = `${ENCHOR_BASE_URL}/download?md5=${song.md5}&isSng=false&downloadNovideoVersion=false&filename=${song.drivePath} (${song.charter})`;
     const coverUrl = `${ENCHOR_FILES_URL}/${song.albumArtMd5}.jpg`;
+    const parsedYear = Number.isNaN(Number.parseInt(song.year, 10))
+      ? null
+      : Number.parseInt(song.year, 10);
 
-    if (!song.modifiedTime){
-      console.log('Missing modifiedTime for song:', song.name, song.artist);
+    if (!song.modifiedTime) {
+      console.log("Missing modifiedTime for song:", song.name, song.artist);
     }
 
     return {
       name: song.name,
       artist: song.artist,
-      album: song.album,
+      album: song.album || null,
       coverUrl: coverUrl,
-      downloadUrl: downloadUrl,
-      sourceUpdatedAt: song.modifiedTime ? new Date(song.modifiedTime) : new Date(),
-      year: parseInt(song.year, 10) || undefined,
-      genre: song.genre,
-      charter: song.charter,
+      downloadUrls: [{ url: downloadUrl, source: "enchor" }],
+      sourceUpdatedAt: song.modifiedTime ? new Date(song.modifiedTime) : null,
+      year: parsedYear,
+      genre: song.genre || null,
+      charter: song.charter || null,
       instruments: {
-        ...(song.diff_drums !== -1 && { drums: song.diff_drums }),
-        ...(song.diff_bass !== -1 && { bass: song.diff_bass }),
-        ...(song.diff_guitar !== -1 && { guitar: song.diff_guitar }),
-        ...(song.diff_keys !== -1 && { prokeys: song.diff_keys }),
-        ...(song.diff_vocals !== -1 && { vocals: song.diff_vocals }),
+        drums: song.diff_drums !== -1 ? song.diff_drums : null,
+        bass: song.diff_bass !== -1 ? song.diff_bass : null,
+        guitar: song.diff_guitar !== -1 ? song.diff_guitar : null,
+        keys: song.diff_keys !== -1 ? song.diff_keys : null,
+        vocals: song.diff_vocals !== -1 ? song.diff_vocals : null,
       },
     };
   });
@@ -72,17 +73,18 @@ export async function fetchEnchor(
     console.log(`Fetching Enchor API page ${page} (size: ${pageSize})...`);
 
     const response = await fetch(ENCHOR_API_URL, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:146.0) Gecko/20100101 Firefox/146.0',
+        "Content-Type": "application/json",
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:146.0) Gecko/20100101 Firefox/146.0",
       },
       body: JSON.stringify({
         instrument: "bass",
         difficulty: null,
         drumType: null,
         drumsReviewed: false,
-        sort: { type: "modifiedTime", direction: 'desc' },
+        sort: { type: "modifiedTime", direction: "desc" },
         source: "website",
         name: { value: "", exact: false, exclude: false },
         artist: { value: "", exact: false, exclude: false },
@@ -115,7 +117,7 @@ export async function fetchEnchor(
         hasVideoBackground: null,
         modchart: null,
         page: page,
-        per_page: pageSize
+        per_page: pageSize,
       }),
     });
 
@@ -133,75 +135,27 @@ export async function fetchEnchor(
     if (latestSourceUpdatedAt) {
       const oldestSongInPage = results[results.length - 1];
       if (oldestSongInPage && oldestSongInPage.sourceUpdatedAt) {
-        console.log('Checking if should stop for page', page, 'oldestSongInPage', oldestSongInPage.sourceUpdatedAt.toISOString(), 'latestSourceUpdatedAt', latestSourceUpdatedAt.toISOString(), 'shouldStop', oldestSongInPage.sourceUpdatedAt <= latestSourceUpdatedAt);
+        console.log(
+          "Checking if should stop for page",
+          page,
+          "oldestSongInPage",
+          oldestSongInPage.sourceUpdatedAt.toISOString(),
+          "latestSourceUpdatedAt",
+          latestSourceUpdatedAt.toISOString(),
+          "shouldStop",
+          oldestSongInPage.sourceUpdatedAt <= latestSourceUpdatedAt,
+        );
         shouldStop = oldestSongInPage.sourceUpdatedAt <= latestSourceUpdatedAt;
       }
     }
 
-    console.log(`Fetched ${results.length} songs from Enchor API page ${page}, shouldStop: ${shouldStop}`);
+    console.log(
+      `Fetched ${results.length} songs from Enchor API page ${page}, shouldStop: ${shouldStop}`,
+    );
 
     return { songs: results, shouldStop };
   } catch (error) {
-    console.error('Error fetching Enchor API:', error);
+    console.error("Error fetching Enchor API:", error);
     throw error;
   }
 }
-
-export async function getTotalSongs(): Promise<number> {
-  try {
-    // Make a request for page 1 to get the total count
-    const response = await fetch(ENCHOR_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:146.0) Gecko/20100101 Firefox/146.0',
-      },
-      body: JSON.stringify({
-        instrument: "bass",
-        difficulty: null,
-        drumType: null,
-        drumsReviewed: false,
-        sort: { type: "modifiedTime", direction: "asc" },
-        source: "website",
-        name: { value: "", exact: false, exclude: false },
-        artist: { value: "", exact: false, exclude: false },
-        album: { value: "", exact: false, exclude: false },
-        genre: { value: "", exact: false, exclude: false },
-        year: { value: "", exact: false, exclude: false },
-        charter: { value: "", exact: false, exclude: false },
-        minLength: null,
-        maxLength: null,
-        minIntensity: null,
-        maxIntensity: null,
-        minAverageNPS: null,
-        maxAverageNPS: null,
-        minMaxNPS: null,
-        maxMaxNPS: null,
-        minYear: null,
-        maxYear: null,
-        modifiedAfter: "",
-        hash: "",
-        trackHash: "",
-        hasSoloSections: null,
-        hasForcedNotes: null,
-        hasOpenNotes: null,
-        hasTapNotes: null,
-        hasLyrics: null,
-        hasVocals: true,
-        hasRollLanes: null,
-        has2xKick: null,
-        hasIssues: null,
-        hasVideoBackground: null,
-        modchart: null,
-        page: 1
-      }),
-    });
-    if (!response.ok) throw new Error(`Failed to fetch Enchor API: ${response.status}`);
-    const json = (await response.json()) as EnchorResponse;
-    return json.found;
-  } catch (error) {
-    console.error('Error fetching Enchor API:', error);
-    throw error;
-  }
-}
-

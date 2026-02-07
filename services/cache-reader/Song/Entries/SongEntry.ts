@@ -1,6 +1,6 @@
-import { FixedArrayStream } from '../../IO/FixedArray';
-import { CacheReadStrings } from '../Cache/CacheReadStrings';
-import { AvailableParts } from './AvailableParts';
+import { FixedArrayStream } from "../../IO/FixedArray";
+import { CacheReadStrings } from "../Cache/CacheReadStrings";
+import { AvailableParts } from "./AvailableParts";
 
 export interface SongMetadata {
   Name: string;
@@ -65,18 +65,62 @@ export interface SongMetadata {
 
 export abstract class SongEntry {
   public _metadata: SongMetadata = {
-    Name: "", Artist: "", Album: "", Genre: "", Year: "", Charter: "", Playlist: "", Source: "",
-    IsMaster: false, VideoLoop: false, AlbumTrack: 0, PlaylistTrack: 0,
-    SongLength: BigInt(0), SongOffset: BigInt(0), SongRating: 0,
-    PreviewStart: BigInt(0), PreviewEnd: BigInt(0), VideoStart: BigInt(0), VideoEnd: BigInt(0),
-    LoadingPhrase: "", LinkBandcamp: "", LinkBluesky: "", LinkFacebook: "", LinkInstagram: "",
-    LinkNewgrounds: "", LinkSoundcloud: "", LinkSpotify: "", LinkTiktok: "", LinkTwitter: "",
-    LinkOther: "", LinkYoutube: "", Location: "",
-    CreditAlbumArtDesignedBy: "", CreditArrangedBy: "", CreditComposedBy: "", CreditCourtesyOf: "",
-    CreditEngineeredBy: "", CreditLicense: "", CreditMasteredBy: "", CreditMixedBy: "", CreditOther: "",
-    CreditPerformedBy: "", CreditProducedBy: "", CreditPublishedBy: "", CreditWrittenBy: "",
-    CharterBass: "", CharterDrums: "", CharterEliteDrums: "", CharterGuitar: "", CharterKeys: "",
-    CharterLowerDiff: "", CharterProBass: "", CharterProKeys: "", CharterProGuitar: "", CharterVenue: "", CharterVocals: ""
+    Name: "",
+    Artist: "",
+    Album: "",
+    Genre: "",
+    Year: "",
+    Charter: "",
+    Playlist: "",
+    Source: "",
+    IsMaster: false,
+    VideoLoop: false,
+    AlbumTrack: 0,
+    PlaylistTrack: 0,
+    SongLength: BigInt(0),
+    SongOffset: BigInt(0),
+    SongRating: 0,
+    PreviewStart: BigInt(0),
+    PreviewEnd: BigInt(0),
+    VideoStart: BigInt(0),
+    VideoEnd: BigInt(0),
+    LoadingPhrase: "",
+    LinkBandcamp: "",
+    LinkBluesky: "",
+    LinkFacebook: "",
+    LinkInstagram: "",
+    LinkNewgrounds: "",
+    LinkSoundcloud: "",
+    LinkSpotify: "",
+    LinkTiktok: "",
+    LinkTwitter: "",
+    LinkOther: "",
+    LinkYoutube: "",
+    Location: "",
+    CreditAlbumArtDesignedBy: "",
+    CreditArrangedBy: "",
+    CreditComposedBy: "",
+    CreditCourtesyOf: "",
+    CreditEngineeredBy: "",
+    CreditLicense: "",
+    CreditMasteredBy: "",
+    CreditMixedBy: "",
+    CreditOther: "",
+    CreditPerformedBy: "",
+    CreditProducedBy: "",
+    CreditPublishedBy: "",
+    CreditWrittenBy: "",
+    CharterBass: "",
+    CharterDrums: "",
+    CharterEliteDrums: "",
+    CharterGuitar: "",
+    CharterKeys: "",
+    CharterLowerDiff: "",
+    CharterProBass: "",
+    CharterProKeys: "",
+    CharterProGuitar: "",
+    CharterVenue: "",
+    CharterVocals: "",
   };
 
   public _parts: AvailableParts = new AvailableParts();
@@ -86,7 +130,10 @@ export abstract class SongEntry {
   private static readonly HASH_SIZE = 20;
   private static readonly AVAILABLE_PARTS_SIZE = 42;
 
-  protected Deserialize(stream: FixedArrayStream, strings: CacheReadStrings): void {
+  protected Deserialize(
+    stream: FixedArrayStream,
+    strings: CacheReadStrings,
+  ): void {
     const hashStream = stream.Slice(SongEntry.HASH_SIZE);
     this._hash = hashStream.ToBuffer(); // Need to implement ToBuffer or just use internal buffer
 
@@ -99,7 +146,8 @@ export abstract class SongEntry {
     this._metadata.Genre = strings.Genres[stream.ReadInt32AsLittleEndian()];
     this._metadata.Year = strings.Years[stream.ReadInt32AsLittleEndian()];
     this._metadata.Charter = strings.Charters[stream.ReadInt32AsLittleEndian()];
-    this._metadata.Playlist = strings.Playlists[stream.ReadInt32AsLittleEndian()];
+    this._metadata.Playlist =
+      strings.Playlists[stream.ReadInt32AsLittleEndian()];
     this._metadata.Source = strings.Sources[stream.ReadInt32AsLittleEndian()];
 
     this._metadata.IsMaster = stream.ReadBoolean();

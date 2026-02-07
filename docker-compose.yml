@@ -6,23 +6,33 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - MONGODB_URI=mongodb://yarg-aggregator-mongo-1:27017/yarg_db
-      - REDIS_HOST=yarg-aggregator-redis-1
+      # Database
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/yarg_db
+      # Redis
+      - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - NEXT_PUBLIC_APP_URL=http://yarg-aggregator.7212.qzz.io:3000
+      # App
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+      # Better Auth
+      - BETTER_AUTH_SECRET=sp4zlaU4dTteE3ckze+/W2o1fbMDVOLdfEIeTzvCAas=
+      - BETTER_AUTH_URL=http://localhost:3000
     depends_on:
-      - mongo
+      - postgres
     restart: unless-stopped
     networks:
       - yarg-network
-      - tunnel
+      # - tunnel
 
-  mongo:
-    image: mongodb-raspberrypi4-unofficial-r7.0.4:latest
+  postgres:
+    image: postgres:15-alpine
     ports:
-      - "27017:27017"
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=yarg_db
     volumes:
-      - mongo_data:/data/db
+      - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     networks:
       - yarg-network
@@ -38,11 +48,11 @@ services:
       - yarg-network
 
 volumes:
-  mongo_data:
+  postgres_data:
   redis_data:
 
 networks:
   yarg-network:
     driver: bridge
-  tunnel:
-    external: true
+  # tunnel:
+  #   external: true

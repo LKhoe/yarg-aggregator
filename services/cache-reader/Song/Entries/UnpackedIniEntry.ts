@@ -1,9 +1,8 @@
-import { FixedArrayStream } from '../../IO/FixedArray';
-import { CacheReadStrings } from '../Cache/CacheReadStrings';
-import { AbridgedFileInfo } from '../../IO/AbridgedFileInfo';
-import { SongEntry } from './SongEntry';
-import { path } from '../../utils/browser-utils';
-
+import { FixedArrayStream } from "../../IO/FixedArray";
+import { CacheReadStrings } from "../Cache/CacheReadStrings";
+import { AbridgedFileInfo } from "../../IO/AbridgedFileInfo";
+import { SongEntry } from "./SongEntry";
+import { path } from "../../utils/browser-utils";
 
 export enum ChartFormat {
   Unknown = 0,
@@ -15,13 +14,18 @@ export class UnpackedIniEntry extends SongEntry {
   public IniLastWrite?: Date;
   public Format: ChartFormat;
 
-  private static CHART_FILE_TYPES: { Filename: string, Format: number }[] = [
+  private static CHART_FILE_TYPES: { Filename: string; Format: number }[] = [
     { Filename: "notes.chart", Format: 1 },
     { Filename: "notes.mid", Format: 2 },
     { Filename: "song.chart", Format: 1 },
   ];
 
-  constructor(directory: string, chartLastWrite: Date, iniLastWrite: Date | undefined, format: number) {
+  constructor(
+    directory: string,
+    chartLastWrite: Date,
+    iniLastWrite: Date | undefined,
+    format: number,
+  ) {
     super();
     this.Directory = directory;
     this.ChartLastWrite = chartLastWrite;
@@ -29,7 +33,11 @@ export class UnpackedIniEntry extends SongEntry {
     this.Format = format;
   }
 
-  public static ForceDeserialize(baseDirectory: string, stream: FixedArrayStream, strings: CacheReadStrings): UnpackedIniEntry {
+  public static ForceDeserialize(
+    baseDirectory: string,
+    stream: FixedArrayStream,
+    strings: CacheReadStrings,
+  ): UnpackedIniEntry {
     const subDir = stream.ReadString();
     const directory = path.join(baseDirectory, subDir);
 
@@ -37,14 +45,23 @@ export class UnpackedIniEntry extends SongEntry {
     const chart = UnpackedIniEntry.CHART_FILE_TYPES[chartTypeIndex];
     const format = chart.Format;
 
-    const chartLastWrite = AbridgedFileInfo.DateTimeFromBinary(stream.ReadInt64AsLittleEndian());
-    
+    const chartLastWrite = AbridgedFileInfo.DateTimeFromBinary(
+      stream.ReadInt64AsLittleEndian(),
+    );
+
     let iniLastWrite: Date | undefined = undefined;
     if (stream.ReadBoolean()) {
-      iniLastWrite = AbridgedFileInfo.DateTimeFromBinary(stream.ReadInt64AsLittleEndian());
+      iniLastWrite = AbridgedFileInfo.DateTimeFromBinary(
+        stream.ReadInt64AsLittleEndian(),
+      );
     }
 
-    const entry = new UnpackedIniEntry(directory, chartLastWrite, iniLastWrite, format);
+    const entry = new UnpackedIniEntry(
+      directory,
+      chartLastWrite,
+      iniLastWrite,
+      format,
+    );
     entry.Deserialize(stream, strings);
     return entry;
   }

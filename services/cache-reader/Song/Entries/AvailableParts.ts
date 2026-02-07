@@ -15,7 +15,7 @@ export class PartValues {
   public static FromBytes(data: Uint8Array): PartValues {
     if (data.length < 2) throw new Error("Insufficient data for PartValues");
 
-    // Layout: 
+    // Layout:
     // Byte 0: SubTracks (and explicitly overlaid Difficulties)
     // Byte 1: Intensity (sbyte)
 
@@ -61,7 +61,7 @@ export class AvailableParts {
   public HarmonyVocals: PartValues = new PartValues();
 
   public static FromBytes(data: Uint8Array): AvailableParts {
-    // Total size 42 bytes. 
+    // Total size 42 bytes.
     // 21 parts * 2 bytes each.
     const ap = new AvailableParts();
     let offset = 0;

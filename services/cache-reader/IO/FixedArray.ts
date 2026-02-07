@@ -1,7 +1,8 @@
 // Use browser-native TextDecoder with fallback for Node.js
-const TextDecoder = typeof window !== 'undefined' 
-  ? window.TextDecoder 
-  : require('util').TextDecoder;
+const TextDecoder =
+  typeof window !== "undefined"
+    ? window.TextDecoder
+    : require("util").TextDecoder;
 
 export class FixedArray {
   private buffer: Uint8Array;
@@ -72,22 +73,37 @@ export class FixedArrayStream {
   }
 
   public ReadInt32(): number {
-    if (this.position + 4 > this.data.length) throw new Error("InvalidOperationException");
-    const value = new DataView(this.data.buffer, this.data.byteOffset, this.data.byteLength).getInt32(this.position, true);
+    if (this.position + 4 > this.data.length)
+      throw new Error("InvalidOperationException");
+    const value = new DataView(
+      this.data.buffer,
+      this.data.byteOffset,
+      this.data.byteLength,
+    ).getInt32(this.position, true);
     this.position += 4;
     return value;
   }
 
   public ReadInt16(): number {
-    if (this.position + 2 > this.data.length) throw new Error("InvalidOperationException");
-    const value = new DataView(this.data.buffer, this.data.byteOffset, this.data.byteLength).getInt16(this.position, true);
+    if (this.position + 2 > this.data.length)
+      throw new Error("InvalidOperationException");
+    const value = new DataView(
+      this.data.buffer,
+      this.data.byteOffset,
+      this.data.byteLength,
+    ).getInt16(this.position, true);
     this.position += 2;
     return value;
   }
 
   public ReadInt64(): bigint {
-    if (this.position + 8 > this.data.length) throw new Error("InvalidOperationException");
-    const value = new DataView(this.data.buffer, this.data.byteOffset, this.data.byteLength).getBigInt64(this.position, true);
+    if (this.position + 8 > this.data.length)
+      throw new Error("InvalidOperationException");
+    const value = new DataView(
+      this.data.buffer,
+      this.data.byteOffset,
+      this.data.byteLength,
+    ).getBigInt64(this.position, true);
     this.position += 8;
     return value;
   }
@@ -96,10 +112,11 @@ export class FixedArrayStream {
     const length = this.Read7BitEncodedInt();
     if (length < 0) throw new Error("Invalid string length");
 
-    if (this.position + length > this.data.length) throw new Error("InvalidOperationException");
+    if (this.position + length > this.data.length)
+      throw new Error("InvalidOperationException");
 
     const strBytes = this.data.subarray(this.position, this.position + length);
-    const str = new TextDecoder('utf-8').decode(strBytes);
+    const str = new TextDecoder("utf-8").decode(strBytes);
     this.position += length;
     return str;
   }
@@ -111,7 +128,7 @@ export class FixedArrayStream {
 
     do {
       byteRead = this.ReadByte();
-      result |= (byteRead & 0x7F) << shift;
+      result |= (byteRead & 0x7f) << shift;
       shift += 7;
     } while ((byteRead & 0x80) !== 0);
 
@@ -126,7 +143,8 @@ export class FixedArrayStream {
 
   public ReadGuid(): string {
     // GUID is 16 bytes
-    if (this.position + 16 > this.data.length) throw new Error("InvalidOperationException");
+    if (this.position + 16 > this.data.length)
+      throw new Error("InvalidOperationException");
     const bytes = this.data.subarray(this.position, this.position + 16);
     this.position += 16;
 
@@ -143,7 +161,7 @@ export class FixedArrayStream {
     // But implementing it safely is good.
 
     // Simple hex dump for now
-    return Buffer.from(bytes).toString('hex');
+    return Buffer.from(bytes).toString("hex");
   }
 
   public Slice(length: number): FixedArrayStream {
@@ -156,7 +174,7 @@ export class FixedArrayStream {
   }
 
   public ToBuffer(): Uint8Array {
-    return this.data.slice(this.position, this.data.length); // return remaining data or the whole slice? 
+    return this.data.slice(this.position, this.data.length); // return remaining data or the whole slice?
     // FixedArrayStream is often a slice itself.
     // Actually, for Slice(length), it returns a new FixedArrayStream on the subarray.
     // So ToBuffer should likely return the underlying data.
@@ -173,8 +191,13 @@ export class FixedArrayStream {
   }
 
   public ReadUInt32AsLittleEndian(): number {
-    if (this.position + 4 > this.data.length) throw new Error("InvalidOperationException");
-    const value = new DataView(this.data.buffer, this.data.byteOffset, this.data.byteLength).getUint32(this.position, true);
+    if (this.position + 4 > this.data.length)
+      throw new Error("InvalidOperationException");
+    const value = new DataView(
+      this.data.buffer,
+      this.data.byteOffset,
+      this.data.byteLength,
+    ).getUint32(this.position, true);
     this.position += 4;
     return value;
   }

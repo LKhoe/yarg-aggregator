@@ -1,8 +1,8 @@
-import { FixedArrayStream } from '../../IO/FixedArray';
-import { CacheReadStrings } from '../Cache/CacheReadStrings';
-import { AbridgedFileInfo } from '../../IO/AbridgedFileInfo';
-import { SongEntry } from './SongEntry';
-import * as path from 'path';
+import { FixedArrayStream } from "../../IO/FixedArray";
+import { CacheReadStrings } from "../Cache/CacheReadStrings";
+import { AbridgedFileInfo } from "../../IO/AbridgedFileInfo";
+import { SongEntry } from "./SongEntry";
+import * as path from "path";
 
 export { SongEntry };
 
@@ -12,15 +12,23 @@ export enum EntryType {
   Sng,
   RBCON,
   RBCON_Upgrade,
-  RBCON_Update
+  RBCON_Update,
 }
 
 export class SngEntry extends SongEntry {
-  public static TryDeserialize(directory: string, stream: FixedArrayStream, strings: CacheReadStrings): SngEntry | null {
+  public static TryDeserialize(
+    directory: string,
+    stream: FixedArrayStream,
+    strings: CacheReadStrings,
+  ): SngEntry | null {
     return null;
   }
 
-  public static ForceDeserialize(directory: string, stream: FixedArrayStream, strings: CacheReadStrings): SngEntry {
+  public static ForceDeserialize(
+    directory: string,
+    stream: FixedArrayStream,
+    strings: CacheReadStrings,
+  ): SngEntry {
     return new SngEntry();
   }
 }
@@ -82,7 +90,10 @@ export class RBCONEntry extends SongEntry {
   // Metadata fields (simplified for skeleton)
   public _rbMetadata: any = {};
 
-  public Deserialize(stream: FixedArrayStream, strings: CacheReadStrings): void {
+  public Deserialize(
+    stream: FixedArrayStream,
+    strings: CacheReadStrings,
+  ): void {
     super.Deserialize(stream, strings);
     this._yearAsNumber = stream.ReadInt32AsLittleEndian();
 
@@ -105,7 +116,7 @@ export class RBCONEntry extends SongEntry {
     // Skipped arrays...
   }
 
-  public UpdateInfo(updateDir: any, updateMidi: any, upgrade: any) { }
+  public UpdateInfo(updateDir: any, updateMidi: any, upgrade: any) {}
 }
 
 export class PackedRBCONEntry extends RBCONEntry {
@@ -120,13 +131,22 @@ export class PackedRBCONEntry extends RBCONEntry {
     // Base logic
   }
 
-  public static ForceDeserialize(listings: CONFileListing[] | null, root: AbridgedFileInfo, name: string, stream: FixedArrayStream, strings: CacheReadStrings): RBCONEntry {
+  public static ForceDeserialize(
+    listings: CONFileListing[] | null,
+    root: AbridgedFileInfo,
+    name: string,
+    stream: FixedArrayStream,
+    strings: CacheReadStrings,
+  ): RBCONEntry {
     const entry = new PackedRBCONEntry(root, name);
     entry._subName = stream.ReadString();
 
     entry.Deserialize(stream, strings);
 
-    entry._psuedoDirectory = path.join(root.FullName, `songs/${entry._subName}`);
+    entry._psuedoDirectory = path.join(
+      root.FullName,
+      `songs/${entry._subName}`,
+    );
 
     if (listings) {
       const location = `songs/${entry._subName}/${entry._subName}`;
@@ -150,7 +170,12 @@ export class UnpackedRBCONEntry extends RBCONEntry {
     super();
   }
 
-  public static ForceDeserialize(root: any, name: string, stream: FixedArrayStream, strings: CacheReadStrings): RBCONEntry {
+  public static ForceDeserialize(
+    root: any,
+    name: string,
+    stream: FixedArrayStream,
+    strings: CacheReadStrings,
+  ): RBCONEntry {
     const entry = new UnpackedRBCONEntry(root, name);
     entry._subName = stream.ReadString();
     entry._midiLastWrite = stream.ReadInt64AsLittleEndian();
@@ -174,6 +199,8 @@ export class PackedRBProUpgrade {
 
   public LastWriteTime: Date;
   constructor(listing: any, root: AbridgedFileInfo) {
-    this.LastWriteTime = AbridgedFileInfo.DateTimeFromBinary(BigInt(root.LastWriteTime.getTime()));
+    this.LastWriteTime = AbridgedFileInfo.DateTimeFromBinary(
+      BigInt(root.LastWriteTime.getTime()),
+    );
   }
 }
