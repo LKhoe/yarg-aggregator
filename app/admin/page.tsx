@@ -8,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Users, Shield } from "lucide-react";
+import { Users, Shield, HardDrive } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { InstallationProvider } from "@/components/installations/InstallationSelector";
@@ -38,6 +38,12 @@ function AdminDashboardContent() {
       description: t("admin.userManagementDescription"),
       href: "/admin/users",
       icon: Users,
+    },
+    {
+      title: t("admin.installations.title"),
+      description: t("admin.installations.description"),
+      href: "/admin/installations",
+      icon: HardDrive,
     },
   ];
 
