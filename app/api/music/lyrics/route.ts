@@ -20,7 +20,7 @@ async function fetchFromLyricsOvh(
     );
     if (!res.ok) return null;
     const json = await res.json();
-    return json.lyrics?.replace(/\n{3,}/g, "\n\n").trim() || null;
+    return json.lyrics?.replace(/\n{2}/g, "\n").trim() || null;
   } catch {
     return null;
   }
