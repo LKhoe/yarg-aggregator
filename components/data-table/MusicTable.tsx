@@ -69,11 +69,6 @@ interface MusicTableProps {
 
 const INSTRUMENTS = ["bass", "guitar", "drums", "vocals", "keys"] as const;
 
-// Cache regex patterns outside component to prevent recreation
-const FEAT_REGEX = /\b(feat|ft|featuring|with)\b.*$/i;
-const VERSION_REGEX =
-  /\b(remix|edit|live|radio edit|extended|mix|version)\b.*$/i;
-
 // Hoist static JSX to prevent recreation on every render
 const LoadingSkeleton = () =>
   Array.from({ length: 20 }).map((_, i) => (
@@ -106,20 +101,6 @@ const LoadingSkeleton = () =>
       </TableCell>
     </TableRow>
   ));
-
-function normalizeText(text: string): string {
-  return text
-    .replace(FEAT_REGEX, "")
-    .replace(VERSION_REGEX, "")
-    .replace(/\(.*?\)|\[.*?\]/g, "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 export default function MusicTable({
   onTotalChange,
@@ -156,13 +137,20 @@ export default function MusicTable({
   // Genre combobox data
   const { genres: genreOptions } = useGenres();
 
-  // Memoize normalized song key function to prevent recreation on every render
-  const getNormalizedSongKey = useCallback((title: string, artist: string) => {
-    return `${normalizeText(title)}|${normalizeText(artist)}`;
-  }, []);
-
   // Memoize instrument list to prevent recreation
   const instrumentList = useMemo(() => INSTRUMENTS, []);
+
+  // Track the sort the user had before we auto-switched to relevance
+  const sortBeforeQueryRef = useRef<{
+    sortBy: string;
+    sortOrder: "asc" | "desc";
+  } | null>(null);
+
+  // Keep track of latest state for the debounce effect without triggering it
+  const stateRef = useRef({ debouncedQuery, sortBy, sortOrder });
+  useEffect(() => {
+    stateRef.current = { debouncedQuery, sortBy, sortOrder };
+  }, [debouncedQuery, sortBy, sortOrder]);
 
   // Debounce search query
   useEffect(() => {
@@ -171,10 +159,41 @@ export default function MusicTable({
       return;
     }
     const timer = setTimeout(() => {
+      const {
+        debouncedQuery: currentDebouncedQuery,
+        sortBy: currentSortBy,
+        sortOrder: currentSortOrder,
+      } = stateRef.current;
+
+      const hadQuery = !!currentDebouncedQuery;
+      const hasQuery = !!query;
+
       setDebouncedQuery(query);
       setData([]); // Reset data for new search
       setNextCursor(null);
       setHasMore(true);
+
+      // Auto-switch to relevance sort when query is entered
+      if (!hadQuery && hasQuery) {
+        sortBeforeQueryRef.current = {
+          sortBy: currentSortBy,
+          sortOrder: currentSortOrder,
+        };
+        setSortBy("relevance");
+        setSortOrder("desc");
+      }
+
+      // Revert sort when query is cleared
+      if (hadQuery && !hasQuery) {
+        if (sortBeforeQueryRef.current) {
+          setSortBy(sortBeforeQueryRef.current.sortBy);
+          setSortOrder(sortBeforeQueryRef.current.sortOrder as "asc" | "desc");
+          sortBeforeQueryRef.current = null;
+        } else {
+          setSortBy("createdAt");
+          setSortOrder("desc");
+        }
+      }
     }, 300);
     return () => clearTimeout(timer);
   }, [query]);
@@ -321,8 +340,21 @@ export default function MusicTable({
   }, []);
 
   const handleSort = (column: string) => {
+    // User is explicitly choosing a sort, clear the auto-switch ref
+    sortBeforeQueryRef.current = null;
+
     if (sortBy === column) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+      if (sortOrder === "asc") {
+        setSortOrder("desc");
+      } else {
+        // Third click: reset to relevance if there's an active query, otherwise createdAt
+        if (debouncedQuery) {
+          setSortBy("relevance");
+        } else {
+          setSortBy("createdAt");
+        }
+        setSortOrder("desc");
+      }
     } else {
       setSortBy(column);
       setSortOrder("asc");
@@ -571,14 +603,11 @@ export default function MusicTable({
             ) : (
               data.map((music) => (
                 <TableRow
-                  key={
-                    music.id ?? getNormalizedSongKey(music.name, music.artist)
-                  }
-                  className={`cursor-pointer ${
-                    music.installed
+                  key={music.id}
+                  className={`cursor-pointer ${music.installed
                       ? "bg-green-500/5 hover:bg-green-500/10"
                       : ""
-                  }`}
+                    }`}
                   onClick={() => onSongSelect?.(music)}
                 >
                   <TableCell className="hidden sm:table-cell">

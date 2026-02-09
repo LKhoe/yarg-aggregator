@@ -161,11 +161,14 @@ export class MusicService {
     // by checking if installationSong.id IS NOT NULL in the WHERE clause
     const filterByInstalled = installed && installationId;
 
+    // Use relevance sort only when explicitly requested and a query is present
+    const useRelevanceSort = sortBy === "relevance" && query && relevanceScore;
+
     let orderByPrimary;
-    if (query && relevanceScore) {
-      orderByPrimary = desc(relevanceScore);
+    if (useRelevanceSort) {
+      orderByPrimary = desc(relevanceScore!);
     } else {
-      switch (sortBy) {
+      switch (sortBy === "relevance" ? "createdAt" : sortBy) {
         case "name":
           orderByPrimary =
             sortOrder === "asc" ? asc(song.title) : desc(song.title);
@@ -192,12 +195,12 @@ export class MusicService {
       const cursorData = JSON.parse(atob(cursor));
       const { lastValue, lastId } = cursorData;
 
-      if (query && relevanceScore) {
+      if (useRelevanceSort) {
         const { lastScore } = cursorData;
         cursorCondition = sql`((${relevanceScore} < ${lastScore}) OR (${relevanceScore} = ${lastScore} AND ${song.id} > ${lastId}))`;
       } else {
         let sortField;
-        switch (sortBy) {
+        switch (sortBy === "relevance" ? "createdAt" : sortBy) {
           case "name":
             sortField = song.title;
             break;
@@ -349,7 +352,7 @@ export class MusicService {
       const lastItem = resultData[resultData.length - 1];
       let lastValue;
 
-      if (query && relevanceScore) {
+      if (useRelevanceSort) {
         const cursorData = {
           lastScore: lastItem.relevanceScore,
           lastId: lastItem.id,
@@ -357,7 +360,7 @@ export class MusicService {
         };
         nextCursor = btoa(JSON.stringify(cursorData));
       } else {
-        switch (sortBy) {
+        switch (sortBy === "relevance" ? "createdAt" : sortBy) {
           case "name":
             lastValue = lastItem.title;
             break;

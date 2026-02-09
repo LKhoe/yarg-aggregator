@@ -27,15 +27,21 @@ async function createConnection() {
   if (!cached.promise) {
     console.log("Creating new database connection...");
     const client = postgres(DATABASE_URL, {
-      // debug: process.env.NODE_ENV === 'development' ? (connection, query, params) => {
-      //   console.log('🔍 DB Query:', query);
-      //   console.log('📋 Params:', params);
-      //   // with the params replaced on the query
-      //   console.log('📋 Params Replaced:', query.replace(/\$\d+/g, (match) => {
-      //     const param = params[Number(match.slice(1)) - 1];
-      //     return typeof param === 'string' ? `'${param}'` : param;
-      //   }));
-      // } : undefined,
+      // debug:
+      //   process.env.NODE_ENV === "development"
+      //     ? (connection, query, params) => {
+      //         // console.log("🔍 DB Query:", query);
+      //         // console.log("📋 Params:", params);
+      //         // with the params replaced on the query
+      //         console.log(
+      //           "📋 Params Replaced:",
+      //           query.replace(/\$\d+/g, (match) => {
+      //             const param = params[Number(match.slice(1)) - 1];
+      //             return typeof param === "string" ? `'${param}'` : param;
+      //           }),
+      //         );
+      //       }
+      //     : undefined,
     });
     cached.promise = Promise.resolve(drizzle(client, { schema }));
   }

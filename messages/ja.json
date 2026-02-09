@@ -68,6 +68,7 @@
     "instruments": "楽器",
     "actions": "アクション",
     "loadMore": "さらに読み込む...",
+    "loading": "読み込み中...",
     "showInstalled": "インストール済みを表示：",
     "installedHighlighted": "インストール済み曲をハイライト",
     "showOnlyInstalled": "インストール済みのみ表示",

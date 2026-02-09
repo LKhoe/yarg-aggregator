@@ -68,6 +68,7 @@
     "instruments": "乐器",
     "actions": "操作",
     "loadMore": "加载更多...",
+    "loading": "加载中...",
     "showInstalled": "显示已安装：",
     "installedHighlighted": "已安装歌曲高亮",
     "showOnlyInstalled": "仅显示已安装",

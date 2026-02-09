@@ -61,7 +61,7 @@ export interface ProviderMusic {
 export interface SearchParams {
   query: string;
   limit: number;
-  sortBy: "name" | "artist" | "album" | "createdAt";
+  sortBy: "name" | "artist" | "album" | "createdAt" | "relevance";
   sortOrder: "asc" | "desc";
   genre: string;
   instruments: string[];
