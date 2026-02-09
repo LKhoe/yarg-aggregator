@@ -70,7 +70,7 @@ export default function HomePage() {
               />
             </div>
 
-            <aside className="hidden lg:block space-y-4 lg:space-y-6 sticky top-20 self-start max-h-[calc(100vh-2rem)] overflow-y-auto">
+            <aside className="hidden lg:block space-y-4 lg:space-y-6 sticky top-20 self-start max-h-[calc(100vh-2rem)] overflow-y-hidden">
               {selectedSong && (
                 <SongDetail
                   song={selectedSong}
