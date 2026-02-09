@@ -1,51 +1,110 @@
 services:
   yarg-aggregator:
+    container_name: yarg-aggregator
     build:
       context: .
       dockerfile: Dockerfile
+    image: yarg-aggregator:latest
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     environment:
       # Database
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/yarg_db
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-yarg_db}
       # Redis
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       # App
-      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      - NODE_ENV=production
       # Better Auth
-      - BETTER_AUTH_SECRET=sp4zlaU4dTteE3ckze+/W2o1fbMDVOLdfEIeTzvCAas=
-      - BETTER_AUTH_URL=http://localhost:3000
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3000}
+      # Google OAuth
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - yarg-network
-      # - tunnel
+    # Memory limits for Raspberry Pi (adjust as needed)
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   postgres:
+    container_name: yarg-postgres
     image: postgres:15-alpine
-    ports:
-      - "5432:5432"
+    # Removed external port exposure for security - only accessible within Docker network
+    # Uncomment if you need direct access: ports: ["5432:5432"]
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=yarg_db
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-yarg_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
     networks:
       - yarg-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
+    container_name: yarg-redis
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    # Removed external port exposure for security - only accessible within Docker network
+    # Uncomment if you need direct access: ports: ["6379:6379"]
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
     networks:
       - yarg-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   postgres_data:
@@ -54,5 +113,3 @@ volumes:
 networks:
   yarg-network:
     driver: bridge
-  # tunnel:
-  #   external: true

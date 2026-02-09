@@ -6,13 +6,17 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# Install all dependencies (including dev for build)
+RUN npm ci
 
 # Copy source files
 COPY . .
 
+# Generate drizzle migrations before build
+RUN npm run db:generate
+
 # Build the application
+# Note: Ensure "output: 'standalone'" is set in next.config.js/ts
 RUN npm run build
 
 # Production stage
@@ -22,17 +26,43 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Copy package files and install production dependencies
-COPY package*.json ./
-RUN npm install --production
+# Install only the packages needed for database migrations
+# We need: drizzle-kit (migrations), tsx (run TypeScript), pg (postgres client)
+RUN npm install -g drizzle-kit tsx
 
-# Copy build output
+# Don't run as root
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Copy only the necessary files for standalone mode
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
+
+# Set the correct permission for prerender cache
+RUN mkdir .next
+RUN chown nextjs:nodejs .next
+
+# Automatically leverage output traces to reduce image size
+# https://nextjs.org/docs/advanced-features/output-file-tracing
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Copy database migration files
+# Note: drizzle.config.ts specifies out: './lib/db/migrations'
+COPY --from=builder --chown=nextjs:nodejs /app/drizzle.config.ts ./
+COPY --from=builder --chown=nextjs:nodejs /app/lib/db ./lib/db
+
+# Copy package.json for drizzle-kit to read
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
+
+# Install pg for database connection during migrations (as nextjs user needs it)
+RUN npm install pg postgres
 
 # Copy and setup entrypoint script
-COPY docker-entrypoint.sh /usr/local/bin/
+COPY --chown=nextjs:nodejs docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Switch to non-root user
+USER nextjs
 
 # Expose port
 EXPOSE 3000
@@ -42,4 +72,4 @@ ENV HOSTNAME="0.0.0.0"
 
 # Set entrypoint and command
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["npm", "start"]
+CMD ["node", "server.js"]
