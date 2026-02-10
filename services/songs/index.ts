@@ -22,6 +22,11 @@ interface ProcessingStats {
   updated: number;
   added: number;
   ignored: number;
+  details: {
+    added: { artist: string; title: string }[];
+    updated: { artist: string; title: string }[];
+    ignored: { artist: string; title: string; reason: string }[];
+  };
 }
 
 export type ProgressCallback = (data: {
@@ -36,7 +41,16 @@ export async function processSongs(
   onProgress?: ProgressCallback,
 ): Promise<ProcessingStats> {
   const BATCH_SIZE = 500;
-  const stats: ProcessingStats = { updated: 0, added: 0, ignored: 0 };
+  const stats: ProcessingStats = {
+    updated: 0,
+    added: 0,
+    ignored: 0,
+    details: {
+      added: [],
+      updated: [],
+      ignored: [],
+    },
+  };
   const totalSongs = songs.length;
   let processedCount = 0;
 
@@ -64,6 +78,9 @@ export async function processSongs(
     stats.updated += batchStats.updated;
     stats.added += batchStats.added;
     stats.ignored += batchStats.ignored;
+    stats.details.added.push(...batchStats.details.added);
+    stats.details.updated.push(...batchStats.details.updated);
+    stats.details.ignored.push(...batchStats.details.ignored);
 
     processedCount += chunk.length;
 
@@ -85,12 +102,38 @@ async function saveSongsInBatches(
   provider: string,
   onPhaseChange?: (phase: string) => void,
 ): Promise<ProcessingStats> {
-  const stats: ProcessingStats = { updated: 0, added: 0, ignored: 0 };
+  const stats: ProcessingStats = {
+    updated: 0,
+    added: 0,
+    ignored: 0,
+    details: {
+      added: [],
+      updated: [],
+      ignored: [],
+    },
+  };
 
   // 1. Normalize and deduplicate songs within the batch
   if (onPhaseChange) onPhaseChange("Deduplicating songs");
   const songsWithKeysRaw = normalizeProviderSongs(songs);
-  const songsWithKeys = deduplicateSongs(songsWithKeysRaw);
+
+  // Filter out songs with less than 4 instruments
+  const songsWithInstruments = songsWithKeysRaw.filter((s) => {
+    const hasEnoughInstruments =
+      getInstrumentCountFromProviderMusic(s.instruments) >= 4;
+    if (!hasEnoughInstruments) {
+      stats.details.ignored.push({
+        artist: s.artist,
+        title: s.name,
+        reason: "Less than 4 instruments",
+      });
+    }
+    return hasEnoughInstruments;
+  });
+
+  stats.ignored += songsWithKeysRaw.length - songsWithInstruments.length;
+
+  const songsWithKeys = deduplicateSongs(songsWithInstruments);
   const keys = songsWithKeys.map((s) => s.key);
 
   // 2. Fetch existing songs
@@ -138,6 +181,11 @@ async function saveSongsInBatches(
         diffKeys: songData.instruments.keys ?? null,
         diffVocals: songData.instruments.vocals ?? null,
       };
+
+      stats.details.added.push({
+        artist: songData.artist,
+        title: songData.name,
+      });
 
       return {
         id: randomUUID(),
@@ -209,6 +257,11 @@ async function saveSongsInBatches(
     // New version has FEWER instruments -> IGNORE completely
     if (newScore < oldScore) {
       stats.ignored++;
+      stats.details.ignored.push({
+        artist: songData.artist,
+        title: songData.name,
+        reason: "Existing version has more instruments",
+      });
       continue;
     }
 
@@ -261,8 +314,18 @@ async function saveSongsInBatches(
     // If nothing to do, ignore
     if (!shouldUpdateSong && !shouldAddDownload && !shouldReplaceDownloads) {
       stats.ignored++;
+      stats.details.ignored.push({
+        artist: songData.artist,
+        title: songData.name,
+        reason: "No changes needed",
+      });
       continue;
     }
+
+    stats.details.updated.push({
+      artist: songData.artist,
+      title: songData.name,
+    });
 
     // Apply download operations
     const firstDownloadUrl = songData.downloadUrls?.[0]?.url;

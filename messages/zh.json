@@ -202,12 +202,20 @@
       "fetching": "获取中",
       "processing": "处理中",
       "saving": "保存歌曲",
-      "deduplicating": "去重中",
-      "fetching_existing": "获取现有歌曲",
-      "resolving": "预解析元数据",
-      "building": "构建事务",
       "completed": "完成",
-      "failed": "失败"
+      "failed": "失败",
+      "uploading": "上传文件",
+      "deduplicating songs": "歌曲去重中",
+      "fetching existing songs": "获取现有歌曲",
+      "pre-resolving metadata": "预解析元数据",
+      "building transactions": "构建事务",
+      "saving songs": "保存歌曲",
+      "noDetailsAvailable": "无详细信息"
+    },
+    "reasons": {
+      "less than 4 instruments": "少于4种乐器",
+      "existing version has more instruments": "现有版本有更多乐器",
+      "no changes needed": "无需更改"
     },
     "status": {
       "fetched": "第 {page} 页 - 已获取 {count} 首歌曲",

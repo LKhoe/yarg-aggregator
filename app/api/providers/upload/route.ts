@@ -97,14 +97,38 @@ export async function POST(request: NextRequest) {
             controller.enqueue(encoder.encode(`data: ${message}\n\n`));
           });
 
-          const completeMessage = JSON.stringify({ type: "complete", stats });
+          // Print the stats grouping the ignored songs by reason
+          const ignoredByReason = stats.details.ignored.reduce(
+            (acc, song) => {
+              const reason = song.reason;
+              if (!acc[reason]) {
+                acc[reason] = [];
+              }
+              acc[reason].push(song);
+              return acc;
+            },
+            {} as Record<string, { artist: string; title: string }[]>,
+          );
+
+          // Send full stats to client
+          const completeMessage = JSON.stringify({
+            type: "complete",
+            stats: {
+              ...stats,
+              details: {
+                ...stats.details,
+                ignored: ignoredByReason,
+              },
+            },
+          });
           controller.enqueue(encoder.encode(`data: ${completeMessage}\n\n`));
           controller.close();
         } catch (error: unknown) {
           console.error("Error processing upload:", error);
           const errorMessage = JSON.stringify({
             type: "error",
-            message: error instanceof Error ? error.message : "Internal server error",
+            message:
+              error instanceof Error ? error.message : "Internal server error",
           });
           controller.enqueue(encoder.encode(`data: ${errorMessage}\n\n`));
           controller.close();

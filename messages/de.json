@@ -202,12 +202,20 @@
       "fetching": "Abrufen",
       "processing": "Verarbeiten",
       "saving": "Lieder speichern",
-      "deduplicating": "Deduplizieren",
-      "fetching_existing": "Vorhandene Lieder abrufen",
-      "resolving": "Metadaten vorauflösen",
-      "building": "Transaktionen erstellen",
       "completed": "Abgeschlossen",
-      "failed": "Fehlgeschlagen"
+      "failed": "Fehlgeschlagen",
+      "uploading": "Datei hochladen",
+      "deduplicating songs": "Lieder deduplizieren",
+      "fetching existing songs": "Vorhandene Lieder abrufen",
+      "pre-resolving metadata": "Metadaten vorauflösen",
+      "building transactions": "Transaktionen erstellen",
+      "saving songs": "Lieder speichern",
+      "noDetailsAvailable": "Keine Details verfügbar"
+    },
+    "reasons": {
+      "less than 4 instruments": "Weniger als 4 Instrumente",
+      "existing version has more instruments": "Vorhandene Version hat mehr Instrumente",
+      "no changes needed": "Keine Änderungen erforderlich"
     },
     "status": {
       "fetched": "Seite {page} - {count} Lieder abgerufen",

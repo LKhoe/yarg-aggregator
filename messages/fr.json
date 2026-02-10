@@ -202,12 +202,20 @@
       "fetching": "Récupération",
       "processing": "Traitement",
       "saving": "Sauvegarde des chansons",
-      "deduplicating": "Déduplication",
-      "fetching_existing": "Récupération des chansons existantes",
-      "resolving": "Pré-résolution des métadonnées",
-      "building": "Construction des transactions",
       "completed": "Terminé",
-      "failed": "Échec"
+      "failed": "Échec",
+      "uploading": "Téléchargement du fichier",
+      "deduplicating songs": "Déduplication des chansons",
+      "fetching existing songs": "Récupération des chansons existantes",
+      "pre-resolving metadata": "Pré-résolution des métadonnées",
+      "building transactions": "Construction des transactions",
+      "saving songs": "Sauvegarde des chansons",
+      "noDetailsAvailable": "Aucun détail disponible"
+    },
+    "reasons": {
+      "less than 4 instruments": "Moins de 4 instruments",
+      "existing version has more instruments": "La version existante a plus d'instruments",
+      "no changes needed": "Aucun changement nécessaire"
     },
     "status": {
       "fetched": "Page {page} - {count} chansons récupérées",

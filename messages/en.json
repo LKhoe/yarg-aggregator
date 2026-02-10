@@ -130,12 +130,20 @@
       "fetching": "Fetching",
       "processing": "Processing",
       "saving": "Saving songs",
-      "deduplicating": "Deduplicating",
-      "fetching_existing": "Fetching existing songs",
-      "resolving": "Pre-resolving metadata",
-      "building": "Building transactions",
       "completed": "Completed",
-      "failed": "Failed"
+      "failed": "Failed",
+      "uploading": "Uploading file",
+      "deduplicating songs": "Deduplicating songs",
+      "fetching existing songs": "Fetching existing songs",
+      "pre-resolving metadata": "Pre-resolving metadata",
+      "building transactions": "Building transactions",
+      "saving songs": "Saving songs",
+      "noDetailsAvailable": "No details available"
+    },
+    "reasons": {
+      "less than 4 instruments": "Less than 4 instruments",
+      "existing version has more instruments": "Existing version has more instruments",
+      "no changes needed": "No changes needed"
     },
     "status": {
       "fetched": "Page {page} - {count} songs fetched",

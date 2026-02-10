@@ -130,16 +130,24 @@
       "fetching": "Buscando",
       "processing": "Processando",
       "saving": "Salvando músicas",
-      "deduplicating": "Deduplicando",
-      "fetching_existing": "Buscando músicas existentes",
-      "resolving": "Pré-resolvendo metadados",
-      "building": "Construindo transações",
       "completed": "Concluído",
-      "failed": "Falhou"
+      "failed": "Falhou",
+      "uploading": "Enviando arquivo",
+      "deduplicating songs": "Deduplicando músicas",
+      "fetching existing songs": "Buscando músicas existentes",
+      "pre-resolving metadata": "Pré-resolvendo metadados",
+      "building transactions": "Construindo transações",
+      "saving songs": "Salvando músicas",
+      "noDetailsAvailable": "Nenhum detalhe disponível"
+    },
+    "reasons": {
+      "less than 4 instruments": "Menos de 4 instrumentos",
+      "existing version has more instruments": "Versão existente tem mais instrumentos",
+      "no changes needed": "Nenhuma alteração necessária"
     },
     "status": {
       "fetched": "Página {page} - {count} músicas buscadas",
-      "running": "Rodando",
+      "running": "Executando",
       "starting": "Iniciando"
     }
   },

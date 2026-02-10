@@ -11,9 +11,21 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, CloudDownload } from "lucide-react";
-import { toast } from "sonner";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useTranslations } from "@/hooks/use-translations";
+import { CloudDownload, RefreshCw, ChevronRight } from "lucide-react";
+import { toast } from "sonner";
 
 interface ProviderProgress {
   page?: number;
@@ -50,6 +62,11 @@ interface JobProgress {
   added?: number;
   updated?: number;
   ignored?: number;
+  details?: {
+    added: any[];
+    updated: any[];
+    ignored: Record<string, any[]>;
+  };
 }
 
 export default function ProviderPanel() {
@@ -61,7 +78,19 @@ export default function ProviderPanel() {
     Record<string, ProviderStatus>
   >({});
   const [fetching, setFetching] = useState<Record<string, boolean>>({});
+  const [detailType, setDetailType] = useState<
+    "added" | "updated" | "ignored" | null
+  >(null);
+  const [detailData, setDetailData] = useState<any>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const openDetails = (type: "added" | "updated" | "ignored") => {
+    if (uploadProgress?.status !== "completed") return;
+
+    setDetailType(type);
+    const data = uploadProgress?.details?.[type];
+    setDetailData(data || null);
+  };
 
   const fetchProviderStatuses = useCallback(async () => {
     try {
@@ -159,51 +188,57 @@ export default function ProviderPanel() {
         currentSource: source,
       });
 
+      let buffer = "";
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split("\n");
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        // Keep the last line in the buffer as it might be incomplete
+        buffer = lines.pop() || "";
 
         for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.slice(6));
+          const trimmedLine = line.trim();
+          if (!trimmedLine || !trimmedLine.startsWith("data: ")) continue;
 
-              if (data.type === "progress") {
-                setUploadProgress({
-                  status: "processing",
-                  progress: data.progress,
-                  currentSource: source,
-                  phase: data.phase,
+          try {
+            const data = JSON.parse(trimmedLine.slice(6));
+
+            if (data.type === "progress") {
+              setUploadProgress({
+                status: "processing",
+                progress: data.progress,
+                currentSource: source,
+                phase: data.phase,
+                added: data.stats?.added,
+                updated: data.stats?.updated,
+                ignored: data.stats?.ignored,
+              });
+            } else if (data.type === "complete") {
+              setUploadProgress({
+                status: "completed",
+                progress: 100,
+                currentSource: source,
+                added: data.stats?.added,
+                updated: data.stats?.updated,
+                ignored: data.stats?.ignored,
+                details: data.stats?.details,
+              });
+              toast.success(
+                t("provider.uploadCompleted", {
                   added: data.stats?.added,
                   updated: data.stats?.updated,
                   ignored: data.stats?.ignored,
-                });
-              } else if (data.type === "complete") {
-                setUploadProgress({
-                  status: "completed",
-                  progress: 100,
-                  currentSource: source,
-                  added: data.stats?.added,
-                  updated: data.stats?.updated,
-                  ignored: data.stats?.ignored,
-                });
-                toast.success(
-                  t("provider.uploadCompleted", {
-                    added: data.stats?.added,
-                    updated: data.stats?.updated,
-                    ignored: data.stats?.ignored,
-                  }),
-                );
-                setTimeout(() => setUploadProgress(null), 3000);
-              } else if (data.type === "error") {
-                throw new Error(data.message);
-              }
-            } catch (parseError) {
-              console.error("Error parsing SSE data:", parseError);
+                }),
+              );
+              // Removed auto-dismiss timeout
+            } else if (data.type === "error") {
+              throw new Error(data.message);
             }
+          } catch (parseError) {
+            console.error("Error parsing SSE data:", parseError);
           }
         }
       }
@@ -264,7 +299,9 @@ export default function ProviderPanel() {
                     <div className="flex gap-1 items-center">
                       {isRunning && (
                         <Badge
-                          className={getStatusColor(progress?.phase ?? "running")}
+                          className={getStatusColor(
+                            progress?.phase ?? "running",
+                          )}
                           variant="secondary"
                         >
                           {progress?.phase === "running"
@@ -341,45 +378,49 @@ export default function ProviderPanel() {
                         progress.phase === "Fetching existing songs" ||
                         progress.phase === "Pre-resolving metadata" ||
                         progress.phase === "Building transactions") && (
-                          <>
-                            <p className="text-xs text-muted-foreground">
-                              {progress?.phase &&
-                                [
-                                  "fetching",
-                                  "processing",
-                                  "Saving songs",
-                                  "Deduplicating songs",
-                                  "Fetching existing songs",
-                                  "Pre-resolving metadata",
-                                  "Building transactions",
-                                ].includes(progress.phase)
-                                ? t(
-                                  `provider.phases.${progress.phase === "Saving songs"
-                                    ? "saving"
-                                    : progress.phase === "Deduplicating songs"
-                                      ? "deduplicating"
-                                      : progress.phase === "Fetching existing songs"
-                                        ? "fetching_existing"
-                                        : progress.phase === "Pre-resolving metadata"
-                                          ? "resolving"
-                                          : progress.phase === "Building transactions"
-                                            ? "building"
-                                            : progress.phase
+                        <>
+                          <p className="text-xs text-muted-foreground">
+                            {progress?.phase &&
+                            [
+                              "fetching",
+                              "processing",
+                              "Saving songs",
+                              "Deduplicating songs",
+                              "Fetching existing songs",
+                              "Pre-resolving metadata",
+                              "Building transactions",
+                            ].includes(progress.phase)
+                              ? t(
+                                  `provider.phases.${
+                                    progress.phase === "Saving songs"
+                                      ? "saving"
+                                      : progress.phase === "Deduplicating songs"
+                                        ? "deduplicating"
+                                        : progress.phase ===
+                                            "Fetching existing songs"
+                                          ? "fetching_existing"
+                                          : progress.phase ===
+                                              "Pre-resolving metadata"
+                                            ? "resolving"
+                                            : progress.phase ===
+                                                "Building transactions"
+                                              ? "building"
+                                              : progress.phase
                                   }` as any,
                                 )
-                                : progress.phase}
-                              ...{" "}
-                              {progress.progress !== undefined &&
-                                `${progress.progress}%`}
-                            </p>
-                            {progress.progress !== undefined && (
-                              <Progress
-                                value={progress.progress}
-                                className="h-1"
-                              />
-                            )}
-                          </>
-                        )}
+                              : progress.phase}
+                            ...{" "}
+                            {progress.progress !== undefined &&
+                              `${progress.progress}%`}
+                          </p>
+                          {progress.progress !== undefined && (
+                            <Progress
+                              value={progress.progress}
+                              className="h-1"
+                            />
+                          )}
+                        </>
+                      )}
                       {progress.stats && (
                         <div className="flex gap-2 text-[10px]">
                           <span className="text-green-600">
@@ -397,24 +438,26 @@ export default function ProviderPanel() {
                   )}
 
                   {/* Show completed stats briefly */}
-                  {!isRunning && progress?.phase === "completed" && progress.stats && (
-                    <div className="mt-2 space-y-1">
-                      <Badge className="bg-green-500" variant="secondary">
-                        {t("provider.phases.completed")}
-                      </Badge>
-                      <div className="flex gap-2 text-[10px]">
-                        <span className="text-green-600">
-                          +{progress.stats.added}
-                        </span>
-                        <span className="text-blue-600">
-                          ~{progress.stats.updated}
-                        </span>
-                        <span className="text-gray-500">
-                          ={progress.stats.ignored}
-                        </span>
+                  {!isRunning &&
+                    progress?.phase === "completed" &&
+                    progress.stats && (
+                      <div className="mt-2 space-y-1">
+                        <Badge className="bg-green-500" variant="secondary">
+                          {t("provider.phases.completed")}
+                        </Badge>
+                        <div className="flex gap-2 text-[10px]">
+                          <span className="text-green-600">
+                            +{progress.stats.added}
+                          </span>
+                          <span className="text-blue-600">
+                            ~{progress.stats.updated}
+                          </span>
+                          <span className="text-gray-500">
+                            ={progress.stats.ignored}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
                   {/* Show failed status */}
                   {!isRunning && progress?.phase === "failed" && (
@@ -443,12 +486,9 @@ export default function ProviderPanel() {
               </span>
               <div className="flex items-center gap-2">
                 <Badge className={getStatusColor(uploadProgress.status)}>
-                  {t(
-                    `provider.phases.${uploadProgress.status}` as any,
-                    {
-                      default: uploadProgress.status,
-                    },
-                  )}
+                  {t(`provider.phases.${uploadProgress.status}` as any, {
+                    default: uploadProgress.status,
+                  })}
                 </Badge>
                 <Button
                   variant="ghost"
@@ -495,35 +535,116 @@ export default function ProviderPanel() {
             {(uploadProgress.added !== undefined ||
               uploadProgress.updated !== undefined ||
               uploadProgress.ignored !== undefined) && (
-                <div className="grid grid-cols-3 gap-2 text-sm">
-                  <div className="text-center p-2 bg-green-50 dark:bg-green-950 rounded">
-                    <div className="font-medium text-green-600 dark:text-green-400">
-                      {uploadProgress.added || 0}
-                    </div>
-                    <div className="text-xs text-green-500 dark:text-green-300">
-                      {t("provider.stats.added")}
-                    </div>
+              <div className="grid grid-cols-3 gap-2 text-sm">
+                <div
+                  onClick={() => openDetails("added")}
+                  className={`text-center p-2 bg-green-50 dark:bg-green-950 rounded ${
+                    uploadProgress.status === "completed"
+                      ? "cursor-pointer hover:opacity-80"
+                      : ""
+                  }`}
+                >
+                  <div className="font-medium text-green-600 dark:text-green-400">
+                    {uploadProgress.added || 0}
                   </div>
-                  <div className="text-center p-2 bg-blue-50 dark:bg-blue-950 rounded">
-                    <div className="font-medium text-blue-600 dark:text-blue-400">
-                      {uploadProgress.updated || 0}
-                    </div>
-                    <div className="text-xs text-blue-500 dark:text-blue-300">
-                      {t("provider.stats.updated")}
-                    </div>
-                  </div>
-                  <div className="text-center p-2 bg-gray-50 dark:bg-gray-950 rounded">
-                    <div className="font-medium text-gray-600 dark:text-gray-400">
-                      {uploadProgress.ignored || 0}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-300">
-                      {t("provider.stats.ignored")}
-                    </div>
+                  <div className="text-xs text-green-500 dark:text-green-300">
+                    {t("provider.stats.added")}
                   </div>
                 </div>
-              )}
+                <div
+                  onClick={() => openDetails("updated")}
+                  className={`text-center p-2 bg-blue-50 dark:bg-blue-950 rounded ${
+                    uploadProgress.status === "completed"
+                      ? "cursor-pointer hover:opacity-80"
+                      : ""
+                  }`}
+                >
+                  <div className="font-medium text-blue-600 dark:text-blue-400">
+                    {uploadProgress.updated || 0}
+                  </div>
+                  <div className="text-xs text-blue-500 dark:text-blue-300">
+                    {t("provider.stats.updated")}
+                  </div>
+                </div>
+                <div
+                  onClick={() => openDetails("ignored")}
+                  className={`text-center p-2 bg-gray-50 dark:bg-gray-950 rounded ${
+                    uploadProgress.status === "completed"
+                      ? "cursor-pointer hover:opacity-80"
+                      : ""
+                  }`}
+                >
+                  <div className="font-medium text-gray-600 dark:text-gray-400">
+                    {uploadProgress.ignored || 0}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-300">
+                    {t("provider.stats.ignored")}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
+
+        <Dialog
+          open={!!detailType}
+          onOpenChange={(open) => !open && setDetailType(null)}
+        >
+          <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="capitalize">
+                {detailType && t(`provider.stats.${detailType}`)}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-hidden relative">
+              <ScrollArea className="h-full pr-4 max-h-[60vh]">
+                {detailType === "ignored" && detailData ? (
+                  Object.entries(detailData).map(([reason, songs]) => (
+                    <Collapsible key={reason} className="mb-2 last:mb-0">
+                      <CollapsibleTrigger className="w-full flex items-center gap-2 font-medium text-xs bg-muted/50 p-2 rounded cursor-pointer hover:bg-muted/70 sticky top-0 backdrop-blur-sm group text-left transition-colors">
+                        <ChevronRight className="h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-90 text-muted-foreground" />
+                        <span>
+                          {t(`provider.reasons.${reason.toLowerCase()}`, {
+                            default: reason
+                          })} ({(songs as any[]).length})
+                        </span>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="max-h-75 overflow-y-auto space-y-1 pl-4 pt-1 pb-2 pr-2">
+                          {(songs as any[]).map((song, i) => (
+                            <div
+                              key={i}
+                              className="text-[10px] text-muted-foreground truncate"
+                              title={`${song.title} - ${song.artist}`}
+                            >
+                              {song.title} - {song.artist}
+                            </div>
+                          ))}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  ))
+                ) : detailData && Array.isArray(detailData) ? (
+                  <div className="space-y-1">
+                    {detailData.map((song: any, i: number) => (
+                      <div
+                        key={i}
+                        className="text-[10px] text-muted-foreground truncate"
+                        title={`${song.title} - ${song.artist}`}
+                      >
+                        {song.title} - {song.artist}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center text-sm text-muted-foreground p-4">
+                    {t("provider.phases.noDetailsAvailable")}
+                  </div>
+                )}
+              </ScrollArea>
+            </div>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

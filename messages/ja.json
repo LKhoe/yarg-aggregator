@@ -202,12 +202,20 @@
       "fetching": "取得中",
       "processing": "処理中",
       "saving": "曲を保存中",
-      "deduplicating": "重複排除中",
-      "fetching_existing": "既存曲を取得中",
-      "resolving": "メタデータを事前解決中",
-      "building": "トランザクション構築中",
       "completed": "完了",
-      "failed": "失敗"
+      "failed": "失敗",
+      "uploading": "ファイルをアップロード中",
+      "deduplicating songs": "曲の重複排除中",
+      "fetching existing songs": "既存曲を取得中",
+      "pre-resolving metadata": "メタデータを事前解決中",
+      "building transactions": "トランザクション構築中",
+      "saving songs": "曲を保存中",
+      "noDetailsAvailable": "詳細がありません"
+    },
+    "reasons": {
+      "less than 4 instruments": "4つ未満の楽器",
+      "existing version has more instruments": "既存のバージョンにより多くの楽器があります",
+      "no changes needed": "変更は必要ありません"
     },
     "status": {
       "fetched": "ページ {page} - {count}曲取得済み",
