@@ -202,7 +202,8 @@
       "loading": "Criando conta...",
       "haveAccount": "Já tem uma conta?",
       "signIn": "Entrar",
-      "checkEmail": "Verifique seu email para confirmar sua conta."
+      "checkEmail": "Verifique seu email para confirmar sua conta.",
+      "success": "Conta criada com sucesso!"
     },
     "verifyEmail": {
       "title": "Verifique seu Email",

@@ -139,9 +139,10 @@
       "passwordRequirement": "至少8个字符",
       "submit": "创建账户",
       "loading": "创建账户中...",
-      "haveAccount": "已有账户？",
+      "haveAccount": "已经有账户了？",
       "signIn": "登录",
-      "checkEmail": "请查看邮箱以验证您的账户。"
+      "checkEmail": "请查看邮箱以验证您的账户。",
+      "success": "账户创建成功！"
     },
     "verifyEmail": {
       "title": "验证您的邮箱",

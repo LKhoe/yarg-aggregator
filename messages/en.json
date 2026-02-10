@@ -202,7 +202,8 @@
       "loading": "Creating account...",
       "haveAccount": "Already have an account?",
       "signIn": "Sign in",
-      "checkEmail": "Check your email to verify your account."
+      "checkEmail": "Check your email to verify your account.",
+      "success": "Account created successfully!"
     },
     "verifyEmail": {
       "title": "Verify Your Email",

@@ -141,7 +141,8 @@
       "loading": "Konto wird erstellt...",
       "haveAccount": "Haben Sie bereits ein Konto?",
       "signIn": "Anmelden",
-      "checkEmail": "Überprüfen Sie Ihre E-Mail, um Ihr Konto zu bestätigen."
+      "checkEmail": "Überprüfen Sie Ihre E-Mail, um Ihr Konto zu bestätigen.",
+      "success": "Konto erfolgreich erstellt!"
     },
     "verifyEmail": {
       "title": "E-Mail bestätigen",

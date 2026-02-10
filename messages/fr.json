@@ -141,7 +141,8 @@
       "loading": "Création du compte...",
       "haveAccount": "Vous avez déjà un compte ?",
       "signIn": "Se connecter",
-      "checkEmail": "Vérifiez votre email pour confirmer votre compte."
+      "checkEmail": "Vérifiez votre email pour confirmer votre compte.",
+      "success": "Compte créé avec succès !"
     },
     "verifyEmail": {
       "title": "Vérifiez Votre Email",

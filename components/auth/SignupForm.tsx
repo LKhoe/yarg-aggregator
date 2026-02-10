@@ -49,8 +49,38 @@ export function SignupForm() {
           toast.error(t("auth.errors.generic"));
         }
       } else {
-        toast.success(t("auth.signup.checkEmail"));
-        router.push("/verify-email");
+        // Check if email verification is required
+        try {
+          const configResponse = await fetch("/api/auth/config");
+          const config = await configResponse.json();
+          
+          if (config.requireEmailVerification) {
+            toast.success(t("auth.signup.checkEmail"));
+            router.push("/verify-email");
+          } else {
+            // Try to sign in the user immediately
+            const signInResult = await signIn.email({
+              email,
+              password,
+              callbackURL: "/",
+            });
+            
+            if (signInResult.error) {
+              // If auto sign-in fails, redirect to login
+              toast.success(t("auth.signup.success"));
+              router.push("/login");
+            } else {
+              // User is signed in, redirect to main page
+              toast.success(t("auth.signup.success"));
+              router.push("/");
+            }
+          }
+        } catch (configError) {
+          // Fallback: if we can't check config, assume verification is not required
+          console.error("Error checking auth config:", configError);
+          toast.success(t("auth.signup.success"));
+          router.push("/login");
+        }
       }
     } catch {
       toast.error(t("auth.errors.generic"));

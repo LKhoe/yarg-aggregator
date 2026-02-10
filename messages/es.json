@@ -141,7 +141,8 @@
       "loading": "Creando cuenta...",
       "haveAccount": "¿Ya tienes cuenta?",
       "signIn": "Iniciar sesión",
-      "checkEmail": "Revisa tu correo para verificar tu cuenta."
+      "checkEmail": "Revisa tu correo para verificar tu cuenta.",
+      "success": "Cuenta creada exitosamente!"
     },
     "verifyEmail": {
       "title": "Verifica tu Correo",

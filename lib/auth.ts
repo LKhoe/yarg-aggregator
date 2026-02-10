@@ -11,7 +11,7 @@ export const auth = betterAuth({
 
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: true,
+    requireEmailVerification: false,
   },
 
   socialProviders: {
@@ -44,7 +44,11 @@ export const auth = betterAuth({
 
           // Check for existing display names and add suffix if needed
           while (true) {
-            const existingResult = await db.select().from(userProfile).where(eq(userProfile.displayName, displayName)).limit(1);
+            const existingResult = await db
+              .select()
+              .from(userProfile)
+              .where(eq(userProfile.displayName, displayName))
+              .limit(1);
             const existing = existingResult[0];
             if (!existing) break;
             displayName = `${baseDisplayName}${suffix}`;
