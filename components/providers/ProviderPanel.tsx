@@ -43,6 +43,11 @@ interface ProviderStatus {
   lastSuccessfulFetch: string | null;
 }
 
+interface SongDetail {
+  title: string;
+  artist: string;
+}
+
 interface JobProgress {
   status: string;
   progress: number;
@@ -63,9 +68,9 @@ interface JobProgress {
   updated?: number;
   ignored?: number;
   details?: {
-    added: any[];
-    updated: any[];
-    ignored: Record<string, any[]>;
+    added: SongDetail[];
+    updated: SongDetail[];
+    ignored: Record<string, SongDetail[]>;
   };
 }
 
@@ -81,7 +86,9 @@ export default function ProviderPanel() {
   const [detailType, setDetailType] = useState<
     "added" | "updated" | "ignored" | null
   >(null);
-  const [detailData, setDetailData] = useState<any>(null);
+  const [detailData, setDetailData] = useState<
+    SongDetail[] | Record<string, SongDetail[]> | null
+  >(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const openDetails = (type: "added" | "updated" | "ignored") => {
@@ -406,7 +413,7 @@ export default function ProviderPanel() {
                                                 "Building transactions"
                                               ? "building"
                                               : progress.phase
-                                  }` as any,
+                                  }`,
                                 )
                               : progress.phase}
                             ...{" "}
@@ -486,7 +493,7 @@ export default function ProviderPanel() {
               </span>
               <div className="flex items-center gap-2">
                 <Badge className={getStatusColor(uploadProgress.status)}>
-                  {t(`provider.phases.${uploadProgress.status}` as any, {
+                  {t(`provider.phases.${uploadProgress.status}`, {
                     default: uploadProgress.status,
                   })}
                 </Badge>
@@ -522,12 +529,9 @@ export default function ProviderPanel() {
               <div className="flex justify-between text-sm">
                 <span>{t("provider.phase")}</span>
                 <span className="capitalize">
-                  {t(
-                    `provider.phases.${uploadProgress.phase?.toLowerCase()}` as any,
-                    {
-                      default: uploadProgress.phase,
-                    },
-                  )}
+                  {t(`provider.phases.${uploadProgress.phase?.toLowerCase()}`, {
+                    default: uploadProgress.phase,
+                  })}
                 </span>
               </div>
             )}
@@ -605,13 +609,14 @@ export default function ProviderPanel() {
                         <ChevronRight className="h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-90 text-muted-foreground" />
                         <span>
                           {t(`provider.reasons.${reason.toLowerCase()}`, {
-                            default: reason
-                          })} ({(songs as any[]).length})
+                            default: reason,
+                          })}{" "}
+                          ({(songs as SongDetail[]).length})
                         </span>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
                         <div className="max-h-75 overflow-y-auto space-y-1 pl-4 pt-1 pb-2 pr-2">
-                          {(songs as any[]).map((song, i) => (
+                          {(songs as SongDetail[]).map((song, i) => (
                             <div
                               key={i}
                               className="text-[10px] text-muted-foreground truncate"
@@ -626,7 +631,7 @@ export default function ProviderPanel() {
                   ))
                 ) : detailData && Array.isArray(detailData) ? (
                   <div className="space-y-1">
-                    {detailData.map((song: any, i: number) => (
+                    {detailData.map((song: SongDetail, i: number) => (
                       <div
                         key={i}
                         className="text-[10px] text-muted-foreground truncate"

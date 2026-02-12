@@ -608,7 +608,25 @@ export class MusicService {
     });
   }
 
-  private static convertToProviderMusic(record: any): ProviderMusic {
+  private static convertToProviderMusic(record: {
+    id: string;
+    title: string;
+    artist?: string | null;
+    album?: string | null;
+    albumImageUrl?: string | null;
+    previewUrl?: string | null;
+    downloadUrls?: Array<{ url: string; source: string }>;
+    diffDrums?: number | null;
+    diffBass?: number | null;
+    diffGuitar?: number | null;
+    diffKeys?: number | null;
+    diffVocals?: number | null;
+    genre?: string | null;
+    year?: number | null;
+    charter?: string | null;
+    installed?: boolean;
+    favorited?: boolean;
+  }): ProviderMusic {
     return {
       id: record.id,
       name: record.title,

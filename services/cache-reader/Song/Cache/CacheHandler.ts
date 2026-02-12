@@ -10,6 +10,7 @@ import {
   UnpackedRBCONEntry,
   PackedRBProUpgrade,
   UnpackedRBProUpgrade,
+  CONFileListing,
 } from "../Entries/EntrySkeletons";
 import { UnpackedIniEntry } from "../Entries/UnpackedIniEntry";
 
@@ -151,7 +152,10 @@ export class CacheHandler {
       const midiLastWrite = stream.ReadInt64AsLittleEndian();
 
       const mods = this.GetQuickCONMods(name);
-      if (!mods.Upgrade || mods.Upgrade.LastWriteTime < midiLastWrite) {
+      if (
+        !mods.Upgrade ||
+        (mods.Upgrade as UnpackedRBProUpgrade).LastWriteTime < midiLastWrite
+      ) {
         mods.Upgrade = new UnpackedRBProUpgrade(name, midiLastWrite, root);
       }
     }
@@ -163,10 +167,13 @@ export class CacheHandler {
     const count = stream.ReadInt32AsLittleEndian();
     for (let i = 0; i < count; i++) {
       const name = stream.ReadString();
+      const mods = this.GetQuickCONMods(name);
       // listings find etc.
       // Simplified logic:
-      const mods = this.GetQuickCONMods(name);
-      if (!mods.Upgrade || mods.Upgrade.LastWriteTime < root.LastWriteTime) {
+      if (
+        !mods.Upgrade ||
+        (mods.Upgrade as PackedRBProUpgrade).LastWriteTime < root.LastWriteTime
+      ) {
         mods.Upgrade = new PackedRBProUpgrade(null, root);
       }
     }
@@ -199,7 +206,7 @@ export class CacheHandler {
     const root = AbridgedFileInfo.FromStream(stream);
     const packed = stream.ReadBoolean();
 
-    let listings: any[] | null = null;
+    let listings: CONFileListing[] | null = null;
     if (packed) {
       listings = this.GetCacheCONListings(root.FullName);
     }
@@ -245,7 +252,7 @@ export class CacheHandler {
     return mods;
   }
 
-  private GetCacheCONListings(filename: string): any[] | null {
+  private GetCacheCONListings(filename: string): CONFileListing[] | null {
     // Placeholder
     return null;
   }

@@ -2,7 +2,6 @@ import { FixedArrayStream } from "../../IO/FixedArray";
 import { CacheReadStrings } from "../Cache/CacheReadStrings";
 import { AbridgedFileInfo } from "../../IO/AbridgedFileInfo";
 import { SongEntry } from "./SongEntry";
-import { path } from "../../utils/browser-utils";
 
 export enum ChartFormat {
   Unknown = 0,
@@ -39,7 +38,8 @@ export class UnpackedIniEntry extends SongEntry {
     strings: CacheReadStrings,
   ): UnpackedIniEntry {
     const subDir = stream.ReadString();
-    const directory = path.join(baseDirectory, subDir);
+    //const directory = path.join(baseDirectory, subDir);
+    const directory = [baseDirectory, subDir].join("/").replace(/\/+/g, "/");
 
     const chartTypeIndex = stream.ReadByte();
     const chart = UnpackedIniEntry.CHART_FILE_TYPES[chartTypeIndex];

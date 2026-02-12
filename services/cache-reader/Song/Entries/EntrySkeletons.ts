@@ -44,7 +44,7 @@ export class CONFileListing {
 export class QuickCONMods {
   public UpdateDirectoryAndDtaLastWrite?: AbridgedFileInfo;
   public UpdateMidi?: bigint;
-  public Upgrade?: any;
+  public Upgrade?: unknown;
 }
 
 export class RBIntensities {
@@ -88,7 +88,7 @@ export class RBCONEntry extends SongEntry {
   public _rbIntensities: RBIntensities = new RBIntensities();
 
   // Metadata fields (simplified for skeleton)
-  public _rbMetadata: any = {};
+  public _rbMetadata: Record<string, unknown> = {};
 
   public Deserialize(
     stream: FixedArrayStream,
@@ -116,7 +116,11 @@ export class RBCONEntry extends SongEntry {
     // Skipped arrays...
   }
 
-  public UpdateInfo(updateDir: any, updateMidi: any, upgrade: any) {}
+  public UpdateInfo(
+    updateDir: AbridgedFileInfo | undefined,
+    updateMidi: bigint | undefined,
+    upgrade: unknown,
+  ) {}
 }
 
 export class PackedRBCONEntry extends RBCONEntry {
@@ -126,7 +130,7 @@ export class PackedRBCONEntry extends RBCONEntry {
   private _imgListing?: CONFileListing;
   private _psuedoDirectory: string = "";
 
-  constructor(root: any, name: string) {
+  constructor(root: AbridgedFileInfo, name: string) {
     super();
     // Base logic
   }
@@ -166,12 +170,12 @@ export class PackedRBCONEntry extends RBCONEntry {
 export class UnpackedRBCONEntry extends RBCONEntry {
   public _midiLastWrite: bigint = BigInt(0);
 
-  constructor(root: any, name: string) {
+  constructor(root: AbridgedFileInfo, name: string) {
     super();
   }
 
   public static ForceDeserialize(
-    root: any,
+    root: AbridgedFileInfo,
     name: string,
     stream: FixedArrayStream,
     strings: CacheReadStrings,
@@ -198,7 +202,7 @@ export class PackedRBProUpgrade {
   public static readonly UPGRADES_MIDI_EXT = ".mid";
 
   public LastWriteTime: Date;
-  constructor(listing: any, root: AbridgedFileInfo) {
+  constructor(listing: CONFileListing | null, root: AbridgedFileInfo) {
     this.LastWriteTime = AbridgedFileInfo.DateTimeFromBinary(
       BigInt(root.LastWriteTime.getTime()),
     );
