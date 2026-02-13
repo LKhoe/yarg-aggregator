@@ -115,7 +115,7 @@ export default function InstallationSelector({
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       {!compact && (
-        <HardDrive className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        <HardDrive className="h-4 w-4 text-muted-foreground shrink-0" />
       )}
       <Select
         value={selectedInstallationId || "none"}
@@ -125,7 +125,7 @@ export default function InstallationSelector({
         disabled={loading}
       >
         <SelectTrigger
-          className={compact ? "h-9 w-[180px]" : "flex-1 min-w-[150px] h-9"}
+          className={compact ? "h-9 w-45" : "flex-1 min-w-37.5 h-9"}
         >
           <SelectValue
             placeholder={

@@ -55,12 +55,18 @@ export const auth = betterAuth({
             suffix++;
           }
 
-          // Create user profile with default role
+          // First user gets admin role, everyone else gets user
+          const existingProfiles = await db
+            .select({ id: userProfile.userId })
+            .from(userProfile)
+            .limit(1);
+          const role = existingProfiles.length === 0 ? "admin" : "user";
+
           await db.insert(userProfile).values({
             userId: user.id,
             displayName,
             avatarUrl: user.image,
-            role: "user",
+            role,
           });
 
           // Create default favorites list

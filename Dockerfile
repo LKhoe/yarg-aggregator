@@ -26,9 +26,11 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Install only the packages needed for database migrations
-# We need: drizzle-kit (migrations), tsx (run TypeScript), pg (postgres client)
-RUN npm install -g drizzle-kit tsx
+# Install pg_isready for entrypoint health check
+RUN apk add --no-cache postgresql-client
+
+# Install tsx globally for running TypeScript setup scripts
+RUN npm install -g tsx
 
 # Don't run as root
 RUN addgroup --system --gid 1001 nodejs
@@ -54,8 +56,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/lib/db ./lib/db
 # Copy package.json for drizzle-kit to read
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
 
-# Install pg for database connection during migrations (as nextjs user needs it)
-RUN npm install pg postgres
+# Install migration dependencies locally (drizzle-kit needs drizzle-orm as peer)
+RUN npm install pg postgres drizzle-orm drizzle-kit
 
 # Copy and setup entrypoint script
 COPY --chown=nextjs:nodejs docker-entrypoint.sh /usr/local/bin/

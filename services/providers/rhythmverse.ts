@@ -84,9 +84,7 @@ export function parseRhythmverseData(
       album,
       coverUrl,
       downloadUrls: [{ url: downloadUrl, source: "rhythmverse" }],
-      sourceUpdatedAt: file.record_updated
-        ? new Date(file.record_updated)
-        : null,
+      sourceUpdatedAt: file.update_date ? new Date(file.update_date) : null,
       year: file.file_year || null,
       genre,
       charter,
@@ -166,7 +164,7 @@ export async function fetchRhythmverse(
 
 function parseDifficulty(diff: string | null | number): number | null {
   if (diff === null || diff === undefined) return null;
-  if (typeof diff === "number") return diff === -1 ? null : diff;
+  if (typeof diff === "number") return diff === -1 || diff === 0 ? null : diff;
   const parsed = parseInt(diff, 10);
-  return isNaN(parsed) || parsed === -1 ? null : parsed;
+  return isNaN(parsed) || parsed === -1 || parsed === 0 ? null : parsed;
 }

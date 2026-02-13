@@ -4,7 +4,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: yarg-aggregator:latest
     ports:
       - "${PORT:-3000}:3000"
     environment:
@@ -35,7 +34,6 @@ services:
     restart: unless-stopped
     networks:
       - yarg-network
-    # Memory limits for Raspberry Pi (adjust as needed)
     deploy:
       resources:
         limits:
@@ -51,8 +49,8 @@ services:
   postgres:
     container_name: yarg-postgres
     image: postgres:15-alpine
-    # Removed external port exposure for security - only accessible within Docker network
-    # Uncomment if you need direct access: ports: ["5432:5432"]
+    # Uncomment if you need direct access:
+    ports: ["5432:5432"]
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
@@ -82,8 +80,8 @@ services:
   redis:
     container_name: yarg-redis
     image: redis:7-alpine
-    # Removed external port exposure for security - only accessible within Docker network
-    # Uncomment if you need direct access: ports: ["6379:6379"]
+    # Uncomment if you need direct access:
+    ports: ["6379:6379"]
     volumes:
       - redis_data:/data
     healthcheck:

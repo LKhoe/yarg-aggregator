@@ -33,6 +33,10 @@ export const initProviderWorker = () => {
         : undefined;
 
       await connection.set(`provider:${source}:running`, "true", "EX", 3600);
+      await connection.publish(
+        "provider:events",
+        JSON.stringify({ source, type: "running", isRunning: true }),
+      );
 
       const fetchFn = source === "enchor" ? fetchEnchor : fetchRhythmverse;
 
@@ -46,17 +50,20 @@ export const initProviderWorker = () => {
           allSongs = allSongs.concat(result.songs);
           shouldStop = result.shouldStop || result.songs.length < PAGE_SIZE;
 
-          // Store progress in Redis
+          // Store progress in Redis and publish event
+          const fetchingProgress = JSON.stringify({
+            source,
+            page,
+            songsFetched: allSongs.length,
+            phase: "fetching",
+          });
           await connection.set(
             `provider:${source}:progress`,
-            JSON.stringify({
-              page,
-              songsFetched: allSongs.length,
-              phase: "fetching",
-            }),
+            fetchingProgress,
             "EX",
             3600,
           );
+          await connection.publish("provider:events", fetchingProgress);
 
           page++;
 
@@ -67,48 +74,59 @@ export const initProviderWorker = () => {
         }
 
         // Process all fetched songs
+        const processingProgress = JSON.stringify({
+          source,
+          page: page - 1,
+          songsFetched: allSongs.length,
+          phase: "processing",
+        });
         await connection.set(
           `provider:${source}:progress`,
-          JSON.stringify({
-            page: page - 1,
-            songsFetched: allSongs.length,
-            phase: "processing",
-          }),
+          processingProgress,
           "EX",
           3600,
         );
+        await connection.publish("provider:events", processingProgress);
 
         const stats = await processSongs(allSongs, source, (data) => {
+          const progressPayload = JSON.stringify({
+            source,
+            page: page - 1,
+            songsFetched: allSongs.length,
+            phase: data.phase,
+            progress: data.progress,
+            stats: data.stats,
+          });
           connection.set(
             `provider:${source}:progress`,
-            JSON.stringify({
-              page: page - 1,
-              songsFetched: allSongs.length,
-              phase: data.phase,
-              progress: data.progress,
-              stats: data.stats,
-            }),
+            progressPayload,
             "EX",
             3600,
           );
+          connection.publish("provider:events", progressPayload);
         });
 
         // Update last successful fetch timestamp
         await ProviderService.updateLastSuccessfulFetch(source);
+        const updatedProvider = await ProviderService.findByName(source);
 
         // Store completion stats
+        const completedProgress = JSON.stringify({
+          source,
+          page: page - 1,
+          songsFetched: allSongs.length,
+          phase: "completed",
+          progress: 100,
+          stats,
+          lastSuccessfulFetch: updatedProvider?.lastSuccessfulFetch ?? null,
+        });
         await connection.set(
           `provider:${source}:progress`,
-          JSON.stringify({
-            page: page - 1,
-            songsFetched: allSongs.length,
-            phase: "completed",
-            progress: 100,
-            stats,
-          }),
+          completedProgress,
           "EX",
           300, // Keep completion data for 5 minutes
         );
+        await connection.publish("provider:events", completedProgress);
 
         console.log(
           `Provider ${source} fetch completed: ${allSongs.length} songs fetched, stats:`,
@@ -116,17 +134,20 @@ export const initProviderWorker = () => {
         );
       } catch (error) {
         console.error(`Provider ${source} fetch failed:`, error);
+        const failedProgress = JSON.stringify({
+          source,
+          page: page - 1,
+          songsFetched: allSongs.length,
+          phase: "failed",
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
         await connection.set(
           `provider:${source}:progress`,
-          JSON.stringify({
-            page: page - 1,
-            songsFetched: allSongs.length,
-            phase: "failed",
-            error: error instanceof Error ? error.message : "Unknown error",
-          }),
+          failedProgress,
           "EX",
           300,
         );
+        await connection.publish("provider:events", failedProgress);
         throw error;
       }
     },
@@ -142,11 +163,19 @@ export const initProviderWorker = () => {
 
   worker.on("completed", async (job) => {
     await connection.del(`provider:${job.data.source}:running`);
+    await connection.publish(
+      "provider:events",
+      JSON.stringify({ source: job.data.source, type: "running", isRunning: false }),
+    );
   });
 
   worker.on("failed", async (job, err) => {
     if (job?.data?.source) {
       await connection.del(`provider:${job.data.source}:running`);
+      await connection.publish(
+        "provider:events",
+        JSON.stringify({ source: job.data.source, type: "running", isRunning: false }),
+      );
     }
   });
 
@@ -155,6 +184,10 @@ export const initProviderWorker = () => {
     for (const provider of providers) {
       await connection.del(`provider:${provider}:running`);
     }
+    await connection.publish(
+      "provider:events",
+      JSON.stringify({ type: "drained" }),
+    );
   });
 
   console.log("Provider worker started");

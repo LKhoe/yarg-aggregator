@@ -36,7 +36,6 @@ import {
   serializeSongEntry,
   type SerializedSongEntry,
 } from "@/services/songs/serialization";
-import { useInstallation } from "@/components/installations/InstallationSelector";
 import { useTranslations } from "@/hooks/use-translations";
 
 interface ImportInstalledSongsResponse {
@@ -55,6 +54,14 @@ interface ImportStats {
   linked: number;
 }
 
+interface Installation {
+  id: string;
+  name: string;
+  path: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export default function CacheDeserializer() {
   const { t } = useTranslations();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -64,8 +71,23 @@ export default function CacheDeserializer() {
   const [error, setError] = useState<string | null>(null);
   const [importStats, setImportStats] = useState<ImportStats | null>(null);
 
-  // Installation state from context
-  const { installations, refreshInstallations } = useInstallation();
+  // Local installations state — fetched lazily when songs are loaded
+  const [installations, setInstallations] = useState<Installation[]>([]);
+  const [installationsLoaded, setInstallationsLoaded] = useState(false);
+
+  const fetchInstallations = React.useCallback(async () => {
+    try {
+      const response = await fetch("/api/installations");
+      if (response.ok) {
+        const data = await response.json();
+        setInstallations(data.installations || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch installations:", err);
+    } finally {
+      setInstallationsLoaded(true);
+    }
+  }, []);
 
   const [selectedInstallationId, setSelectedInstallationId] =
     useState<string>("");
@@ -109,6 +131,10 @@ export default function CacheDeserializer() {
       toast.success(
         t("cacheDeserializer.successLoaded", { count: songEntries.length }),
       );
+      // Fetch installations lazily now that songs are loaded
+      if (!installationsLoaded) {
+        fetchInstallations();
+      }
     } catch (err) {
       const errorMessage =
         err instanceof Error
@@ -184,7 +210,7 @@ export default function CacheDeserializer() {
 
         // Refresh installations list if we created a new one
         if (isCreatingNew) {
-          await refreshInstallations();
+          await fetchInstallations();
           setIsCreatingNew(false);
           setNewInstallationName("");
           setNewInstallationPath("");

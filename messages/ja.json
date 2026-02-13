@@ -22,6 +22,15 @@
     "name": "YARGアグリゲーター",
     "subtitle": "音楽チャートライブラリ"
   },
+  "common": {
+    "time": {
+      "justNow": "たった今",
+      "minutesAgo": "{count}分前",
+      "hoursAgo": "{count}時間前",
+      "daysAgo": "{count}日前",
+      "monthsAgo": "{count}ヶ月前"
+    }
+  },
   "welcome": {
     "title": "YARGアグリゲーターへようこそ",
     "description": "Enchor.usとRhythmverseから音楽チャートを閲覧、検索、ダウンロード。",
@@ -222,7 +231,11 @@
       "fetched": "ページ {page} - {count}曲取得済み",
       "running": "実行中",
       "starting": "開始中"
-    }
+    },
+    "songs": "曲",
+    "never": "未取得",
+    "fetchFromApi": "APIから取得",
+    "uploadZip": "ZIPアップロード"
   },
   "community": {
     "title": "コミュニティ",

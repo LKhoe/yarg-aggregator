@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,9 +22,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 import { useTranslations } from "@/hooks/use-translations";
-import { CloudDownload, RefreshCw, ChevronRight } from "lucide-react";
+import {
+  CloudDownload,
+  RefreshCw,
+  ChevronRight,
+  Clock,
+  Music,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Upload,
+} from "lucide-react";
 import { toast } from "sonner";
 
 interface ProviderProgress {
@@ -41,6 +55,7 @@ interface ProviderStatus {
   isRunning: boolean;
   progress: ProviderProgress | null;
   lastSuccessfulFetch: string | null;
+  songCount?: number;
 }
 
 interface SongDetail {
@@ -74,6 +89,260 @@ interface JobProgress {
   };
 }
 
+function useRelativeTime(date: string | null) {
+  const { t } = useTranslations();
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!date) return;
+    const interval = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(interval);
+  }, [date]);
+
+  return useMemo(() => {
+    if (!date) return null;
+    const diff = now - new Date(date).getTime();
+    const minutes = Math.floor(diff / 60_000);
+    if (minutes < 1) return t("common.time.justNow");
+    if (minutes < 60) return t("common.time.minutesAgo", { count: minutes });
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return t("common.time.hoursAgo", { count: hours });
+    const days = Math.floor(hours / 24);
+    if (days < 30) return t("common.time.daysAgo", { count: days });
+    const months = Math.floor(days / 30);
+    return t("common.time.monthsAgo", { count: months });
+  }, [date, now, t]);
+}
+
+function ProviderCard({
+  src,
+  status,
+  fetching,
+  onFetch,
+  onUpload,
+  t,
+}: {
+  src: string;
+  status: ProviderStatus | undefined;
+  fetching: boolean;
+  onFetch: () => void;
+  onUpload: (file: File) => void;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const isRunning = status?.isRunning ?? false;
+  const progress = status?.progress;
+  const songCount = status?.songCount ?? 0;
+  const relativeTime = useRelativeTime(status?.lastSuccessfulFetch ?? null);
+  const hasEverFetched = !!status?.lastSuccessfulFetch;
+  const isCompleted = !isRunning && progress?.phase === "completed";
+  const isFailed = !isRunning && progress?.phase === "failed";
+
+  const statusIcon = isRunning ? (
+    <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
+  ) : isFailed ? (
+    <AlertCircle className="h-3 w-3 text-red-500" />
+  ) : isCompleted || hasEverFetched ? (
+    <CheckCircle2 className="h-3 w-3 text-green-500" />
+  ) : (
+    <div className="h-2 w-2 rounded-full bg-muted-foreground/30" />
+  );
+
+  const getPhaseLabel = (phase: string) => {
+    const phaseMap: Record<string, string> = {
+      "Saving songs": "saving",
+      "Deduplicating songs": "deduplicating",
+      "Fetching existing songs": "fetching_existing",
+      "Pre-resolving metadata": "resolving",
+      "Building transactions": "building",
+    };
+    const key = phaseMap[phase] ?? phase;
+    return t(`provider.phases.${key}`);
+  };
+
+  const isProcessingPhase =
+    progress?.phase === "processing" ||
+    progress?.phase === "Saving songs" ||
+    progress?.phase === "Deduplicating songs" ||
+    progress?.phase === "Fetching existing songs" ||
+    progress?.phase === "Pre-resolving metadata" ||
+    progress?.phase === "Building transactions";
+
+  return (
+    <div className="bg-muted/50 p-3 rounded-lg border text-sm space-y-2.5">
+      {/* Header row */}
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          {statusIcon}
+          <span className="text-xs font-semibold tracking-wide uppercase">
+            {src === "enchor" ? "Enchor.us" : "Rhythmverse"}
+          </span>
+          {isRunning && progress?.phase && (
+            <Badge
+              className="bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20 text-[10px] px-1.5 py-0"
+              variant="outline"
+            >
+              {progress.phase === "running"
+                ? t("provider.status.running")
+                : progress.phase === "completed"
+                  ? t("provider.phases.completed")
+                  : getPhaseLabel(progress.phase)}
+            </Badge>
+          )}
+          {isCompleted && (
+            <Badge
+              className="bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/20 text-[10px] px-1.5 py-0"
+              variant="outline"
+            >
+              {t("provider.phases.completed")}
+            </Badge>
+          )}
+          {isFailed && (
+            <Badge
+              className="bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/20 text-[10px] px-1.5 py-0"
+              variant="outline"
+            >
+              {t("provider.phases.failed")}
+            </Badge>
+          )}
+        </div>
+        <div className="flex gap-0.5 items-center">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={onFetch}
+                disabled={isRunning || fetching}
+              >
+                <CloudDownload className="w-3.5 h-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={4}>
+              {t("provider.fetchFromApi")}
+            </TooltipContent>
+          </Tooltip>
+          <input
+            type="file"
+            id={`upload-${src}`}
+            className="hidden"
+            accept=".zip"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onUpload(file);
+              e.target.value = "";
+            }}
+          />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() =>
+                  document.getElementById(`upload-${src}`)?.click()
+                }
+              >
+                <Upload className="w-3.5 h-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={4}>
+              {t("provider.uploadZip")}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+
+      {/* Info row — always visible */}
+      <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <Music className="h-3 w-3" />
+          {songCount.toLocaleString()} {t("provider.songs")}
+        </span>
+        <span className="text-muted-foreground/30">|</span>
+        {hasEverFetched ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="flex items-center gap-1 cursor-default">
+                <Clock className="h-3 w-3" />
+                {relativeTime}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={4}>
+              {new Date(status!.lastSuccessfulFetch!).toLocaleString()}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <span className="flex items-center gap-1 italic">
+            <Clock className="h-3 w-3" />
+            {t("provider.never")}
+          </span>
+        )}
+      </div>
+
+      {/* Active progress */}
+      {isRunning && progress && (
+        <div className="space-y-1.5 pt-0.5">
+          {progress.phase === "fetching" && (
+            <p className="text-xs text-muted-foreground">
+              {t("provider.status.fetched", {
+                page: progress.page ?? 0,
+                count: progress.songsFetched ?? 0,
+              })}
+            </p>
+          )}
+          {isProcessingPhase && (
+            <>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{getPhaseLabel(progress.phase!)}</span>
+                {progress.progress !== undefined && (
+                  <span>{progress.progress}%</span>
+                )}
+              </div>
+              {progress.progress !== undefined && (
+                <Progress value={progress.progress} className="h-1" />
+              )}
+            </>
+          )}
+          {progress.stats && (
+            <div className="flex gap-2 text-[10px] pt-0.5">
+              <span className="text-green-600 dark:text-green-400">
+                +{progress.stats.added}
+              </span>
+              <span className="text-blue-600 dark:text-blue-400">
+                ~{progress.stats.updated}
+              </span>
+              <span className="text-muted-foreground">
+                ={progress.stats.ignored}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Completed stats */}
+      {isCompleted && progress?.stats && (
+        <div className="flex gap-2 text-[10px]">
+          <span className="text-green-600 dark:text-green-400">
+            +{progress.stats.added}
+          </span>
+          <span className="text-blue-600 dark:text-blue-400">
+            ~{progress.stats.updated}
+          </span>
+          <span className="text-muted-foreground">
+            ={progress.stats.ignored}
+          </span>
+        </div>
+      )}
+
+      {/* Failed error */}
+      {isFailed && progress?.error && (
+        <p className="text-[10px] text-red-500 truncate">{progress.error}</p>
+      )}
+    </div>
+  );
+}
+
 export default function ProviderPanel() {
   const { t } = useTranslations();
   const [uploadProgress, setUploadProgress] = useState<JobProgress | null>(
@@ -89,7 +358,6 @@ export default function ProviderPanel() {
   const [detailData, setDetailData] = useState<
     SongDetail[] | Record<string, SongDetail[]> | null
   >(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const openDetails = (type: "added" | "updated" | "ignored") => {
     if (uploadProgress?.status !== "completed") return;
@@ -99,40 +367,76 @@ export default function ProviderPanel() {
     setDetailData(data || null);
   };
 
-  const fetchProviderStatuses = useCallback(async () => {
-    try {
-      const response = await fetch("/api/providers");
-      if (response.ok) {
-        const data: ProviderStatus[] = await response.json();
-        const statusMap: Record<string, ProviderStatus> = {};
-        for (const provider of data) {
-          statusMap[provider.name] = provider;
-        }
-        setProviderStatuses(statusMap);
+  // SSE connection for real-time provider updates
+  useEffect(() => {
+    const eventSource = new EventSource("/api/providers/events");
 
-        // Check if any provider is still running
-        const anyRunning = data.some((p) => p.isRunning);
-        if (!anyRunning && pollRef.current) {
-          clearInterval(pollRef.current);
-          pollRef.current = null;
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "init") {
+          setProviderStatuses(data.providers);
+          return;
         }
+
+        if (data.type === "drained") {
+          setProviderStatuses((prev) => {
+            const next = { ...prev };
+            for (const key of Object.keys(next)) {
+              next[key] = { ...next[key], isRunning: false };
+            }
+            return next;
+          });
+          return;
+        }
+
+        if (data.type === "running" && data.source) {
+          setProviderStatuses((prev) => ({
+            ...prev,
+            [data.source]: {
+              ...prev[data.source],
+              name: data.source,
+              isRunning: data.isRunning,
+              progress: prev[data.source]?.progress ?? null,
+              lastSuccessfulFetch:
+                prev[data.source]?.lastSuccessfulFetch ?? null,
+            },
+          }));
+          return;
+        }
+
+        if (data.source && data.phase) {
+          setProviderStatuses((prev) => ({
+            ...prev,
+            [data.source]: {
+              ...prev[data.source],
+              name: data.source,
+              isRunning: data.phase !== "completed" && data.phase !== "failed",
+              progress: {
+                page: data.page,
+                songsFetched: data.songsFetched,
+                phase: data.phase,
+                progress: data.progress,
+                stats: data.stats,
+                error: data.error,
+              },
+              lastSuccessfulFetch:
+                data.lastSuccessfulFetch ??
+                prev[data.source]?.lastSuccessfulFetch ??
+                null,
+            },
+          }));
+        }
+      } catch (err) {
+        console.error("Error parsing SSE event:", err);
       }
-    } catch (error) {
-      console.error("Error fetching provider statuses:", error);
-    }
-  }, []);
+    };
 
-  // Initial fetch
-  useEffect(() => {
-    fetchProviderStatuses();
-  }, [fetchProviderStatuses]);
+    eventSource.onerror = () => { };
 
-  // Cleanup polling on unmount
-  useEffect(() => {
     return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-      }
+      eventSource.close();
     };
   }, []);
 
@@ -151,13 +455,6 @@ export default function ProviderPanel() {
       }
 
       toast.success(`Started fetching from ${source}`);
-
-      // Start polling for progress
-      if (!pollRef.current) {
-        pollRef.current = setInterval(fetchProviderStatuses, 2000);
-      }
-      // Immediate status refresh
-      await fetchProviderStatuses();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to start fetch",
@@ -171,6 +468,12 @@ export default function ProviderPanel() {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("source", source);
+
+    setUploadProgress({
+      status: "uploading",
+      progress: 0,
+      currentSource: source,
+    });
 
     try {
       const response = await fetch("/api/providers/upload", {
@@ -189,12 +492,6 @@ export default function ProviderPanel() {
         throw new Error("No response body");
       }
 
-      setUploadProgress({
-        status: "uploading",
-        progress: 0,
-        currentSource: source,
-      });
-
       let buffer = "";
 
       while (true) {
@@ -203,7 +500,6 @@ export default function ProviderPanel() {
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
-        // Keep the last line in the buffer as it might be incomplete
         buffer = lines.pop() || "";
 
         for (const line of lines) {
@@ -240,7 +536,6 @@ export default function ProviderPanel() {
                   ignored: data.stats?.ignored,
                 }),
               );
-              // Removed auto-dismiss timeout
             } else if (data.type === "error") {
               throw new Error(data.message);
             }
@@ -287,202 +582,18 @@ export default function ProviderPanel() {
         <CardDescription>{t("provider.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            {["enchor", "rhythmverse"].map((src) => {
-              const status = providerStatuses[src];
-              const isRunning = status?.isRunning ?? false;
-              const progress = status?.progress;
-
-              return (
-                <div
-                  key={src}
-                  className="bg-muted/50 p-2 rounded-md border text-sm"
-                >
-                  <div className="flex justify-between items-center mb-1">
-                    <p className="text-[10px] uppercase font-bold text-muted-foreground">
-                      {src === "enchor" ? "Enchor.us" : "Rhythmverse"}
-                    </p>
-                    <div className="flex gap-1 items-center">
-                      {isRunning && (
-                        <Badge
-                          className={getStatusColor(
-                            progress?.phase ?? "running",
-                          )}
-                          variant="secondary"
-                        >
-                          {progress?.phase === "running"
-                            ? t("provider.status.running")
-                            : progress?.phase === "completed"
-                              ? t("provider.phases.completed")
-                              : progress?.phase}
-                        </Badge>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5"
-                        onClick={() => startFetch(src)}
-                        disabled={isRunning || fetching[src]}
-                        title="Fetch from API"
-                      >
-                        <CloudDownload className="w-3 h-3" />
-                      </Button>
-                      <input
-                        type="file"
-                        id={`upload-${src}`}
-                        className="hidden"
-                        accept=".zip"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            handleUpload(file, src);
-                          }
-                          e.target.value = "";
-                        }}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5"
-                        onClick={() =>
-                          document.getElementById(`upload-${src}`)?.click()
-                        }
-                        title="Upload Zip"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="w-3 h-3"
-                        >
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                          <polyline points="17 8 12 3 7 8" />
-                          <line x1="12" x2="12" y1="3" y2="15" />
-                        </svg>
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Fetch progress for this provider */}
-                  {isRunning && progress && (
-                    <div className="mt-2 space-y-1">
-                      {progress.phase === "fetching" && (
-                        <p className="text-xs text-muted-foreground">
-                          {t("provider.status.fetched", {
-                            page: progress.page ?? 0,
-                            count: progress.songsFetched ?? 0,
-                          })}
-                        </p>
-                      )}
-                      {(progress.phase === "processing" ||
-                        progress.phase === "Saving songs" ||
-                        progress.phase === "Deduplicating songs" ||
-                        progress.phase === "Fetching existing songs" ||
-                        progress.phase === "Pre-resolving metadata" ||
-                        progress.phase === "Building transactions") && (
-                        <>
-                          <p className="text-xs text-muted-foreground">
-                            {progress?.phase &&
-                            [
-                              "fetching",
-                              "processing",
-                              "Saving songs",
-                              "Deduplicating songs",
-                              "Fetching existing songs",
-                              "Pre-resolving metadata",
-                              "Building transactions",
-                            ].includes(progress.phase)
-                              ? t(
-                                  `provider.phases.${
-                                    progress.phase === "Saving songs"
-                                      ? "saving"
-                                      : progress.phase === "Deduplicating songs"
-                                        ? "deduplicating"
-                                        : progress.phase ===
-                                            "Fetching existing songs"
-                                          ? "fetching_existing"
-                                          : progress.phase ===
-                                              "Pre-resolving metadata"
-                                            ? "resolving"
-                                            : progress.phase ===
-                                                "Building transactions"
-                                              ? "building"
-                                              : progress.phase
-                                  }`,
-                                )
-                              : progress.phase}
-                            ...{" "}
-                            {progress.progress !== undefined &&
-                              `${progress.progress}%`}
-                          </p>
-                          {progress.progress !== undefined && (
-                            <Progress
-                              value={progress.progress}
-                              className="h-1"
-                            />
-                          )}
-                        </>
-                      )}
-                      {progress.stats && (
-                        <div className="flex gap-2 text-[10px]">
-                          <span className="text-green-600">
-                            +{progress.stats.added}
-                          </span>
-                          <span className="text-blue-600">
-                            ~{progress.stats.updated}
-                          </span>
-                          <span className="text-gray-500">
-                            ={progress.stats.ignored}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Show completed stats briefly */}
-                  {!isRunning &&
-                    progress?.phase === "completed" &&
-                    progress.stats && (
-                      <div className="mt-2 space-y-1">
-                        <Badge className="bg-green-500" variant="secondary">
-                          {t("provider.phases.completed")}
-                        </Badge>
-                        <div className="flex gap-2 text-[10px]">
-                          <span className="text-green-600">
-                            +{progress.stats.added}
-                          </span>
-                          <span className="text-blue-600">
-                            ~{progress.stats.updated}
-                          </span>
-                          <span className="text-gray-500">
-                            ={progress.stats.ignored}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                  {/* Show failed status */}
-                  {!isRunning && progress?.phase === "failed" && (
-                    <div className="mt-2">
-                      <Badge className="bg-red-500" variant="secondary">
-                        {t("provider.phases.failed")}
-                      </Badge>
-                      {progress.error && (
-                        <p className="text-[10px] text-red-500 mt-1 truncate">
-                          {progress.error}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+        <div className="grid grid-cols-2 gap-3">
+          {["enchor", "rhythmverse"].map((src) => (
+            <ProviderCard
+              key={src}
+              src={src}
+              status={providerStatuses[src]}
+              fetching={fetching[src] ?? false}
+              onFetch={() => startFetch(src)}
+              onUpload={(file) => handleUpload(file, src)}
+              t={t}
+            />
+          ))}
         </div>
 
         {uploadProgress && (
@@ -539,54 +650,51 @@ export default function ProviderPanel() {
             {(uploadProgress.added !== undefined ||
               uploadProgress.updated !== undefined ||
               uploadProgress.ignored !== undefined) && (
-              <div className="grid grid-cols-3 gap-2 text-sm">
-                <div
-                  onClick={() => openDetails("added")}
-                  className={`text-center p-2 bg-green-50 dark:bg-green-950 rounded ${
-                    uploadProgress.status === "completed"
-                      ? "cursor-pointer hover:opacity-80"
-                      : ""
-                  }`}
-                >
-                  <div className="font-medium text-green-600 dark:text-green-400">
-                    {uploadProgress.added || 0}
+                <div className="grid grid-cols-3 gap-2 text-sm">
+                  <div
+                    onClick={() => openDetails("added")}
+                    className={`text-center p-2 bg-green-50 dark:bg-green-950 rounded ${uploadProgress.status === "completed"
+                        ? "cursor-pointer hover:opacity-80"
+                        : ""
+                      }`}
+                  >
+                    <div className="font-medium text-green-600 dark:text-green-400">
+                      {uploadProgress.added || 0}
+                    </div>
+                    <div className="text-xs text-green-500 dark:text-green-300">
+                      {t("provider.stats.added")}
+                    </div>
                   </div>
-                  <div className="text-xs text-green-500 dark:text-green-300">
-                    {t("provider.stats.added")}
+                  <div
+                    onClick={() => openDetails("updated")}
+                    className={`text-center p-2 bg-blue-50 dark:bg-blue-950 rounded ${uploadProgress.status === "completed"
+                        ? "cursor-pointer hover:opacity-80"
+                        : ""
+                      }`}
+                  >
+                    <div className="font-medium text-blue-600 dark:text-blue-400">
+                      {uploadProgress.updated || 0}
+                    </div>
+                    <div className="text-xs text-blue-500 dark:text-blue-300">
+                      {t("provider.stats.updated")}
+                    </div>
                   </div>
-                </div>
-                <div
-                  onClick={() => openDetails("updated")}
-                  className={`text-center p-2 bg-blue-50 dark:bg-blue-950 rounded ${
-                    uploadProgress.status === "completed"
-                      ? "cursor-pointer hover:opacity-80"
-                      : ""
-                  }`}
-                >
-                  <div className="font-medium text-blue-600 dark:text-blue-400">
-                    {uploadProgress.updated || 0}
-                  </div>
-                  <div className="text-xs text-blue-500 dark:text-blue-300">
-                    {t("provider.stats.updated")}
-                  </div>
-                </div>
-                <div
-                  onClick={() => openDetails("ignored")}
-                  className={`text-center p-2 bg-gray-50 dark:bg-gray-950 rounded ${
-                    uploadProgress.status === "completed"
-                      ? "cursor-pointer hover:opacity-80"
-                      : ""
-                  }`}
-                >
-                  <div className="font-medium text-gray-600 dark:text-gray-400">
-                    {uploadProgress.ignored || 0}
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-300">
-                    {t("provider.stats.ignored")}
+                  <div
+                    onClick={() => openDetails("ignored")}
+                    className={`text-center p-2 bg-gray-50 dark:bg-gray-950 rounded ${uploadProgress.status === "completed"
+                        ? "cursor-pointer hover:opacity-80"
+                        : ""
+                      }`}
+                  >
+                    <div className="font-medium text-gray-600 dark:text-gray-400">
+                      {uploadProgress.ignored || 0}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-300">
+                      {t("provider.stats.ignored")}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
           </div>
         )}
 
@@ -600,53 +708,51 @@ export default function ProviderPanel() {
                 {detailType && t(`provider.stats.${detailType}`)}
               </DialogTitle>
             </DialogHeader>
-            <div className="flex-1 overflow-hidden relative">
-              <ScrollArea className="h-full pr-4 max-h-[60vh]">
-                {detailType === "ignored" && detailData ? (
-                  Object.entries(detailData).map(([reason, songs]) => (
-                    <Collapsible key={reason} className="mb-2 last:mb-0">
-                      <CollapsibleTrigger className="w-full flex items-center gap-2 font-medium text-xs bg-muted/50 p-2 rounded cursor-pointer hover:bg-muted/70 sticky top-0 backdrop-blur-sm group text-left transition-colors">
-                        <ChevronRight className="h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-90 text-muted-foreground" />
-                        <span>
-                          {t(`provider.reasons.${reason.toLowerCase()}`, {
-                            default: reason,
-                          })}{" "}
-                          ({(songs as SongDetail[]).length})
-                        </span>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className="max-h-75 overflow-y-auto space-y-1 pl-4 pt-1 pb-2 pr-2">
-                          {(songs as SongDetail[]).map((song, i) => (
-                            <div
-                              key={i}
-                              className="text-[10px] text-muted-foreground truncate"
-                              title={`${song.title} - ${song.artist}`}
-                            >
-                              {song.title} - {song.artist}
-                            </div>
-                          ))}
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  ))
-                ) : detailData && Array.isArray(detailData) ? (
-                  <div className="space-y-1">
-                    {detailData.map((song: SongDetail, i: number) => (
-                      <div
-                        key={i}
-                        className="text-[10px] text-muted-foreground truncate"
-                        title={`${song.title} - ${song.artist}`}
-                      >
-                        {song.title} - {song.artist}
+            <div className="overflow-y-auto max-h-[60vh] pr-2">
+              {detailType === "ignored" && detailData ? (
+                Object.entries(detailData).map(([reason, songs]) => (
+                  <Collapsible key={reason} className="mb-2 last:mb-0">
+                    <CollapsibleTrigger className="w-full flex items-center gap-2 font-medium text-xs bg-muted/50 p-2 rounded cursor-pointer hover:bg-muted/70 sticky top-0 backdrop-blur-sm group text-left transition-colors">
+                      <ChevronRight className="h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-90 text-muted-foreground" />
+                      <span>
+                        {t(`provider.reasons.${reason.toLowerCase()}`, {
+                          default: reason,
+                        })}{" "}
+                        ({(songs as SongDetail[]).length})
+                      </span>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="space-y-1 pl-4 pt-1 pb-2 pr-2">
+                        {(songs as SongDetail[]).map((song, i) => (
+                          <div
+                            key={i}
+                            className="text-[10px] text-muted-foreground truncate"
+                            title={`${song.title} - ${song.artist}`}
+                          >
+                            {song.title} - {song.artist}
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center text-sm text-muted-foreground p-4">
-                    {t("provider.phases.noDetailsAvailable")}
-                  </div>
-                )}
-              </ScrollArea>
+                    </CollapsibleContent>
+                  </Collapsible>
+                ))
+              ) : detailData && Array.isArray(detailData) ? (
+                <div className="space-y-1">
+                  {detailData.map((song: SongDetail, i: number) => (
+                    <div
+                      key={i}
+                      className="text-[10px] text-muted-foreground truncate"
+                      title={`${song.title} - ${song.artist}`}
+                    >
+                      {song.title} - {song.artist}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-sm text-muted-foreground p-4">
+                  {t("provider.phases.noDetailsAvailable")}
+                </div>
+              )}
             </div>
           </DialogContent>
         </Dialog>

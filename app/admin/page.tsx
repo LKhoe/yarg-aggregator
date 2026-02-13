@@ -11,7 +11,6 @@ import {
 import { Users, Shield, HardDrive } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { InstallationProvider } from "@/components/installations/InstallationSelector";
 
 const ProviderPanel = dynamic(
   () => import("@/components/providers/ProviderPanel"),
@@ -48,7 +47,6 @@ function AdminDashboardContent() {
   ];
 
   return (
-    <InstallationProvider>
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Shield className="h-8 w-8 text-primary" />
@@ -85,7 +83,6 @@ function AdminDashboardContent() {
           <ProviderPanel />
         </div>
       </div>
-    </InstallationProvider>
   );
 }
 

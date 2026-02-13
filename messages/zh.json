@@ -19,8 +19,17 @@
     "toggleTheme": "切换主题"
   },
   "app": {
-    "name": "YARG聚合器",
+    "name": "YARG Aggregator",
     "subtitle": "音乐谱面库"
+  },
+  "common": {
+    "time": {
+      "justNow": "刚刚",
+      "minutesAgo": "{count}分钟前",
+      "hoursAgo": "{count}小时前",
+      "daysAgo": "{count}天前",
+      "monthsAgo": "{count}个月前"
+    }
   },
   "welcome": {
     "title": "欢迎使用YARG聚合器",
@@ -222,7 +231,11 @@
       "fetched": "第 {page} 页 - 已获取 {count} 首歌曲",
       "running": "运行中",
       "starting": "启动中"
-    }
+    },
+    "songs": "首歌曲",
+    "never": "从未获取",
+    "fetchFromApi": "从API获取",
+    "uploadZip": "上传ZIP"
   },
   "community": {
     "title": "社区",

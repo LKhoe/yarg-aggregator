@@ -7,6 +7,7 @@ import {
 import { ProviderMusic } from "@/types";
 import { processSongs } from "@/services/songs";
 import { getAuthenticatedUser, hasPermission } from "@/lib/middleware/auth";
+import { ProviderService } from "@/lib/services/provider";
 import AdmZip from "adm-zip";
 
 export async function POST(request: NextRequest) {
@@ -96,6 +97,20 @@ export async function POST(request: NextRequest) {
             const message = JSON.stringify({ type: "progress", ...data });
             controller.enqueue(encoder.encode(`data: ${message}\n\n`));
           });
+
+          // Update lastSuccessfulFetch based on max sourceUpdatedAt
+          const dates = allSongs
+            .map((s) => s.sourceUpdatedAt)
+            .filter((d): d is Date => d !== null);
+          if (dates.length > 0) {
+            const maxDate = new Date(
+              Math.max(...dates.map((d) => d.getTime())),
+            );
+            await ProviderService.updateLastSuccessfulFetchIfNewer(
+              source as "enchor" | "rhythmverse",
+              maxDate,
+            );
+          }
 
           // Print the stats grouping the ignored songs by reason
           const ignoredByReason = stats.details.ignored.reduce(

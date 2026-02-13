@@ -22,6 +22,15 @@
     "name": "YARG Aggregator",
     "subtitle": "Music chart library"
   },
+  "common": {
+    "time": {
+      "justNow": "just now",
+      "minutesAgo": "{count}m ago",
+      "hoursAgo": "{count}h ago",
+      "daysAgo": "{count}d ago",
+      "monthsAgo": "{count}mo ago"
+    }
+  },
   "welcome": {
     "title": "Welcome to YARG Aggregator",
     "description": "Browse, search, and download music charts from Enchor.us and Rhythmverse.",
@@ -149,7 +158,11 @@
       "fetched": "Page {page} - {count} songs fetched",
       "running": "Running",
       "starting": "Starting"
-    }
+    },
+    "songs": "songs",
+    "never": "Never fetched",
+    "fetchFromApi": "Fetch from API",
+    "uploadZip": "Upload ZIP"
   },
   "community": {
     "title": "Community",

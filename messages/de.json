@@ -20,7 +20,16 @@
   },
   "app": {
     "name": "YARG Aggregator",
-    "subtitle": "Musik-Chart-Bibliothek"
+    "subtitle": "Charts-Bibliothek"
+  },
+  "common": {
+    "time": {
+      "justNow": "gerade eben",
+      "minutesAgo": "vor {count}m",
+      "hoursAgo": "vor {count}h",
+      "daysAgo": "vor {count}t",
+      "monthsAgo": "vor {count} monaten"
+    }
   },
   "welcome": {
     "title": "Willkommen bei YARG Aggregator",
@@ -222,7 +231,11 @@
       "fetched": "Seite {page} - {count} Lieder abgerufen",
       "running": "Läuft",
       "starting": "Starten"
-    }
+    },
+    "songs": "Lieder",
+    "never": "Nie abgerufen",
+    "fetchFromApi": "Von API abrufen",
+    "uploadZip": "ZIP hochladen"
   },
   "community": {
     "title": "Community",

@@ -24,7 +24,7 @@ echo "✅ Database is ready!"
 # 2. Run Drizzle migrations (migrations were generated at build time)
 echo ""
 echo "🔄 Running database migrations..."
-drizzle-kit migrate
+npx drizzle-kit migrate
 echo "✅ Database migrations complete!"
 
 # 3. Apply custom SQL (Extensions, Search, Triggers)

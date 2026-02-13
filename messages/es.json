@@ -22,6 +22,15 @@
     "name": "YARG Aggregator",
     "subtitle": "Biblioteca de partituras musicales"
   },
+  "common": {
+    "time": {
+      "justNow": "ahora mismo",
+      "minutesAgo": "hace {count}m",
+      "hoursAgo": "hace {count}h",
+      "daysAgo": "hace {count}d",
+      "monthsAgo": "hace {count} meses"
+    }
+  },
   "welcome": {
     "title": "Bienvenido a YARG Aggregator",
     "description": "Explora, busca y descarga partituras musicales de Enchor.us y Rhythmverse.",
@@ -222,7 +231,11 @@
       "fetched": "Página {page} - {count} canciones obtenidas",
       "running": "Ejecutando",
       "starting": "Iniciando"
-    }
+    },
+    "songs": "canciones",
+    "never": "Nunca obtenido",
+    "fetchFromApi": "Obtener de API",
+    "uploadZip": "Subir ZIP"
   },
   "community": {
     "title": "Comunidad",
