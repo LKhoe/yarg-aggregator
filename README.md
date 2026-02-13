@@ -34,7 +34,7 @@ Ensure you have the following installed:
 
 - **Node.js** (v18+ LTS)
 - **Docker** & **Docker Compose** (for database services)
-- **pnpm** (recommended) or npm
+- **npm** (recommended) or pnpm
 
 ## Installation & Setup
 
@@ -46,7 +46,7 @@ Ensure you have the following installed:
 
 2. **Install dependencies:**
    ```bash
-   pnpm install
+   npm install
    ```
 
 3. **Configure Environment Variables:**
@@ -71,17 +71,17 @@ Ensure you have the following installed:
 
 5. **Run Database Migrations:**
    ```bash
-   pnpm db:migrate
+   npm db:migrate
    ```
 
 6. **Set Up Full-Text Search:**
    ```bash
-   pnpm db:setup
+   npm db:setup
    ```
 
 7. **Run the Application:**
    ```bash
-   pnpm dev
+   npm dev
    ```
    The app will be available at [http://localhost:3000](http://localhost:3000).
 
@@ -152,21 +152,21 @@ Ensure you have the following installed:
 
 | Command | Description |
 |---------|-------------|
-| `pnpm dev` | Start development server |
-| `pnpm build` | Build for production |
-| `pnpm start` | Start production server |
-| `pnpm lint` | Run ESLint |
-| `pnpm db:generate` | Generate Drizzle migrations |
-| `pnpm db:migrate` | Run database migrations |
-| `pnpm db:studio` | Open Drizzle Studio |
-| `pnpm db:setup` | Set up full-text search |
+| `npm dev` | Start development server |
+| `npm build` | Build for production |
+| `npm start` | Start production server |
+| `npm lint` | Run ESLint |
+| `npm db:generate` | Generate Drizzle migrations |
+| `npm db:migrate` | Run database migrations |
+| `npm db:studio` | Open Drizzle Studio |
+| `npm db:setup` | Set up full-text search |
 
 ## Contributing
 
 Contributions are welcome! Please run the linter before submitting PRs:
 
 ```bash
-pnpm lint
+npm lint
 ```
 
 ## License
