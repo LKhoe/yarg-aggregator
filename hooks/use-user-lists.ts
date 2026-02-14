@@ -49,13 +49,12 @@ export function useUserLists(isAuthenticated: boolean) {
     [lists],
   );
 
-  const addSongToList = useCallback(
-    async (listId: string, songId: string) => {
-      const response = await fetch(`/api/lists/${listId}/songs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ songId }),
-      });
+  const addSongToList = useCallback(async (listId: string, songId: string) => {
+    const response = await fetch(`/api/lists/${listId}/songs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ songId }),
+    });
 
       if (!response.ok) {
         throw new Error("Failed to add song to list");
