@@ -118,7 +118,22 @@
     "successImported": "Importado exitosamente: {added} añadidos, {updated} actualizados, {linked} vinculados",
     "failedToSave": "Falló guardar canciones en la base de datos",
     "songsList": "Canciones ({count})",
-    "unknownArtist": "Artista Desconocido"
+    "unknownArtist": "Artista Desconocido",
+    "duplicates": {
+      "title": "Duplicados Encontrados ({count})",
+      "description": "Se encontraron canciones con el mismo nombre y artista. Se recomienda mantener la versión con más instrumentos.",
+      "keep": "Mantener",
+      "delete": "Eliminar",
+      "instrumentCount": "{count} instrumentos",
+      "copyPaths": "Copiar {count} rutas para eliminar",
+      "copiedPaths": "{count} rutas copiadas al portapapeles"
+    },
+    "lowInstruments": {
+      "title": "Canciones con Pocos Instrumentos ({count})",
+      "description": "Estas canciones tienen menos de 4 instrumentos y pueden no ofrecer una experiencia de banda completa.",
+      "copyPaths": "Copiar {count} rutas",
+      "copiedPaths": "{count} rutas copiadas al portapapeles"
+    }
   },
   "auth": {
     "login": {

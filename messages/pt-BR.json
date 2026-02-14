@@ -118,7 +118,22 @@
     "successImported": "Importado com sucesso: {added} adicionados, {updated} atualizados, {linked} vinculados",
     "failedToSave": "Falha ao salvar músicas no banco de dados",
     "songsList": "Músicas ({count})",
-    "unknownArtist": "Artista Desconhecido"
+    "unknownArtist": "Artista Desconhecido",
+    "duplicates": {
+      "title": "Duplicatas Encontradas ({count})",
+      "description": "Músicas com o mesmo nome e artista foram encontradas. A versão com mais instrumentos é recomendada para manter.",
+      "keep": "Manter",
+      "delete": "Excluir",
+      "instrumentCount": "{count} instrumentos",
+      "copyPaths": "Copiar {count} caminhos para excluir",
+      "copiedPaths": "{count} caminhos copiados para a área de transferência"
+    },
+    "lowInstruments": {
+      "title": "Músicas com Poucos Instrumentos ({count})",
+      "description": "Essas músicas têm menos de 4 instrumentos e podem não proporcionar uma experiência completa de banda.",
+      "copyPaths": "Copiar {count} caminhos",
+      "copiedPaths": "{count} caminhos copiados para a área de transferência"
+    }
   },
   "provider": {
     "title": "Controle de Provedores",

@@ -118,7 +118,22 @@
     "successImported": "Successfully imported: {added} added, {updated} updated, {linked} linked",
     "failedToSave": "Failed to save songs to database",
     "songsList": "Songs ({count})",
-    "unknownArtist": "Unknown Artist"
+    "unknownArtist": "Unknown Artist",
+    "duplicates": {
+      "title": "Duplicates Found ({count})",
+      "description": "Songs with the same name and artist were found. The version with more instruments is recommended to keep.",
+      "keep": "Keep",
+      "delete": "Delete",
+      "instrumentCount": "{count} instruments",
+      "copyPaths": "Copy {count} paths to delete",
+      "copiedPaths": "Copied {count} paths to clipboard"
+    },
+    "lowInstruments": {
+      "title": "Low Instrument Songs ({count})",
+      "description": "These songs have fewer than 4 instruments and may not provide a full band experience.",
+      "copyPaths": "Copy {count} paths",
+      "copiedPaths": "Copied {count} paths to clipboard"
+    }
   },
   "provider": {
     "title": "Provider Control",

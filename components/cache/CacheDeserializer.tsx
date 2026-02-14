@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,6 +21,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -32,11 +37,17 @@ import {
   Music,
   AlertCircle,
   CheckCircle,
+  ChevronRight,
+  Copy,
   Database,
   Plus,
+  Trash2,
+  Trophy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { SongEntry } from "@/services/cache-reader/Song/Entries/SongEntry";
+import { UnpackedIniEntry } from "@/services/cache-reader/Song/Entries/UnpackedIniEntry";
+import { AvailableParts } from "@/services/cache-reader/Song/Entries/AvailableParts";
 import deserializeCache from "@/services/cache-reader/deserializer";
 import {
   serializeSongEntry,
@@ -74,6 +85,122 @@ interface Installation {
   updatedAt: Date;
 }
 
+interface DuplicateEntry {
+  song: SongEntry;
+  index: number;
+  directory: string;
+  instrumentCount: number;
+  isBest: boolean;
+}
+
+interface DuplicateGroup {
+  name: string;
+  artist: string;
+  entries: DuplicateEntry[];
+}
+
+function normalizeText(text: string): string {
+  return text
+    .replace(/\(.*?\)|\[.*?\]/g, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getSongDirectory(entry: SongEntry): string {
+  if (entry instanceof UnpackedIniEntry) {
+    return entry.Directory;
+  }
+  return entry._metadata.Location || "";
+}
+
+function countInstruments(parts: AvailableParts): number {
+  let count = 0;
+  if (
+    parts.FiveFretGuitar.Intensity >= 0 ||
+    parts.SixFretGuitar.Intensity >= 0
+  )
+    count++;
+  if (parts.FiveFretBass.Intensity >= 0 || parts.SixFretBass.Intensity >= 0)
+    count++;
+  if (
+    parts.FourLaneDrums.Intensity >= 0 ||
+    parts.FiveLaneDrums.Intensity >= 0 ||
+    parts.ProDrums.Intensity >= 0
+  )
+    count++;
+  if (parts.Keys.Intensity >= 0 || parts.ProKeys.Intensity >= 0) count++;
+  if (parts.LeadVocals.Intensity >= 0 || parts.HarmonyVocals.Intensity >= 0)
+    count++;
+  return count;
+}
+
+function findDuplicates(songs: SongEntry[]): DuplicateGroup[] {
+  const groups = new Map<string, { name: string; artist: string; entries: { song: SongEntry; index: number }[] }>();
+
+  for (let i = 0; i < songs.length; i++) {
+    const song = songs[i];
+    const key = `${normalizeText(song._metadata.Name)}|${normalizeText(song._metadata.Artist)}`;
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        name: song._metadata.Name,
+        artist: song._metadata.Artist,
+        entries: [],
+      });
+    }
+    groups.get(key)!.entries.push({ song, index: i });
+  }
+
+  const duplicates: DuplicateGroup[] = [];
+
+  for (const group of groups.values()) {
+    if (group.entries.length <= 1) continue;
+
+    const entries: DuplicateEntry[] = group.entries.map((e) => ({
+      song: e.song,
+      index: e.index,
+      directory: getSongDirectory(e.song),
+      instrumentCount: countInstruments(e.song._parts),
+      isBest: false,
+    }));
+
+    // Find the best entry (most instruments, then most metadata)
+    let bestIdx = 0;
+    for (let i = 1; i < entries.length; i++) {
+      if (entries[i].instrumentCount > entries[bestIdx].instrumentCount) {
+        bestIdx = i;
+      } else if (entries[i].instrumentCount === entries[bestIdx].instrumentCount) {
+        // Tiebreak: more metadata fields filled
+        const metaCount = (s: SongEntry) => {
+          let c = 0;
+          if (s._metadata.Album) c++;
+          if (s._metadata.Genre) c++;
+          if (s._metadata.Year) c++;
+          if (s._metadata.Charter) c++;
+          return c;
+        };
+        if (metaCount(entries[i].song) > metaCount(entries[bestIdx].song)) {
+          bestIdx = i;
+        }
+      }
+    }
+    entries[bestIdx].isBest = true;
+
+    duplicates.push({
+      name: group.name,
+      artist: group.artist,
+      entries,
+    });
+  }
+
+  return duplicates;
+}
+
 export default function CacheDeserializer() {
   const { t } = useTranslations();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -85,6 +212,27 @@ export default function CacheDeserializer() {
   const [detailType, setDetailType] = useState<
     "added" | "updated" | "linked" | null
   >(null);
+
+  const duplicates = useMemo(() => findDuplicates(songs), [songs]);
+
+  const pathsToDelete = useMemo(() => {
+    return duplicates.flatMap((group) =>
+      group.entries
+        .filter((e) => !e.isBest && e.directory)
+        .map((e) => e.directory),
+    );
+  }, [duplicates]);
+
+  const lowInstrumentSongs = useMemo(() => {
+    return songs
+      .map((song, index) => ({
+        song,
+        index,
+        directory: getSongDirectory(song),
+        instrumentCount: countInstruments(song._parts),
+      }))
+      .filter((s) => s.instrumentCount < 4);
+  }, [songs]);
 
   // Local installations state — fetched lazily when songs are loaded
   const [installations, setInstallations] = useState<Installation[]>([]);
@@ -322,6 +470,173 @@ export default function CacheDeserializer() {
               {t("cacheDeserializer.successLoaded", { count: songs.length })}
             </AlertDescription>
           </Alert>
+        )}
+
+        {/* Duplicates Section */}
+        {duplicates.length > 0 && (
+          <div className="space-y-3 p-4 border rounded-lg bg-amber-500/5 border-amber-500/20">
+            <h3 className="text-lg font-semibold flex items-center gap-2 text-amber-600 dark:text-amber-400">
+              <Copy className="h-5 w-5" />
+              {t("cacheDeserializer.duplicates.title", {
+                count: duplicates.length,
+              })}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              {t("cacheDeserializer.duplicates.description")}
+            </p>
+
+            <div className="space-y-1">
+              {duplicates.map((group, groupIdx) => (
+                <Collapsible key={groupIdx}>
+                  <CollapsibleTrigger className="w-full flex items-center gap-2 font-medium text-sm bg-muted/50 p-2 rounded cursor-pointer hover:bg-muted/70 group text-left transition-colors">
+                    <ChevronRight className="h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-90 text-muted-foreground shrink-0" />
+                    <span className="truncate flex-1">
+                      {group.name} - {group.artist}
+                    </span>
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {group.entries.length}x
+                    </span>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="space-y-1 pl-6 pt-1 pb-2">
+                      {group.entries.map((entry, entryIdx) => (
+                        <div
+                          key={entryIdx}
+                          className={`flex items-start gap-2 text-xs p-2 rounded ${
+                            entry.isBest
+                              ? "bg-green-500/10 border border-green-500/20"
+                              : "bg-red-500/5 border border-red-500/10"
+                          }`}
+                        >
+                          {entry.isBest ? (
+                            <Trophy className="h-3.5 w-3.5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`font-medium ${entry.isBest ? "text-green-700 dark:text-green-300" : "text-red-600 dark:text-red-400"}`}
+                              >
+                                {entry.isBest
+                                  ? t("cacheDeserializer.duplicates.keep")
+                                  : t("cacheDeserializer.duplicates.delete")}
+                              </span>
+                              <span className="text-muted-foreground">
+                                {t(
+                                  "cacheDeserializer.duplicates.instrumentCount",
+                                  { count: entry.instrumentCount },
+                                )}
+                              </span>
+                            </div>
+                            {entry.directory && (
+                              <p
+                                className="text-muted-foreground truncate mt-0.5"
+                                title={entry.directory}
+                              >
+                                {entry.directory}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              ))}
+            </div>
+
+            {/* Copy all paths to delete */}
+            {pathsToDelete.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-amber-700 dark:text-amber-300 border-amber-500/30 hover:bg-amber-500/10"
+                onClick={() => {
+                  navigator.clipboard.writeText(pathsToDelete.join("\n"));
+                  toast.success(
+                    t("cacheDeserializer.duplicates.copiedPaths", {
+                      count: pathsToDelete.length,
+                    }),
+                  );
+                }}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                {t("cacheDeserializer.duplicates.copyPaths", {
+                  count: pathsToDelete.length,
+                })}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Low Instrument Songs Section */}
+        {lowInstrumentSongs.length > 0 && (
+          <div className="space-y-3 p-4 border rounded-lg bg-orange-500/5 border-orange-500/20">
+            <h3 className="text-lg font-semibold flex items-center gap-2 text-orange-600 dark:text-orange-400">
+              <AlertCircle className="h-5 w-5" />
+              {t("cacheDeserializer.lowInstruments.title", {
+                count: lowInstrumentSongs.length,
+              })}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              {t("cacheDeserializer.lowInstruments.description")}
+            </p>
+
+            <div className="border rounded-lg max-h-64 overflow-y-auto">
+              <div className="space-y-1 p-2">
+                {lowInstrumentSongs.map((entry) => (
+                  <div
+                    key={entry.index}
+                    className="flex items-start gap-2 text-xs p-2 rounded bg-muted/50"
+                  >
+                    <span className="shrink-0 font-mono text-orange-600 dark:text-orange-400 mt-0.5">
+                      {entry.instrumentCount}/5
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">
+                        {entry.song._metadata.Name} -{" "}
+                        {entry.song._metadata.Artist}
+                      </p>
+                      {entry.directory && (
+                        <p
+                          className="text-muted-foreground truncate"
+                          title={entry.directory}
+                        >
+                          {entry.directory}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Copy paths */}
+            {lowInstrumentSongs.some((e) => e.directory) && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-orange-700 dark:text-orange-300 border-orange-500/30 hover:bg-orange-500/10"
+                onClick={() => {
+                  const paths = lowInstrumentSongs
+                    .filter((e) => e.directory)
+                    .map((e) => e.directory);
+                  navigator.clipboard.writeText(paths.join("\n"));
+                  toast.success(
+                    t("cacheDeserializer.lowInstruments.copiedPaths", {
+                      count: paths.length,
+                    }),
+                  );
+                }}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                {t("cacheDeserializer.lowInstruments.copyPaths", {
+                  count: lowInstrumentSongs.filter((e) => e.directory).length,
+                })}
+              </Button>
+            )}
+          </div>
         )}
 
         {/* Installation Selection & Save Section */}

@@ -118,7 +118,22 @@
     "successImported": "正常にインポート：{added}追加、{updated}更新、{linked}リンク",
     "failedToSave": "曲のデータベースへの保存に失敗しました",
     "songsList": "曲（{count}）",
-    "unknownArtist": "不明なアーティスト"
+    "unknownArtist": "不明なアーティスト",
+    "duplicates": {
+      "title": "重複が見つかりました（{count}）",
+      "description": "同じ曲名とアーティストの曲が見つかりました。楽器数が多いバージョンを残すことをお勧めします。",
+      "keep": "保持",
+      "delete": "削除",
+      "instrumentCount": "{count} 楽器",
+      "copyPaths": "削除する {count} パスをコピー",
+      "copiedPaths": "{count} パスをクリップボードにコピーしました"
+    },
+    "lowInstruments": {
+      "title": "楽器が少ない曲（{count}）",
+      "description": "これらの曲は楽器が4つ未満で、フルバンド体験を提供できない可能性があります。",
+      "copyPaths": "{count} パスをコピー",
+      "copiedPaths": "{count} パスをクリップボードにコピーしました"
+    }
   },
   "auth": {
     "login": {

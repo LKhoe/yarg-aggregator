@@ -118,7 +118,22 @@
     "successImported": "导入成功：{added}已添加，{updated}已更新，{linked}已链接",
     "failedToSave": "保存歌曲到数据库失败",
     "songsList": "歌曲（{count}）",
-    "unknownArtist": "未知艺术家"
+    "unknownArtist": "未知艺术家",
+    "duplicates": {
+      "title": "发现重复项（{count}）",
+      "description": "发现了同名同艺术家的歌曲。建议保留乐器数量更多的版本。",
+      "keep": "保留",
+      "delete": "删除",
+      "instrumentCount": "{count} 种乐器",
+      "copyPaths": "复制 {count} 个待删除路径",
+      "copiedPaths": "已复制 {count} 个路径到剪贴板"
+    },
+    "lowInstruments": {
+      "title": "乐器较少的歌曲（{count}）",
+      "description": "这些歌曲的乐器少于4种，可能无法提供完整的乐队体验。",
+      "copyPaths": "复制 {count} 个路径",
+      "copiedPaths": "已复制 {count} 个路径到剪贴板"
+    }
   },
   "auth": {
     "login": {

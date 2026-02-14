@@ -118,7 +118,22 @@
     "successImported": "Erfolgreich importiert: {added} hinzugefügt, {updated} aktualisiert, {linked} verknüpft",
     "failedToSave": "Fehler beim Speichern der Lieder in der Datenbank",
     "songsList": "Lieder ({count})",
-    "unknownArtist": "Unbekannter Künstler"
+    "unknownArtist": "Unbekannter Künstler",
+    "duplicates": {
+      "title": "Duplikate Gefunden ({count})",
+      "description": "Lieder mit demselben Namen und Künstler wurden gefunden. Die Version mit mehr Instrumenten wird empfohlen beizubehalten.",
+      "keep": "Behalten",
+      "delete": "Löschen",
+      "instrumentCount": "{count} Instrumente",
+      "copyPaths": "{count} Pfade zum Löschen kopieren",
+      "copiedPaths": "{count} Pfade in die Zwischenablage kopiert"
+    },
+    "lowInstruments": {
+      "title": "Lieder mit wenigen Instrumenten ({count})",
+      "description": "Diese Lieder haben weniger als 4 Instrumente und bieten möglicherweise kein vollständiges Band-Erlebnis.",
+      "copyPaths": "{count} Pfade kopieren",
+      "copiedPaths": "{count} Pfade in die Zwischenablage kopiert"
+    }
   },
   "auth": {
     "login": {

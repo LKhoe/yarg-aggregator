@@ -118,7 +118,22 @@
     "successImported": "Importé avec succès : {added} ajoutés, {updated} mis à jour, {linked} liés",
     "failedToSave": "Échec de la sauvegarde des chansons dans la base de données",
     "songsList": "Chansons ({count})",
-    "unknownArtist": "Artiste Inconnu"
+    "unknownArtist": "Artiste Inconnu",
+    "duplicates": {
+      "title": "Doublons Trouvés ({count})",
+      "description": "Des chansons avec le même nom et artiste ont été trouvées. La version avec plus d'instruments est recommandée à conserver.",
+      "keep": "Garder",
+      "delete": "Supprimer",
+      "instrumentCount": "{count} instruments",
+      "copyPaths": "Copier {count} chemins à supprimer",
+      "copiedPaths": "{count} chemins copiés dans le presse-papiers"
+    },
+    "lowInstruments": {
+      "title": "Chansons avec Peu d'Instruments ({count})",
+      "description": "Ces chansons ont moins de 4 instruments et peuvent ne pas offrir une expérience de groupe complète.",
+      "copyPaths": "Copier {count} chemins",
+      "copiedPaths": "{count} chemins copiés dans le presse-papiers"
+    }
   },
   "auth": {
     "login": {
