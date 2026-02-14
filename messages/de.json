@@ -197,6 +197,7 @@
     "title": "Anbieter-Steuerung",
     "description": "Musik-Charts von Enchor.us und Rhythmverse abrufen",
     "uploadStatus": "Upload-Status",
+    "fetchStatus": "Abruf-Status",
     "uploadProgress": "Upload-Fortschritt",
     "source": "Quelle",
     "phase": "Phase",
@@ -209,6 +210,7 @@
     "uploadCompleted": "Upload abgeschlossen! Hinzugefügt: {added}, Aktualisiert: {updated}, Ignoriert: {ignored}",
     "uploadFailed": "Upload fehlgeschlagen: {error}",
     "phases": {
+      "running": "Läuft",
       "fetching": "Abrufen",
       "processing": "Verarbeiten",
       "saving": "Lieder speichern",

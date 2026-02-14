@@ -124,6 +124,7 @@
     "title": "Controle de Provedores",
     "description": "Buscar partituras musicais do Enchor.us e Rhythmverse",
     "uploadStatus": "Status do Upload",
+    "fetchStatus": "Status do Fetch",
     "uploadProgress": "Progresso do Upload",
     "source": "Fonte",
     "phase": "Fase",
@@ -136,6 +137,7 @@
     "uploadCompleted": "Upload concluído! Adicionado: {added}, Atualizado: {updated}, Ignorado: {ignored}",
     "uploadFailed": "Falha no upload: {error}",
     "phases": {
+      "running": "Executando",
       "fetching": "Buscando",
       "processing": "Processando",
       "saving": "Salvando músicas",

@@ -197,6 +197,7 @@
     "title": "Contrôle des Fournisseurs",
     "description": "Récupérer des partitions musicales d'Enchor.us et Rhythmverse",
     "uploadStatus": "Statut de Téléchargement",
+    "fetchStatus": "Statut de Récupération",
     "uploadProgress": "Progression du Téléchargement",
     "source": "Source",
     "phase": "Phase",
@@ -209,6 +210,7 @@
     "uploadCompleted": "Téléchargement terminé ! Ajouté : {added}, Mis à jour : {updated}, Ignoré : {ignored}",
     "uploadFailed": "Échec du téléchargement : {error}",
     "phases": {
+      "running": "En cours",
       "fetching": "Récupération",
       "processing": "Traitement",
       "saving": "Sauvegarde des chansons",

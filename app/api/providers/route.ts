@@ -2,14 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { ProviderService } from "@/lib/services/provider";
 import { providerQueue } from "@/lib/queue";
 import { getAuthenticatedUser, hasPermission } from "@/lib/middleware/auth";
-import Redis from "ioredis";
+import { getRedisClient } from "@/lib/redis";
 
-const REDIS_HOST = process.env.REDIS_HOST || "localhost";
-const REDIS_PORT = parseInt(process.env.REDIS_PORT || "6379", 10);
-const redis = new Redis({
-  host: REDIS_HOST,
-  port: REDIS_PORT,
-});
+const redis = getRedisClient();
 
 export async function POST(request: NextRequest) {
   // Check authentication and authorization
@@ -32,12 +27,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if provider is currently running using Redis
-    const isRunning = await redis.get(`provider:${source}:running`);
-    if (isRunning === "true") {
+    // Atomically acquire the running lock
+    const acquired = await redis.set(
+      `provider:${source}:running`,
+      "true",
+      "EX",
+      120,
+      "NX",
+    );
+    if (!acquired) {
       return NextResponse.json(
         { error: `Provider is already running for ${source}` },
-        { status: 400 },
+        { status: 409 },
       );
     }
 
@@ -60,11 +61,16 @@ export async function POST(request: NextRequest) {
         },
       };
 
-      await providerQueue.add(
-        retryJobData.name,
-        retryJobData.data,
-        retryJobData.opts,
-      );
+      try {
+        await providerQueue.add(
+          retryJobData.name,
+          retryJobData.data,
+          retryJobData.opts,
+        );
+      } catch (error) {
+        await redis.del(`provider:${source}:running`);
+        throw error;
+      }
 
       return NextResponse.json({
         success: true,
@@ -85,7 +91,12 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    await providerQueue.add(jobData.name, jobData.data, jobData.opts);
+    try {
+      await providerQueue.add(jobData.name, jobData.data, jobData.opts);
+    } catch (error) {
+      await redis.del(`provider:${source}:running`);
+      throw error;
+    }
 
     return NextResponse.json({
       success: true,
@@ -93,10 +104,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error starting provider:", error);
-    return NextResponse.json(
-      { error: "Failed to start provider" },
-      { status: 500 },
-    );
+    const message =
+      error instanceof Error ? error.message : "Failed to start provider";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -147,14 +157,18 @@ export async function DELETE(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error stopping provider:", error);
-    return NextResponse.json(
-      { error: "Failed to stop provider" },
-      { status: 500 },
-    );
+    const message =
+      error instanceof Error ? error.message : "Failed to stop provider";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authUser = await getAuthenticatedUser(request);
+  if (!authUser) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     // Get all providers from database
     const providers = await ProviderService.getAll();
@@ -205,9 +219,8 @@ export async function GET() {
     return NextResponse.json(enrichedData);
   } catch (error) {
     console.error("Error getting provider status:", error);
-    return NextResponse.json(
-      { error: "Failed to get provider status" },
-      { status: 500 },
-    );
+    const message =
+      error instanceof Error ? error.message : "Failed to get provider status";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

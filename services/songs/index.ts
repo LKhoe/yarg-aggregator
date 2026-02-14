@@ -33,7 +33,7 @@ export type ProgressCallback = (data: {
   phase: string;
   progress: number;
   stats: ProcessingStats;
-}) => void;
+}) => void | Promise<void>;
 
 export async function processSongs(
   songs: ProviderMusic[],
@@ -90,7 +90,7 @@ export async function processSongs(
         100,
         Math.round((processedCount / totalSongs) * 100),
       );
-      onProgress({ phase: "Saving songs", progress, stats });
+      await onProgress({ phase: "Saving songs", progress, stats });
     }
   }
 

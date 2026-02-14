@@ -124,6 +124,7 @@
     "title": "Provider Control",
     "description": "Fetch music charts from Enchor.us and Rhythmverse",
     "uploadStatus": "Upload Status",
+    "fetchStatus": "Fetch Status",
     "uploadProgress": "Upload Progress",
     "source": "Source",
     "phase": "Phase",
@@ -136,6 +137,7 @@
     "uploadCompleted": "Upload completed! Added: {added}, Updated: {updated}, Ignored: {ignored}",
     "uploadFailed": "Upload failed: {error}",
     "phases": {
+      "running": "Running",
       "fetching": "Fetching",
       "processing": "Processing",
       "saving": "Saving songs",

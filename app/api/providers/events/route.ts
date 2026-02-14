@@ -1,21 +1,27 @@
-import Redis from "ioredis";
+import { createRedisReader, createRedisSubscriber } from "@/lib/redis";
 import { ProviderService } from "@/lib/services/provider";
 import { db } from "@/lib/db";
 import { downloadUrl } from "@/lib/db/schema";
 import { countDistinct } from "drizzle-orm";
-
-const REDIS_HOST = process.env.REDIS_HOST || "localhost";
-const REDIS_PORT = parseInt(process.env.REDIS_PORT || "6379", 10);
+import { NextRequest } from "next/server";
+import { getAuthenticatedUser } from "@/lib/middleware/auth";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authUser = await getAuthenticatedUser(request);
+  if (!authUser) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
   const encoder = new TextEncoder();
 
   // Dedicated reader for initial state
-  const reader = new Redis({ host: REDIS_HOST, port: REDIS_PORT });
+  const reader = createRedisReader();
   // Dedicated subscriber (ioredis requires separate connection for pub/sub)
-  const subscriber = new Redis({ host: REDIS_HOST, port: REDIS_PORT });
+  const subscriber = createRedisSubscriber();
+
+  let heartbeat: ReturnType<typeof setInterval> | null = null;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -68,14 +74,25 @@ export async function GET() {
             // Stream closed, will be cleaned up by cancel
           }
         });
+
+        // Send heartbeat every 30s to keep connection alive
+        heartbeat = setInterval(() => {
+          try {
+            controller.enqueue(encoder.encode(":heartbeat\n\n"));
+          } catch {
+            if (heartbeat) clearInterval(heartbeat);
+          }
+        }, 30_000);
       } catch (error) {
         console.error("SSE init error:", error);
+        if (heartbeat) clearInterval(heartbeat);
         reader.disconnect();
         subscriber.disconnect();
         controller.close();
       }
     },
     cancel() {
+      if (heartbeat) clearInterval(heartbeat);
       subscriber.unsubscribe("provider:events").catch(() => {});
       subscriber.disconnect();
     },

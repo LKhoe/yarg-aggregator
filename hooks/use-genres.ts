@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 
-interface Genre {
+export interface Genre {
   id: string;
   name: string;
 }

@@ -4,6 +4,33 @@ const ENCHOR_BASE_URL = "https://www.enchor.us";
 const ENCHOR_API_URL = "https://api.enchor.us/search/advanced";
 const ENCHOR_FILES_URL = "https://files.enchor.us";
 
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  retries = 3,
+): Promise<Response> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (response.status === 429 || response.status >= 500) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return response;
+    } catch (error) {
+      if (attempt === retries) throw error;
+      const delay = 1000 * Math.pow(2, attempt - 1);
+      console.warn(
+        `Enchor fetch attempt ${attempt} failed, retrying in ${delay}ms...`,
+      );
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw new Error("fetchWithRetry: unreachable");
+}
+
 export interface EnchorResponse {
   found: number;
   out_of: number;
@@ -72,7 +99,7 @@ export async function fetchEnchor(
   try {
     console.log(`Fetching Enchor API page ${page} (size: ${pageSize})...`);
 
-    const response = await fetch(ENCHOR_API_URL, {
+    const response = await fetchWithRetry(ENCHOR_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -127,6 +154,11 @@ export async function fetchEnchor(
 
     const json = (await response.json()) as EnchorResponse;
     const { data } = json;
+    if (!Array.isArray(data)) {
+      throw new Error(
+        `Enchor API returned unexpected data type: ${typeof data}`,
+      );
+    }
 
     const results = parseEnchorData(data);
 
@@ -146,6 +178,11 @@ export async function fetchEnchor(
           oldestSongInPage.sourceUpdatedAt <= latestSourceUpdatedAt,
         );
         shouldStop = oldestSongInPage.sourceUpdatedAt <= latestSourceUpdatedAt;
+      } else {
+        shouldStop = true;
+        console.log(
+          `Error on Enchor API page ${page}, missing oldestSongInPage`,
+        );
       }
     }
 

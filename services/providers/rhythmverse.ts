@@ -4,6 +4,33 @@ import { decode } from "he";
 const RHYTHMVERSE_BASE_URL = "https://rhythmverse.co";
 const RHYTHMVERSE_API_URL = "https://rhythmverse.co/api/yarg/songfiles/list";
 
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  retries = 3,
+): Promise<Response> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (response.status === 429 || response.status >= 500) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return response;
+    } catch (error) {
+      if (attempt === retries) throw error;
+      const delay = 1000 * Math.pow(2, attempt - 1);
+      console.warn(
+        `Rhythmverse fetch attempt ${attempt} failed, retrying in ${delay}ms...`,
+      );
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw new Error("fetchWithRetry: unreachable");
+}
+
 export interface RhythmVerseResponse {
   status: string;
   data: {
@@ -118,7 +145,7 @@ export async function fetchRhythmverse(
     body.append("page", page.toString());
     body.append("records", pageSize.toString());
 
-    const response = await fetch(RHYTHMVERSE_API_URL, {
+    const response = await fetchWithRetry(RHYTHMVERSE_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
@@ -138,6 +165,11 @@ export async function fetchRhythmverse(
     if (json.status !== "success") {
       throw new Error(`RhythmVerse API returned status: ${json.status}`);
     }
+    if (!json.data?.songs || !Array.isArray(json.data.songs)) {
+      throw new Error(
+        `RhythmVerse API returned unexpected songs type: ${typeof json.data?.songs}`,
+      );
+    }
 
     const { songs } = json.data;
     const results = parseRhythmverseData(songs);
@@ -147,6 +179,16 @@ export async function fetchRhythmverse(
     if (latestSourceUpdatedAt) {
       const oldestSongInPage = results[results.length - 1];
       if (oldestSongInPage && oldestSongInPage.sourceUpdatedAt) {
+        console.log(
+          "Checking if should stop for page",
+          page,
+          "oldestSongInPage",
+          oldestSongInPage.sourceUpdatedAt.toISOString(),
+          "latestSourceUpdatedAt",
+          latestSourceUpdatedAt.toISOString(),
+          "shouldStop",
+          oldestSongInPage.sourceUpdatedAt <= latestSourceUpdatedAt,
+        );
         shouldStop = oldestSongInPage.sourceUpdatedAt <= latestSourceUpdatedAt;
       }
     }

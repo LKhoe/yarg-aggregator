@@ -470,6 +470,7 @@ export default function MusicTable({
                 setGenre(val ?? "");
                 handleFilterChange();
               }}
+              items={genreOptions.map((g) => g.name)}
             >
               <ComboboxInput
                 placeholder={t("table.allGenres") || "All genres"}
@@ -477,13 +478,13 @@ export default function MusicTable({
                 className="w-full sm:w-45 h-9 text-sm"
               />
               <ComboboxContent>
+                <ComboboxEmpty>{t("table.noGenresFound")}</ComboboxEmpty>
                 <ComboboxList>
-                  <ComboboxEmpty>{t("table.noGenresFound")}</ComboboxEmpty>
-                  {genreOptions.map((g) => (
-                    <ComboboxItem key={g.id} value={g.name}>
-                      {g.name}
+                  {(genre: string) => (
+                    <ComboboxItem key={genre} value={genre}>
+                      {genre}
                     </ComboboxItem>
-                  ))}
+                  )}
                 </ComboboxList>
               </ComboboxContent>
             </Combobox>
@@ -604,10 +605,11 @@ export default function MusicTable({
               data.map((music) => (
                 <TableRow
                   key={music.id}
-                  className={`cursor-pointer ${music.installed
+                  className={`cursor-pointer ${
+                    music.installed
                       ? "bg-green-500/5 hover:bg-green-500/10"
                       : ""
-                    }`}
+                  }`}
                   onClick={() => onSongSelect?.(music)}
                 >
                   <TableCell className="hidden sm:table-cell">

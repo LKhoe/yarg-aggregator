@@ -197,6 +197,7 @@
     "title": "Control de Proveedores",
     "description": "Obtener partituras musicales de Enchor.us y Rhythmverse",
     "uploadStatus": "Estado de Subida",
+    "fetchStatus": "Estado de Descarga",
     "uploadProgress": "Progreso de Subida",
     "source": "Fuente",
     "phase": "Fase",
@@ -209,6 +210,7 @@
     "uploadCompleted": "¡Subida completada! Añadido: {added}, Actualizado: {updated}, Ignorado: {ignored}",
     "uploadFailed": "Falló la subida: {error}",
     "phases": {
+      "running": "Ejecutando",
       "fetching": "Obteniendo",
       "processing": "Procesando",
       "saving": "Guardando canciones",

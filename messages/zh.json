@@ -197,6 +197,7 @@
     "title": "提供者控制",
     "description": "从Enchor.us和Rhythmverse获取音乐谱面",
     "uploadStatus": "上传状态",
+    "fetchStatus": "获取状态",
     "uploadProgress": "上传进度",
     "source": "来源",
     "phase": "阶段",
@@ -209,6 +210,7 @@
     "uploadCompleted": "上传完成！已添加：{added}，已更新：{updated}，已忽略：{ignored}",
     "uploadFailed": "上传失败：{error}",
     "phases": {
+      "running": "运行中",
       "fetching": "获取中",
       "processing": "处理中",
       "saving": "保存歌曲",

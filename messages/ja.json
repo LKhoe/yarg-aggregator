@@ -197,6 +197,7 @@
     "title": "プロバイダーコントロール",
     "description": "Enchor.usとRhythmverseから音楽チャートを取得",
     "uploadStatus": "アップロードステータス",
+    "fetchStatus": "フェッチステータス",
     "uploadProgress": "アップロード進行状況",
     "source": "ソース",
     "phase": "フェーズ",
@@ -209,6 +210,7 @@
     "uploadCompleted": "アップロード完了！追加：{added}、更新：{updated}、無視：{ignored}",
     "uploadFailed": "アップロード失敗：{error}",
     "phases": {
+      "running": "実行中",
       "fetching": "取得中",
       "processing": "処理中",
       "saving": "曲を保存中",

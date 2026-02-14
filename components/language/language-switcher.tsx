@@ -10,15 +10,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useTranslations } from "@/hooks/use-translations";
+import Image from "next/image";
 
 const languages = [
-  { code: "pt-BR", name: "Português (BR)", flag: "🇧🇷" },
-  { code: "en", name: "English", flag: "🇺🇸" },
-  { code: "es", name: "Español", flag: "🇪🇸" },
-  { code: "fr", name: "Français", flag: "🇫🇷" },
-  { code: "de", name: "Deutsch", flag: "🇩🇪" },
-  { code: "ja", name: "日本語", flag: "🇯🇵" },
-  { code: "zh", name: "中文", flag: "🇨🇳" },
+  { code: "pt-BR", name: "Português (BR)" },
+  { code: "en", name: "English" },
+  { code: "es", name: "Español" },
+  { code: "fr", name: "Français" },
+  { code: "de", name: "Deutsch" },
+  { code: "ja", name: "日本語" },
+  { code: "zh", name: "中文" },
 ];
 
 interface LanguageSwitcherProps {
@@ -47,7 +48,12 @@ export function LanguageSwitcher({
             onClick={() => onLanguageChange(language.code)}
             className={currentLocale === language.code ? "bg-accent" : ""}
           >
-            <span className="mr-2">{language.flag}</span>
+            <Image
+              src={`/flags/${language.code}.svg`}
+              alt={language.name}
+              width={16}
+              height={16}
+            />
             {language.name}
           </DropdownMenuItem>
         ))}

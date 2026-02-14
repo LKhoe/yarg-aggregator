@@ -1,18 +1,11 @@
 import { Queue, Worker, Job } from "bullmq";
-import Redis from "ioredis";
+import { getRedisClient } from "@/lib/redis";
 import { fetchEnchor } from "@/services/providers/enchor";
 import { fetchRhythmverse } from "@/services/providers/rhythmverse";
 import { processSongs } from "@/services/songs/index";
 import { ProviderService } from "@/lib/services/provider";
 
-const REDIS_HOST = process.env.REDIS_HOST || "localhost";
-const REDIS_PORT = parseInt(process.env.REDIS_PORT || "6379", 10);
-
-const connection = new Redis({
-  host: REDIS_HOST,
-  port: REDIS_PORT,
-  maxRetriesPerRequest: null, // Required for BullMQ
-});
+const connection = getRedisClient();
 
 export const providerQueue = new Queue("provider-fetch", { connection });
 
@@ -32,7 +25,7 @@ export const initProviderWorker = () => {
         ? new Date(latestSourceUpdatedAt)
         : undefined;
 
-      await connection.set(`provider:${source}:running`, "true", "EX", 3600);
+      await connection.set(`provider:${source}:running`, "true", "EX", 120);
       await connection.publish(
         "provider:events",
         JSON.stringify({ source, type: "running", isRunning: true }),
@@ -41,13 +34,13 @@ export const initProviderWorker = () => {
       const fetchFn = source === "enchor" ? fetchEnchor : fetchRhythmverse;
 
       let page = 1;
-      let allSongs: Awaited<ReturnType<typeof fetchFn>>["songs"] = [];
+      const allSongs: Awaited<ReturnType<typeof fetchFn>>["songs"] = [];
       let shouldStop = false;
 
       try {
         while (!shouldStop) {
           const result = await fetchFn(page, PAGE_SIZE, latestDate);
-          allSongs = allSongs.concat(result.songs);
+          allSongs.push(...result.songs);
           shouldStop = result.shouldStop || result.songs.length < PAGE_SIZE;
 
           // Store progress in Redis and publish event
@@ -64,6 +57,9 @@ export const initProviderWorker = () => {
             3600,
           );
           await connection.publish("provider:events", fetchingProgress);
+
+          // Refresh running lock TTL
+          await connection.expire(`provider:${source}:running`, 120);
 
           page++;
 
@@ -88,36 +84,57 @@ export const initProviderWorker = () => {
         );
         await connection.publish("provider:events", processingProgress);
 
-        const stats = await processSongs(allSongs, source, (data) => {
+        const stats = await processSongs(allSongs, source, async (data) => {
+          // Strip details to keep SSE payloads small (counts only)
+          const { details: _, ...counts } = data.stats;
           const progressPayload = JSON.stringify({
             source,
             page: page - 1,
             songsFetched: allSongs.length,
             phase: data.phase,
             progress: data.progress,
-            stats: data.stats,
+            stats: counts,
           });
-          connection.set(
+          await connection.set(
             `provider:${source}:progress`,
             progressPayload,
             "EX",
             3600,
           );
-          connection.publish("provider:events", progressPayload);
+          await connection.publish("provider:events", progressPayload);
         });
 
         // Update last successful fetch timestamp
         await ProviderService.updateLastSuccessfulFetch(source);
         const updatedProvider = await ProviderService.findByName(source);
 
-        // Store completion stats
+        // Group ignored by reason (same format as upload route)
+        const ignoredByReason = stats.details.ignored.reduce(
+          (acc, item) => {
+            if (!acc[item.reason]) acc[item.reason] = [];
+            acc[item.reason].push({ artist: item.artist, title: item.title });
+            return acc;
+          },
+          {} as Record<string, { artist: string; title: string }[]>,
+        );
+
+        // Store completion stats with details for dialog
         const completedProgress = JSON.stringify({
           source,
           page: page - 1,
           songsFetched: allSongs.length,
           phase: "completed",
           progress: 100,
-          stats,
+          stats: {
+            added: stats.added,
+            updated: stats.updated,
+            ignored: stats.ignored,
+          },
+          details: {
+            added: stats.details.added,
+            updated: stats.details.updated,
+            ignored: ignoredByReason,
+          },
           lastSuccessfulFetch: updatedProvider?.lastSuccessfulFetch ?? null,
         });
         await connection.set(
@@ -129,8 +146,10 @@ export const initProviderWorker = () => {
         await connection.publish("provider:events", completedProgress);
 
         console.log(
-          `Provider ${source} fetch completed: ${allSongs.length} songs fetched, stats:`,
-          stats,
+          `Provider ${source} fetch completed: ${allSongs.length} songs fetched, stats:\n`,
+          `added: ${stats.added}\n`,
+          `updated: ${stats.updated}\n`,
+          `ignored: ${stats.ignored}\n`,
         );
       } catch (error) {
         console.error(`Provider ${source} fetch failed:`, error);
@@ -163,19 +182,11 @@ export const initProviderWorker = () => {
 
   worker.on("completed", async (job) => {
     await connection.del(`provider:${job.data.source}:running`);
-    await connection.publish(
-      "provider:events",
-      JSON.stringify({ source: job.data.source, type: "running", isRunning: false }),
-    );
   });
 
-  worker.on("failed", async (job, err) => {
+  worker.on("failed", async (job) => {
     if (job?.data?.source) {
       await connection.del(`provider:${job.data.source}:running`);
-      await connection.publish(
-        "provider:events",
-        JSON.stringify({ source: job.data.source, type: "running", isRunning: false }),
-      );
     }
   });
 

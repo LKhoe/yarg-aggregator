@@ -38,7 +38,18 @@ import {
   AlertCircle,
   Loader2,
   Upload,
+  Cog,
+  Database,
+  Check,
 } from "lucide-react";
+import {
+  Stepper,
+  StepperItem,
+  StepperTrigger,
+  StepperIndicator,
+  StepperSeparator,
+  StepperNav,
+} from "@/components/reui/stepper";
 import { toast } from "sonner";
 
 interface ProviderProgress {
@@ -47,6 +58,11 @@ interface ProviderProgress {
   phase?: string;
   progress?: number;
   stats?: { added: number; updated: number; ignored: number };
+  details?: {
+    added: SongDetail[];
+    updated: SongDetail[];
+    ignored: Record<string, SongDetail[]>;
+  };
   error?: string;
 }
 
@@ -114,6 +130,47 @@ function useRelativeTime(date: string | null) {
   }, [date, now, t]);
 }
 
+const FETCH_STEPS = [
+  { icon: CloudDownload },
+  { icon: Cog },
+  { icon: Database },
+  { icon: Check },
+];
+
+function getPhaseLabel(
+  phase: string,
+  t: (key: string, params?: Record<string, string | number>) => string,
+) {
+  const phaseMap: Record<string, string> = {
+    "Saving songs": "saving",
+    "Deduplicating songs": "deduplicating",
+    "Fetching existing songs": "fetching_existing",
+    "Pre-resolving metadata": "resolving",
+    "Building transactions": "building",
+  };
+  const key = phaseMap[phase] ?? phase;
+  return t(`provider.phases.${key}`);
+}
+
+function getStepFromPhase(phase: string | undefined): number {
+  switch (phase) {
+    case "fetching":
+      return 1;
+    case "processing":
+    case "Deduplicating songs":
+    case "Fetching existing songs":
+    case "Pre-resolving metadata":
+    case "Building transactions":
+      return 2;
+    case "Saving songs":
+      return 3;
+    case "completed":
+      return 5;
+    default:
+      return 1;
+  }
+}
+
 function ProviderCard({
   src,
   status,
@@ -147,65 +204,17 @@ function ProviderCard({
     <div className="h-2 w-2 rounded-full bg-muted-foreground/30" />
   );
 
-  const getPhaseLabel = (phase: string) => {
-    const phaseMap: Record<string, string> = {
-      "Saving songs": "saving",
-      "Deduplicating songs": "deduplicating",
-      "Fetching existing songs": "fetching_existing",
-      "Pre-resolving metadata": "resolving",
-      "Building transactions": "building",
-    };
-    const key = phaseMap[phase] ?? phase;
-    return t(`provider.phases.${key}`);
-  };
-
-  const isProcessingPhase =
-    progress?.phase === "processing" ||
-    progress?.phase === "Saving songs" ||
-    progress?.phase === "Deduplicating songs" ||
-    progress?.phase === "Fetching existing songs" ||
-    progress?.phase === "Pre-resolving metadata" ||
-    progress?.phase === "Building transactions";
-
   return (
-    <div className="bg-muted/50 p-3 rounded-lg border text-sm space-y-2.5">
+    <div className="bg-muted/50 p-3 rounded-lg border text-sm space-y-2.5 min-w-0 overflow-hidden">
       {/* Header row */}
       <div className="flex justify-between items-center">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           {statusIcon}
-          <span className="text-xs font-semibold tracking-wide uppercase">
+          <span className="text-xs font-semibold tracking-wide uppercase truncate">
             {src === "enchor" ? "Enchor.us" : "Rhythmverse"}
           </span>
-          {isRunning && progress?.phase && (
-            <Badge
-              className="bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20 text-[10px] px-1.5 py-0"
-              variant="outline"
-            >
-              {progress.phase === "running"
-                ? t("provider.status.running")
-                : progress.phase === "completed"
-                  ? t("provider.phases.completed")
-                  : getPhaseLabel(progress.phase)}
-            </Badge>
-          )}
-          {isCompleted && (
-            <Badge
-              className="bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/20 text-[10px] px-1.5 py-0"
-              variant="outline"
-            >
-              {t("provider.phases.completed")}
-            </Badge>
-          )}
-          {isFailed && (
-            <Badge
-              className="bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/20 text-[10px] px-1.5 py-0"
-              variant="outline"
-            >
-              {t("provider.phases.failed")}
-            </Badge>
-          )}
         </div>
-        <div className="flex gap-0.5 items-center">
+        <div className="flex gap-0.5 items-center shrink-0">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -279,66 +288,6 @@ function ProviderCard({
           </span>
         )}
       </div>
-
-      {/* Active progress */}
-      {isRunning && progress && (
-        <div className="space-y-1.5 pt-0.5">
-          {progress.phase === "fetching" && (
-            <p className="text-xs text-muted-foreground">
-              {t("provider.status.fetched", {
-                page: progress.page ?? 0,
-                count: progress.songsFetched ?? 0,
-              })}
-            </p>
-          )}
-          {isProcessingPhase && (
-            <>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{getPhaseLabel(progress.phase!)}</span>
-                {progress.progress !== undefined && (
-                  <span>{progress.progress}%</span>
-                )}
-              </div>
-              {progress.progress !== undefined && (
-                <Progress value={progress.progress} className="h-1" />
-              )}
-            </>
-          )}
-          {progress.stats && (
-            <div className="flex gap-2 text-[10px] pt-0.5">
-              <span className="text-green-600 dark:text-green-400">
-                +{progress.stats.added}
-              </span>
-              <span className="text-blue-600 dark:text-blue-400">
-                ~{progress.stats.updated}
-              </span>
-              <span className="text-muted-foreground">
-                ={progress.stats.ignored}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Completed stats */}
-      {isCompleted && progress?.stats && (
-        <div className="flex gap-2 text-[10px]">
-          <span className="text-green-600 dark:text-green-400">
-            +{progress.stats.added}
-          </span>
-          <span className="text-blue-600 dark:text-blue-400">
-            ~{progress.stats.updated}
-          </span>
-          <span className="text-muted-foreground">
-            ={progress.stats.ignored}
-          </span>
-        </div>
-      )}
-
-      {/* Failed error */}
-      {isFailed && progress?.error && (
-        <p className="text-[10px] text-red-500 truncate">{progress.error}</p>
-      )}
     </div>
   );
 }
@@ -359,12 +308,20 @@ export default function ProviderPanel() {
     SongDetail[] | Record<string, SongDetail[]> | null
   >(null);
 
-  const openDetails = (type: "added" | "updated" | "ignored") => {
-    if (uploadProgress?.status !== "completed") return;
+  const openDetails = (
+    type: "added" | "updated" | "ignored",
+    details?: ProviderProgress["details"],
+  ) => {
+    // Use provided details (from fetch flow) or fall back to upload details
+    const source =
+      details ??
+      (uploadProgress?.status === "completed"
+        ? uploadProgress?.details
+        : undefined);
+    if (!source) return;
 
     setDetailType(type);
-    const data = uploadProgress?.details?.[type];
-    setDetailData(data || null);
+    setDetailData(source[type] || null);
   };
 
   // SSE connection for real-time provider updates
@@ -419,6 +376,7 @@ export default function ProviderPanel() {
                 phase: data.phase,
                 progress: data.progress,
                 stats: data.stats,
+                details: data.details,
                 error: data.error,
               },
               lastSuccessfulFetch:
@@ -433,7 +391,7 @@ export default function ProviderPanel() {
       }
     };
 
-    eventSource.onerror = () => { };
+    eventSource.onerror = () => {};
 
     return () => {
       eventSource.close();
@@ -453,6 +411,18 @@ export default function ProviderPanel() {
         const data = await response.json();
         throw new Error(data.error || "Failed to start fetch");
       }
+
+      // Immediately show stepper before first SSE event arrives
+      setProviderStatuses((prev) => ({
+        ...prev,
+        [source]: {
+          ...prev[source],
+          name: source,
+          isRunning: true,
+          progress: { phase: "fetching", page: 0, songsFetched: 0 },
+          lastSuccessfulFetch: prev[source]?.lastSuccessfulFetch ?? null,
+        },
+      }));
 
       toast.success(`Started fetching from ${source}`);
     } catch (error) {
@@ -555,6 +525,27 @@ export default function ProviderPanel() {
     }
   };
 
+  const clearFetchProgress = (source: string) => {
+    setProviderStatuses((prev) => ({
+      ...prev,
+      [source]: {
+        ...prev[source],
+        progress: null,
+      },
+    }));
+  };
+
+  // Providers with active fetch progress (running, completed, or failed)
+  const fetchProgressSources = ["enchor", "rhythmverse"].filter((src) => {
+    const status = providerStatuses[src];
+    if (!status?.progress?.phase) return false;
+    return (
+      status.isRunning ||
+      status.progress.phase === "completed" ||
+      status.progress.phase === "failed"
+    );
+  });
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "running":
@@ -595,6 +586,152 @@ export default function ProviderPanel() {
             />
           ))}
         </div>
+
+        {fetchProgressSources.map((src) => {
+          const status = providerStatuses[src];
+          const progress = status?.progress;
+          if (!progress) return null;
+
+          const isRunning = status.isRunning;
+          const isCompleted = !isRunning && progress.phase === "completed";
+          const isFailed = !isRunning && progress.phase === "failed";
+          const phaseStatus = isRunning
+            ? "running"
+            : (progress.phase ?? "unknown");
+
+          return (
+            <div key={src} className="space-y-3 pt-4 border-t">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  {t("provider.fetchStatus")}{" "}
+                  <span className="capitalize">
+                    {src === "enchor" ? "Enchor.us" : "Rhythmverse"}
+                  </span>
+                </span>
+                <div className="flex items-center gap-2">
+                  <Badge className={getStatusColor(phaseStatus)}>
+                    {t(`provider.phases.${phaseStatus}`, {
+                      default: phaseStatus,
+                    })}
+                  </Badge>
+                  {(isCompleted || isFailed) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => clearFetchProgress(src)}
+                      className="h-6 px-2 text-xs"
+                    >
+                      {t("provider.clear")}
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <Stepper
+                value={getStepFromPhase(progress.phase)}
+                indicators={{
+                  loading: <Loader2 className="size-2.5 animate-spin" />,
+                }}
+              >
+                <StepperNav>
+                  {FETCH_STEPS.map((step, i) => (
+                    <StepperItem
+                      key={i}
+                      step={i + 1}
+                      loading={
+                        isRunning && getStepFromPhase(progress.phase) === i + 1
+                      }
+                    >
+                      <StepperTrigger asChild>
+                        <StepperIndicator className="size-5">
+                          <step.icon className="size-2.5" />
+                        </StepperIndicator>
+                      </StepperTrigger>
+                      {i < FETCH_STEPS.length - 1 && (
+                        <StepperSeparator className="bg-accent data-[state=completed]:bg-primary" />
+                      )}
+                    </StepperItem>
+                  ))}
+                </StepperNav>
+              </Stepper>
+
+              {isRunning && progress.phase === "fetching" && (
+                <p className="text-[11px] text-muted-foreground text-center">
+                  {t("provider.status.fetched", {
+                    page: progress.page ?? 0,
+                    count: progress.songsFetched ?? 0,
+                  })}
+                </p>
+              )}
+
+              {isRunning &&
+                progress.phase &&
+                !["fetching", "completed", "failed"].includes(
+                  progress.phase,
+                ) && (
+                  <p className="text-[11px] text-muted-foreground text-center">
+                    {getPhaseLabel(progress.phase, t)}
+                  </p>
+                )}
+
+              {isRunning && progress.stats && (
+                <div className="flex gap-2 text-[10px] justify-center">
+                  <span className="text-green-600 dark:text-green-400">
+                    +{progress.stats.added}
+                  </span>
+                  <span className="text-blue-600 dark:text-blue-400">
+                    ~{progress.stats.updated}
+                  </span>
+                  <span className="text-muted-foreground">
+                    ={progress.stats.ignored}
+                  </span>
+                </div>
+              )}
+
+              {isCompleted && progress.stats && (
+                <div className="grid grid-cols-3 gap-2 text-sm">
+                  <div
+                    onClick={() => openDetails("added", progress.details)}
+                    className="text-center p-2 bg-green-50 dark:bg-green-950 rounded cursor-pointer hover:opacity-80"
+                  >
+                    <div className="font-medium text-green-600 dark:text-green-400">
+                      {progress.stats.added}
+                    </div>
+                    <div className="text-xs text-green-500 dark:text-green-300">
+                      {t("provider.stats.added")}
+                    </div>
+                  </div>
+                  <div
+                    onClick={() => openDetails("updated", progress.details)}
+                    className="text-center p-2 bg-blue-50 dark:bg-blue-950 rounded cursor-pointer hover:opacity-80"
+                  >
+                    <div className="font-medium text-blue-600 dark:text-blue-400">
+                      {progress.stats.updated}
+                    </div>
+                    <div className="text-xs text-blue-500 dark:text-blue-300">
+                      {t("provider.stats.updated")}
+                    </div>
+                  </div>
+                  <div
+                    onClick={() => openDetails("ignored", progress.details)}
+                    className="text-center p-2 bg-gray-50 dark:bg-gray-950 rounded cursor-pointer hover:opacity-80"
+                  >
+                    <div className="font-medium text-gray-600 dark:text-gray-400">
+                      {progress.stats.ignored}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-300">
+                      {t("provider.stats.ignored")}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {isFailed && progress.error && (
+                <p className="text-sm text-red-500">{progress.error}</p>
+              )}
+            </div>
+          );
+        })}
 
         {uploadProgress && (
           <div className="space-y-3 pt-4 border-t">
@@ -650,51 +787,54 @@ export default function ProviderPanel() {
             {(uploadProgress.added !== undefined ||
               uploadProgress.updated !== undefined ||
               uploadProgress.ignored !== undefined) && (
-                <div className="grid grid-cols-3 gap-2 text-sm">
-                  <div
-                    onClick={() => openDetails("added")}
-                    className={`text-center p-2 bg-green-50 dark:bg-green-950 rounded ${uploadProgress.status === "completed"
-                        ? "cursor-pointer hover:opacity-80"
-                        : ""
-                      }`}
-                  >
-                    <div className="font-medium text-green-600 dark:text-green-400">
-                      {uploadProgress.added || 0}
-                    </div>
-                    <div className="text-xs text-green-500 dark:text-green-300">
-                      {t("provider.stats.added")}
-                    </div>
+              <div className="grid grid-cols-3 gap-2 text-sm">
+                <div
+                  onClick={() => openDetails("added")}
+                  className={`text-center p-2 bg-green-50 dark:bg-green-950 rounded ${
+                    uploadProgress.status === "completed"
+                      ? "cursor-pointer hover:opacity-80"
+                      : ""
+                  }`}
+                >
+                  <div className="font-medium text-green-600 dark:text-green-400">
+                    {uploadProgress.added || 0}
                   </div>
-                  <div
-                    onClick={() => openDetails("updated")}
-                    className={`text-center p-2 bg-blue-50 dark:bg-blue-950 rounded ${uploadProgress.status === "completed"
-                        ? "cursor-pointer hover:opacity-80"
-                        : ""
-                      }`}
-                  >
-                    <div className="font-medium text-blue-600 dark:text-blue-400">
-                      {uploadProgress.updated || 0}
-                    </div>
-                    <div className="text-xs text-blue-500 dark:text-blue-300">
-                      {t("provider.stats.updated")}
-                    </div>
-                  </div>
-                  <div
-                    onClick={() => openDetails("ignored")}
-                    className={`text-center p-2 bg-gray-50 dark:bg-gray-950 rounded ${uploadProgress.status === "completed"
-                        ? "cursor-pointer hover:opacity-80"
-                        : ""
-                      }`}
-                  >
-                    <div className="font-medium text-gray-600 dark:text-gray-400">
-                      {uploadProgress.ignored || 0}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-300">
-                      {t("provider.stats.ignored")}
-                    </div>
+                  <div className="text-xs text-green-500 dark:text-green-300">
+                    {t("provider.stats.added")}
                   </div>
                 </div>
-              )}
+                <div
+                  onClick={() => openDetails("updated")}
+                  className={`text-center p-2 bg-blue-50 dark:bg-blue-950 rounded ${
+                    uploadProgress.status === "completed"
+                      ? "cursor-pointer hover:opacity-80"
+                      : ""
+                  }`}
+                >
+                  <div className="font-medium text-blue-600 dark:text-blue-400">
+                    {uploadProgress.updated || 0}
+                  </div>
+                  <div className="text-xs text-blue-500 dark:text-blue-300">
+                    {t("provider.stats.updated")}
+                  </div>
+                </div>
+                <div
+                  onClick={() => openDetails("ignored")}
+                  className={`text-center p-2 bg-gray-50 dark:bg-gray-950 rounded ${
+                    uploadProgress.status === "completed"
+                      ? "cursor-pointer hover:opacity-80"
+                      : ""
+                  }`}
+                >
+                  <div className="font-medium text-gray-600 dark:text-gray-400">
+                    {uploadProgress.ignored || 0}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-300">
+                    {t("provider.stats.ignored")}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
