@@ -14,13 +14,18 @@ interface UserList {
 export function useUserLists(isAuthenticated: boolean) {
   const [lists, setLists] = useState<UserList[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [prevAuth, setPrevAuth] = useState(isAuthenticated);
 
-  useEffect(() => {
+  if (prevAuth !== isAuthenticated) {
+    setPrevAuth(isAuthenticated);
     if (!isAuthenticated) {
       setLists([]);
       setLoaded(false);
-      return;
     }
+  }
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
 
     let cancelled = false;
 
@@ -56,14 +61,12 @@ export function useUserLists(isAuthenticated: boolean) {
       body: JSON.stringify({ songId }),
     });
 
-      if (!response.ok) {
-        throw new Error("Failed to add song to list");
-      }
+    if (!response.ok) {
+      throw new Error("Failed to add song to list");
+    }
 
-      return response.json();
-    },
-    [],
-  );
+    return response.json();
+  }, []);
 
   return { lists, nonFavoriteLists, addSongToList, loaded };
 }
