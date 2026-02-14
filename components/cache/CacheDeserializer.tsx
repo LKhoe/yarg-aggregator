@@ -21,6 +21,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Upload,
   FileText,
   Music,
@@ -38,20 +44,26 @@ import {
 } from "@/services/songs/serialization";
 import { useTranslations } from "@/hooks/use-translations";
 
-interface ImportInstalledSongsResponse {
-  success: boolean;
-  stats?: {
-    added: number;
-    updated: number;
-    linked: number;
-  };
-  error?: string;
+interface SongDetail {
+  title: string;
+  artist: string;
 }
 
 interface ImportStats {
   added: number;
   updated: number;
   linked: number;
+  details: {
+    added: SongDetail[];
+    updated: SongDetail[];
+    linked: SongDetail[];
+  };
+}
+
+interface ImportInstalledSongsResponse {
+  success: boolean;
+  stats?: ImportStats;
+  error?: string;
 }
 
 interface Installation {
@@ -70,6 +82,9 @@ export default function CacheDeserializer() {
   const [songs, setSongs] = useState<SongEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [importStats, setImportStats] = useState<ImportStats | null>(null);
+  const [detailType, setDetailType] = useState<
+    "added" | "updated" | "linked" | null
+  >(null);
 
   // Local installations state — fetched lazily when songs are loaded
   const [installations, setInstallations] = useState<Installation[]>([]);
@@ -425,7 +440,13 @@ export default function CacheDeserializer() {
             {/* Import Stats */}
             {importStats && (
               <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="p-3 bg-green-500/10 rounded-lg">
+                <div
+                  onClick={() =>
+                    importStats.details.added.length > 0 &&
+                    setDetailType("added")
+                  }
+                  className={`p-3 bg-green-500/10 rounded-lg ${importStats.details.added.length > 0 ? "cursor-pointer hover:opacity-80" : ""}`}
+                >
                   <div className="text-2xl font-bold text-green-600">
                     {importStats.added}
                   </div>
@@ -433,7 +454,13 @@ export default function CacheDeserializer() {
                     {t("cacheDeserializer.stats.added")}
                   </div>
                 </div>
-                <div className="p-3 bg-blue-500/10 rounded-lg">
+                <div
+                  onClick={() =>
+                    importStats.details.updated.length > 0 &&
+                    setDetailType("updated")
+                  }
+                  className={`p-3 bg-blue-500/10 rounded-lg ${importStats.details.updated.length > 0 ? "cursor-pointer hover:opacity-80" : ""}`}
+                >
                   <div className="text-2xl font-bold text-blue-600">
                     {importStats.updated}
                   </div>
@@ -441,7 +468,13 @@ export default function CacheDeserializer() {
                     {t("cacheDeserializer.stats.updated")}
                   </div>
                 </div>
-                <div className="p-3 bg-purple-500/10 rounded-lg">
+                <div
+                  onClick={() =>
+                    importStats.details.linked.length > 0 &&
+                    setDetailType("linked")
+                  }
+                  className={`p-3 bg-purple-500/10 rounded-lg ${importStats.details.linked.length > 0 ? "cursor-pointer hover:opacity-80" : ""}`}
+                >
                   <div className="text-2xl font-bold text-purple-600">
                     {importStats.linked}
                   </div>
@@ -451,6 +484,40 @@ export default function CacheDeserializer() {
                 </div>
               </div>
             )}
+
+            {/* Details Dialog */}
+            <Dialog
+              open={!!detailType}
+              onOpenChange={(open) => !open && setDetailType(null)}
+            >
+              <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
+                <DialogHeader>
+                  <DialogTitle className="capitalize">
+                    {detailType &&
+                      t(`cacheDeserializer.stats.${detailType}`)}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="overflow-y-auto max-h-[60vh] pr-2">
+                  {detailType && importStats?.details[detailType]?.length ? (
+                    <div className="space-y-1">
+                      {importStats.details[detailType].map((song, i) => (
+                        <div
+                          key={i}
+                          className="text-[10px] text-muted-foreground truncate"
+                          title={`${song.title} - ${song.artist}`}
+                        >
+                          {song.title} - {song.artist}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center text-sm text-muted-foreground p-4">
+                      {t("provider.phases.noDetailsAvailable")}
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
 

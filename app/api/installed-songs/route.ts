@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   processSerializedInstalledSongs,
   type InstallationInfo,
+  type InstalledSongsStats,
 } from "@/services/songs/installed";
 import { type SerializedSongEntry } from "@/services/songs/serialization";
 
@@ -12,11 +13,7 @@ export interface ImportInstalledSongsRequest {
 
 export interface ImportInstalledSongsResponse {
   success: boolean;
-  stats?: {
-    added: number;
-    updated: number;
-    linked: number;
-  };
+  stats?: InstalledSongsStats;
   error?: string;
 }
 

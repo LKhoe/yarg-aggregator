@@ -24,10 +24,20 @@ export interface InstallationInfo {
   path?: string;
 }
 
+export interface SongDetail {
+  title: string;
+  artist: string;
+}
+
 export interface InstalledSongsStats {
   added: number;
   updated: number;
   linked: number;
+  details: {
+    added: SongDetail[];
+    updated: SongDetail[];
+    linked: SongDetail[];
+  };
 }
 
 // =============================================================================
@@ -171,7 +181,12 @@ export async function processInstalledSongsForInstallation(
   installationInfo: InstallationInfo,
   songEntries: SongEntry[],
 ): Promise<InstalledSongsStats> {
-  const stats: InstalledSongsStats = { added: 0, updated: 0, linked: 0 };
+  const stats: InstalledSongsStats = {
+    added: 0,
+    updated: 0,
+    linked: 0,
+    details: { added: [], updated: [], linked: [] },
+  };
 
   if (songEntries.length === 0) {
     return stats;
@@ -201,13 +216,43 @@ export async function processInstalledSongsForInstallation(
       newSongs.push(songData);
     } else {
       existingSongIds.push(existing.id);
-      stats.updated++; // Count as "updated" even if just linking
+      stats.updated++;
+      stats.details.updated.push({
+        title: songData.name,
+        artist: songData.artist,
+      });
     }
   }
 
   // Step 6: Insert new songs (using "local" as the provider - no download links)
   const insertedSongs = await insertNewSongs(newSongs, metadata, "local");
   stats.added = insertedSongs.length;
+  for (const songData of newSongs) {
+    stats.details.added.push({
+      title: songData.name,
+      artist: songData.artist,
+    });
+  }
+
+  // Build a map from songId to song detail for linked tracking
+  const songIdToDetail = new Map<string, SongDetail>();
+  for (let i = 0; i < insertedSongs.length; i++) {
+    songIdToDetail.set(insertedSongs[i].id, {
+      title: newSongs[i].name,
+      artist: newSongs[i].artist,
+    });
+  }
+  for (let i = 0; i < existingSongIds.length; i++) {
+    const songData = songsWithKeys.find(
+      (s) => existingMap.get(s.key)?.id === existingSongIds[i],
+    );
+    if (songData) {
+      songIdToDetail.set(existingSongIds[i], {
+        title: songData.name,
+        artist: songData.artist,
+      });
+    }
+  }
 
   // Collect all song IDs (new + existing)
   const allSongIds = [...insertedSongs.map((s) => s.id), ...existingSongIds];
@@ -244,6 +289,12 @@ export async function processInstalledSongsForInstallation(
         })),
       );
       stats.linked = songsToLink.length;
+      for (const songId of songsToLink) {
+        const detail = songIdToDetail.get(songId);
+        if (detail) {
+          stats.details.linked.push(detail);
+        }
+      }
     }
   }
 
@@ -334,7 +385,12 @@ export async function processSerializedInstalledSongs(
   installationInfo: InstallationInfo,
   serializedEntries: SerializedSongEntry[],
 ): Promise<InstalledSongsStats> {
-  const stats: InstalledSongsStats = { added: 0, updated: 0, linked: 0 };
+  const stats: InstalledSongsStats = {
+    added: 0,
+    updated: 0,
+    linked: 0,
+    details: { added: [], updated: [], linked: [] },
+  };
 
   if (serializedEntries.length === 0) {
     return stats;
@@ -365,12 +421,42 @@ export async function processSerializedInstalledSongs(
     } else {
       existingSongIds.push(existing.id);
       stats.updated++;
+      stats.details.updated.push({
+        title: songData.name,
+        artist: songData.artist,
+      });
     }
   }
 
   // Step 6: Insert new songs
   const insertedSongs = await insertNewSongs(newSongs, metadata, "local");
   stats.added = insertedSongs.length;
+  for (const songData of newSongs) {
+    stats.details.added.push({
+      title: songData.name,
+      artist: songData.artist,
+    });
+  }
+
+  // Build a map from songId to song detail for linked tracking
+  const songIdToDetail = new Map<string, SongDetail>();
+  for (let i = 0; i < insertedSongs.length; i++) {
+    songIdToDetail.set(insertedSongs[i].id, {
+      title: newSongs[i].name,
+      artist: newSongs[i].artist,
+    });
+  }
+  for (let i = 0; i < existingSongIds.length; i++) {
+    const songData = songsWithKeys.find(
+      (s) => existingMap.get(s.key)?.id === existingSongIds[i],
+    );
+    if (songData) {
+      songIdToDetail.set(existingSongIds[i], {
+        title: songData.name,
+        artist: songData.artist,
+      });
+    }
+  }
 
   // Collect all song IDs
   const allSongIds = [...insertedSongs.map((s) => s.id), ...existingSongIds];
@@ -404,6 +490,12 @@ export async function processSerializedInstalledSongs(
         })),
       );
       stats.linked = songsToLink.length;
+      for (const songId of songsToLink) {
+        const detail = songIdToDetail.get(songId);
+        if (detail) {
+          stats.details.linked.push(detail);
+        }
+      }
     }
   }
 
