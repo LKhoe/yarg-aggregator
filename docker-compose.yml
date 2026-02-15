@@ -34,6 +34,8 @@ services:
     restart: unless-stopped
     networks:
       - yarg-network
+      # Uncomment in production:
+      # - tunnel
     deploy:
       resources:
         limits:
@@ -49,7 +51,7 @@ services:
   postgres:
     container_name: yarg-postgres
     image: postgres:15-alpine
-    # Uncomment if you need direct access:
+    # Comment ports in production:
     ports: ["5432:5432"]
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
@@ -80,7 +82,7 @@ services:
   redis:
     container_name: yarg-redis
     image: redis:7-alpine
-    # Uncomment if you need direct access:
+    # Comment ports in production:
     ports: ["6379:6379"]
     volumes:
       - redis_data:/data
@@ -111,3 +113,5 @@ volumes:
 networks:
   yarg-network:
     driver: bridge
+  # tunnel:
+  #   external: true
