@@ -444,6 +444,12 @@
       "dangerZone": "危険な操作"
     }
   },
+  "songLyrics": {
+    "title": "歌詞",
+    "notFound": "この曲の歌詞は見つかりませんでした。",
+    "fetchError": "歌詞の取得に失敗しました。",
+    "source": "ソース: {source}"
+  },
   "songDetail": {
     "title": "楽曲詳細",
     "instruments": "楽器",

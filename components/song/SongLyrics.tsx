@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Collapsible,
@@ -15,6 +16,7 @@ interface SongLyricsProps {
 }
 
 export default function SongLyrics({ songName, artistName }: SongLyricsProps) {
+  const t = useTranslations("songLyrics");
   const { isAuthenticated } = useAuth();
   const [open, setOpen] = useState(false);
   const [lyrics, setLyrics] = useState<string | null>(null);
@@ -47,7 +49,7 @@ export default function SongLyrics({ songName, artistName }: SongLyricsProps) {
       const res = await fetch(`/api/music/lyrics?${params}`);
 
       if (!res.ok) {
-        setError("Lyrics not found for this song.");
+        setError(t("notFound"));
         return;
       }
 
@@ -55,11 +57,11 @@ export default function SongLyrics({ songName, artistName }: SongLyricsProps) {
       setLyrics(json.lyrics);
       setSource(json.source);
     } catch {
-      setError("Failed to fetch lyrics.");
+      setError(t("fetchError"));
     } finally {
       setLoading(false);
     }
-  }, [songName, artistName, fetched]);
+  }, [songName, artistName, fetched, t]);
 
   const handleOpenChange = useCallback(
     (isOpen: boolean) => {
@@ -79,7 +81,7 @@ export default function SongLyrics({ songName, artistName }: SongLyricsProps) {
         <ChevronRight
           className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-90" : ""}`}
         />
-        Lyrics
+        {t("title")}
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="mt-2">
@@ -100,7 +102,7 @@ export default function SongLyrics({ songName, artistName }: SongLyricsProps) {
               </div>
               {source && (
                 <p className="text-[10px] text-muted-foreground mt-1.5">
-                  Source: {source}
+                  {t("source", { source })}
                 </p>
               )}
             </>

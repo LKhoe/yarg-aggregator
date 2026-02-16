@@ -444,6 +444,12 @@
       "dangerZone": "Zona de Peligro"
     }
   },
+  "songLyrics": {
+    "title": "Letras",
+    "notFound": "Letras no encontradas para esta canción.",
+    "fetchError": "Error al obtener las letras.",
+    "source": "Fuente: {source}"
+  },
   "songDetail": {
     "title": "Detalles de la Canción",
     "instruments": "Instrumentos",

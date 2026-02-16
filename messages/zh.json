@@ -444,6 +444,12 @@
       "dangerZone": "危险区域"
     }
   },
+  "songLyrics": {
+    "title": "歌词",
+    "notFound": "未找到此歌曲的歌词。",
+    "fetchError": "获取歌词失败。",
+    "source": "来源：{source}"
+  },
   "songDetail": {
     "title": "歌曲详情",
     "instruments": "乐器",

@@ -444,6 +444,12 @@
       "dangerZone": "Danger Zone"
     }
   },
+  "songLyrics": {
+    "title": "Lyrics",
+    "notFound": "Lyrics not found for this song.",
+    "fetchError": "Failed to fetch lyrics.",
+    "source": "Source: {source}"
+  },
   "songDetail": {
     "title": "Song Details",
     "instruments": "Instruments",

@@ -26,6 +26,23 @@ async function fetchFromLyricsOvh(
   }
 }
 
+async function fetchFromLrcLib(
+  artist: string,
+  song: string,
+): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://lrclib.net/api/search?track_name=${encodeURIComponent(song)}&artist_name=${encodeURIComponent(artist)}`,
+      { signal: AbortSignal.timeout(8000) },
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json?.[0].plainLyrics?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchFromVagalume(
   artist: string,
   song: string,
@@ -69,9 +86,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ lyrics: ovhResult, source: "lyrics.ovh" });
   }
 
+  const lrcResult = await fetchFromLrcLib(artist, song);
+  if (lrcResult) {
+    return NextResponse.json({ lyrics: lrcResult, source: "lrclib.net" });
+  }
+
   const vagalumeResult = await fetchFromVagalume(artist, song);
   if (vagalumeResult) {
-    return NextResponse.json({ lyrics: vagalumeResult, source: "Vagalume" });
+    return NextResponse.json({
+      lyrics: vagalumeResult,
+      source: "vagalume.com.br",
+    });
   }
 
   return NextResponse.json({ error: "Lyrics not found" }, { status: 404 });
