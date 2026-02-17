@@ -1,1 +1,0 @@
-- [ ] The installed songs have wrong difficulty levels. For example, "Me Lambe" is listed to have many instruments, but it's just guitar.

@@ -18,10 +18,14 @@ export const auth = betterAuth({
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      scope: ["https://www.googleapis.com/auth/youtube.readonly"],
+      accessType: "offline",
+      prompt: "consent",
     },
     spotify: {
       clientId: process.env.SPOTIFY_CLIENT_ID!,
       clientSecret: process.env.SPOTIFY_CLIENT_SECRET!,
+      scope: ["playlist-read-private", "playlist-read-collaborative"],
     },
   },
 

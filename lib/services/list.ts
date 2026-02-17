@@ -322,6 +322,45 @@ export class ListService {
     return true;
   }
 
+  static async addSongsToList(
+    listId: string,
+    songIds: string[],
+    userId: string,
+  ): Promise<number> {
+    if (songIds.length === 0) return 0;
+
+    // Verify list ownership
+    const listResult = await db.select().from(songList).where(and(eq(songList.id, listId), eq(songList.userId, userId))).limit(1);
+    const list = listResult[0];
+
+    if (!list) return 0;
+
+    // Get existing songs in list to skip duplicates
+    const existingItems = await db
+      .select({ songId: songListItem.songId })
+      .from(songListItem)
+      .where(eq(songListItem.listId, listId));
+
+    const existingSet = new Set(existingItems.map((item) => item.songId));
+    const newSongIds = songIds.filter((id) => !existingSet.has(id));
+
+    if (newSongIds.length === 0) return 0;
+
+    await db.insert(songListItem).values(
+      newSongIds.map((songId) => ({
+        listId,
+        songId,
+      })),
+    );
+
+    await db
+      .update(songList)
+      .set({ updatedAt: new Date() })
+      .where(eq(songList.id, listId));
+
+    return newSongIds.length;
+  }
+
   static async addSongToList(
     listId: string,
     songId: string,

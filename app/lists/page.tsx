@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useTranslations } from "@/hooks/use-translations";
+import { PlaylistImportDialog } from "@/components/import/PlaylistImportDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +27,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Heart, List, Lock, Globe } from "lucide-react";
+import { Plus, Heart, List, Lock, Globe, Download } from "lucide-react";
 import Link from "next/link";
 
 interface SongList {
@@ -41,11 +43,25 @@ interface SongList {
 
 function ListsContent() {
   const { t } = useTranslations();
+  const searchParams = useSearchParams();
   const [lists, setLists] = useState<SongList[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [newListName, setNewListName] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importProvider, setImportProvider] = useState<string | null>(null);
+
+  // Handle OAuth callback redirect with ?import=provider
+  useEffect(() => {
+    const provider = searchParams.get("import");
+    if (provider === "spotify" || provider === "google") {
+      setImportProvider(provider);
+      setIsImportOpen(true);
+      // Clean up URL
+      window.history.replaceState({}, "", "/lists");
+    }
+  }, [searchParams]);
 
   const fetchLists = useCallback(async () => {
     try {
@@ -102,13 +118,18 @@ function ListsContent() {
             {t("lists.myListsDescription")}
           </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              {t("lists.createList")}
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsImportOpen(true)}>
+            <Download className="h-4 w-4 mr-2" />
+            {t("import.button")}
+          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                {t("lists.createList")}
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <form onSubmit={handleCreateList}>
               <DialogHeader>
@@ -145,6 +166,12 @@ function ListsContent() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
+        <PlaylistImportDialog
+          open={isImportOpen}
+          onOpenChange={setIsImportOpen}
+          initialProvider={importProvider}
+        />
       </div>
 
       {isLoading ? (
