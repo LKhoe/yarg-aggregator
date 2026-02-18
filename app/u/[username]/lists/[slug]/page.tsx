@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Music, ArrowLeft, User, Download } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 interface PublicList {
   id: string;
@@ -41,6 +42,7 @@ interface PublicList {
     name: string;
     artist: string;
     album: string | null;
+    albumImageUrl: string | null;
     addedAt: string;
     downloadUrls: { url: string; source: string }[];
   }[];
@@ -89,8 +91,8 @@ export default function PublicListPage() {
 
   const downloadUrls = list
     ? list.songs
-        .filter((song) => song.downloadUrls.length > 0)
-        .map((song) => song.downloadUrls[0].url)
+      .filter((song) => song.downloadUrls.length > 0)
+      .map((song) => song.downloadUrls[0].url)
     : [];
 
   const handleDownloadAll = async () => {
@@ -113,10 +115,11 @@ export default function PublicListPage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <Skeleton className="h-8 w-48" />
         <Card>
           <CardHeader>
-            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-6 w-32" />
             <Skeleton className="h-4 w-32 mt-2" />
           </CardHeader>
           <CardContent className="space-y-3">
@@ -131,7 +134,8 @@ export default function PublicListPage() {
 
   if (error || !list) {
     return (
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <Skeleton className="h-8 w-48" />
         <Card>
           <CardHeader className="text-center">
             <CardTitle>{t("lists.notFound")}</CardTitle>
@@ -216,16 +220,83 @@ export default function PublicListPage() {
               {t("lists.noSongs")}
             </p>
           ) : (
-            <div className="divide-y">
+            <div className="space-y-2">
               {list.songs.map((song) => (
-                <div key={song.id} className="flex items-center gap-4 py-3">
-                  <Music className="h-5 w-5 text-muted-foreground shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{song.name}</p>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {song.artist}
-                      {song.album && ` • ${song.album}`}
-                    </p>
+                <div
+                  key={song.id}
+                  className="flex items-center justify-between p-3 border rounded-lg"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="relative h-10 w-10 shrink-0">
+                      {song.albumImageUrl ? (
+                        <>
+                          <Image
+                            src={song.albumImageUrl}
+                            alt={song.name}
+                            className="h-10 w-10 rounded object-cover bg-muted opacity-0 transition-opacity duration-300"
+                            width={40}
+                            height={40}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              const parent = target.parentElement;
+                              if (parent) {
+                                const skeleton =
+                                  parent.querySelector(".loading-skeleton");
+                                const fallback =
+                                  parent.querySelector(".error-fallback");
+                                if (skeleton) {
+                                  (skeleton as HTMLElement).style.display =
+                                    "none";
+                                }
+                                if (fallback) {
+                                  (fallback as HTMLElement).style.display =
+                                    "flex";
+                                }
+                              }
+                            }}
+                            onLoad={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              const parent = target.parentElement;
+                              if (parent) {
+                                const skeleton =
+                                  parent.querySelector(".loading-skeleton");
+                                const fallback =
+                                  parent.querySelector(".error-fallback");
+                                if (skeleton) {
+                                  (skeleton as HTMLElement).style.display =
+                                    "none";
+                                }
+                                if (fallback) {
+                                  (fallback as HTMLElement).style.display =
+                                    "none";
+                                }
+                              }
+                              target.style.opacity = "1";
+                            }}
+                          />
+                          <div className="loading-skeleton absolute inset-0 h-10 w-10 rounded">
+                            <Skeleton className="h-full w-full rounded" />
+                          </div>
+                          <div
+                            className="error-fallback absolute inset-0 h-10 w-10 rounded bg-muted flex items-center justify-center"
+                            style={{ display: "none" }}
+                          >
+                            <Music className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
+                          <Music className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium">{song.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {song.artist}
+                        {song.album && ` • ${song.album}`}
+                      </p>
+                    </div>
                   </div>
                 </div>
               ))}

@@ -49,6 +49,7 @@ import {
 import { useRouter } from "next/navigation";
 import type { ProviderMusic, PaginatedResponse } from "@/types";
 import Link from "next/link";
+import Image from "next/image";
 
 interface InstallationSongData {
   id: string;
@@ -245,7 +246,11 @@ function InstallationDetailContent({
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && searchHasMore && !isLoadingMoreSearch) {
+        if (
+          entries[0].isIntersecting &&
+          searchHasMore &&
+          !isLoadingMoreSearch
+        ) {
           fetchSearchResults(searchNextCursor);
         }
       },
@@ -253,7 +258,13 @@ function InstallationDetailContent({
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [searchHasMore, isSearching, isLoadingMoreSearch, searchNextCursor, fetchSearchResults]);
+  }, [
+    searchHasMore,
+    isSearching,
+    isLoadingMoreSearch,
+    searchNextCursor,
+    fetchSearchResults,
+  ]);
 
   const handleAddSong = async (songId: string) => {
     setAddingSongId(songId);
@@ -504,32 +515,56 @@ function InstallationDetailContent({
                               <div className="relative h-10 w-10 rounded shrink-0">
                                 {result.coverUrl ? (
                                   <>
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
+                                    <Image
                                       src={result.coverUrl}
                                       alt={result.name}
-                                      className="h-10 w-10 rounded object-cover bg-muted"
-                                      style={{ display: "none" }}
-                                      onLoad={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        const parent = target.parentElement;
-                                        if (parent) {
-                                          const skeleton = parent.querySelector(".loading-skeleton");
-                                          const fallback = parent.querySelector(".error-fallback");
-                                          if (skeleton) (skeleton as HTMLElement).style.display = "none";
-                                          if (fallback) (fallback as HTMLElement).style.display = "none";
-                                        }
-                                        target.style.display = "block";
-                                      }}
+                                      className="h-10 w-10 rounded object-cover bg-muted opacity-0 transition-opacity duration-300"
+                                      width={40}
+                                      height={40}
                                       onError={(e) => {
                                         const target = e.target as HTMLImageElement;
                                         const parent = target.parentElement;
                                         if (parent) {
-                                          const skeleton = parent.querySelector(".loading-skeleton");
-                                          const fallback = parent.querySelector(".error-fallback");
-                                          if (skeleton) (skeleton as HTMLElement).style.display = "none";
-                                          if (fallback) (fallback as HTMLElement).style.display = "flex";
+                                          const skeleton =
+                                            parent.querySelector(
+                                              ".loading-skeleton",
+                                            );
+                                          const fallback =
+                                            parent.querySelector(
+                                              ".error-fallback",
+                                            );
+                                          if (skeleton)
+                                            (
+                                              skeleton as HTMLElement
+                                            ).style.display = "none";
+                                          if (fallback)
+                                            (
+                                              fallback as HTMLElement
+                                            ).style.display = "flex";
                                         }
+                                      }}
+                                      onLoad={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        const parent = target.parentElement;
+                                        if (parent) {
+                                          const skeleton =
+                                            parent.querySelector(
+                                              ".loading-skeleton",
+                                            );
+                                          const fallback =
+                                            parent.querySelector(
+                                              ".error-fallback",
+                                            );
+                                          if (skeleton)
+                                            (
+                                              skeleton as HTMLElement
+                                            ).style.display = "none";
+                                          if (fallback)
+                                            (
+                                              fallback as HTMLElement
+                                            ).style.display = "none";
+                                        }
+                                        target.style.opacity = "1";
                                       }}
                                     />
                                     <div className="loading-skeleton absolute inset-0 h-10 w-10 rounded">
@@ -747,9 +782,9 @@ function InstallationDetailContent({
                 <AlertDialogCancel>{t("admin.cancel")}</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleDeleteInstallation}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  className="bg-destructive hover:bg-destructive/90"
                 >
-                  {t("admin.confirmDelete")}
+                  {t("admin.installations.deleteInstallation")}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

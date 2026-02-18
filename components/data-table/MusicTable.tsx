@@ -42,6 +42,7 @@ import { useGenres } from "@/hooks/use-genres";
 import type { ProviderMusic, PaginatedResponse } from "@/types";
 import { DifficultyMedal } from "@/components/ui/difficulty-medal";
 import { InstrumentIcon } from "@/components/ui/instrument-icon";
+import Image from "next/image";
 import {
   MultiSelect,
   MultiSelectContent,
@@ -67,7 +68,7 @@ interface MusicTableProps {
   onSongSelect?: (song: ProviderMusic) => void;
 }
 
-const INSTRUMENTS = ["bass", "guitar", "drums", "vocals", "keys"] as const;
+const INSTRUMENTS = ["guitar", "bass", "drums", "vocals", "keys"] as const;
 
 // Hoist static JSX to prevent recreation on every render
 const LoadingSkeleton = () =>
@@ -616,12 +617,13 @@ export default function MusicTable({
                     <div className="relative h-8 w-8 sm:h-12 sm:w-12 rounded">
                       {music.coverUrl ? (
                         <>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
+                          <Image
                             src={music.coverUrl}
                             alt={music.name}
-                            className="h-8 w-8 sm:h-12 sm:w-12 rounded object-cover bg-muted"
-                            style={{ display: "none" }}
+                            className="h-8 w-8 sm:h-12 sm:w-12 rounded object-cover bg-muted opacity-0 transition-opacity duration-300"
+                            width={48}
+                            height={48}
+                            sizes="(max-width: 640px) 32px, 48px"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
                               const parent = target.parentElement;
@@ -657,7 +659,7 @@ export default function MusicTable({
                                     "none";
                                 }
                               }
-                              target.style.display = "block";
+                              target.style.opacity = "1";
                             }}
                           />
                           {/* Loading skeleton - shown while image is loading */}
@@ -687,12 +689,13 @@ export default function MusicTable({
                       <div className="relative h-8 w-8 sm:h-12 sm:w-12 rounded shrink-0 sm:hidden">
                         {music.coverUrl ? (
                           <>
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
+                            <Image
                               src={music.coverUrl}
                               alt={music.name}
-                              className="h-8 w-8 rounded object-cover bg-muted"
-                              style={{ display: "none" }}
+                              className="h-8 w-8 rounded object-cover bg-muted opacity-0 transition-opacity duration-300"
+                              width={32}
+                              height={32}
+                              sizes="32px"
                               onError={(e) => {
                                 const target = e.target as HTMLImageElement;
                                 const parent = target.parentElement;
@@ -728,7 +731,7 @@ export default function MusicTable({
                                       "none";
                                   }
                                 }
-                                target.style.display = "block";
+                                target.style.opacity = "1";
                               }}
                             />
                             {/* Loading skeleton - shown while image is loading */}

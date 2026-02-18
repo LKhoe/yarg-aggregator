@@ -21,7 +21,7 @@ export function SignupForm() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isSpotifyLoading, setIsSpotifyLoading] = useState(false);
 
-  const handleEmailSignup = async (e: React.FormEvent) => {
+  const handleEmailSignup = async (e: React.SubmitEvent) => {
     e.preventDefault();
 
     if (password !== confirmPassword) {

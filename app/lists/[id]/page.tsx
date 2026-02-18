@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { ArrowLeft, Heart, Trash2, Globe, Lock, Download } from "lucide-react";
+import { ArrowLeft, Heart, Trash2, Globe, Lock, Download, Music } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import Link from "next/link";
 import Image from "next/image";
@@ -168,8 +168,8 @@ function ListDetailContent({ params }: { params: Promise<{ id: string }> }) {
 
   const downloadUrls = list
     ? list.items
-        .filter((item) => item.song.downloadUrls.length > 0)
-        .map((item) => item.song.downloadUrls[0].url)
+      .filter((item) => item.song.downloadUrls.length > 0)
+      .map((item) => item.song.downloadUrls[0].url)
     : [];
 
   const handleDownloadAll = async () => {
@@ -365,15 +365,69 @@ function ListDetailContent({ params }: { params: Promise<{ id: string }> }) {
                   className="flex items-center justify-between p-3 border rounded-lg"
                 >
                   <div className="flex items-center gap-3">
-                    {item.song.albumImageUrl && (
-                      <Image
-                        src={item.song.albumImageUrl}
-                        alt={item.song.title}
-                        className="h-10 w-10 rounded object-cover"
-                        width={40}
-                        height={40}
-                      />
-                    )}
+                    <div className="relative h-10 w-10 shrink-0">
+                      {item.song.albumImageUrl ? (
+                        <>
+                          <Image
+                            src={item.song.albumImageUrl}
+                            alt={item.song.title}
+                            className="h-10 w-10 rounded object-cover bg-muted opacity-0 transition-opacity duration-300"
+                            width={40}
+                            height={40}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              const parent = target.parentElement;
+                              if (parent) {
+                                const skeleton =
+                                  parent.querySelector(".loading-skeleton");
+                                const fallback =
+                                  parent.querySelector(".error-fallback");
+                                if (skeleton) {
+                                  (skeleton as HTMLElement).style.display =
+                                    "none";
+                                }
+                                if (fallback) {
+                                  (fallback as HTMLElement).style.display =
+                                    "flex";
+                                }
+                              }
+                            }}
+                            onLoad={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              const parent = target.parentElement;
+                              if (parent) {
+                                const skeleton =
+                                  parent.querySelector(".loading-skeleton");
+                                const fallback =
+                                  parent.querySelector(".error-fallback");
+                                if (skeleton) {
+                                  (skeleton as HTMLElement).style.display =
+                                    "none";
+                                }
+                                if (fallback) {
+                                  (fallback as HTMLElement).style.display =
+                                    "none";
+                                }
+                              }
+                              target.style.opacity = "1";
+                            }}
+                          />
+                          <div className="loading-skeleton absolute inset-0 h-10 w-10 rounded">
+                            <Skeleton className="h-full w-full rounded" />
+                          </div>
+                          <div
+                            className="error-fallback absolute inset-0 h-10 w-10 rounded bg-muted flex items-center justify-center"
+                            style={{ display: "none" }}
+                          >
+                            <Music className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
+                          <Music className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
                     <div>
                       <p className="font-medium">{item.song.title}</p>
                       <p className="text-sm text-muted-foreground">

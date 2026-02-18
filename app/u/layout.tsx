@@ -8,12 +8,10 @@ export default function ProfileLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-linear-to-br from-background via-background to-primary/10">
+    <div className="min-h-screen bg-background text-foreground">
       <BackgroundOrbs />
       <Header />
-      <main className="container mx-auto px-4 py-8 relative z-10">
-        {children}
-      </main>
+      <main className="container mx-auto px-4 py-8">{children}</main>
       <Footer />
     </div>
   );

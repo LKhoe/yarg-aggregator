@@ -46,6 +46,7 @@ export async function GET(
           name: item.song.title,
           artist: item.song.artist.name,
           album: item.song.album?.name ?? null,
+          albumImageUrl: item.song.albumImageUrl,
           addedAt: item.addedAt,
           downloadUrls: item.song.downloadUrls,
         })),

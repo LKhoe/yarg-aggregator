@@ -28,6 +28,7 @@ import {
   CollapsibleTrigger,
   CollapsibleContent,
 } from "@/components/ui/collapsible";
+import Image from "next/image";
 import { Skeleton } from "@/components/ui/skeleton";
 import PlatformLinks from "./PlatformLinks";
 import SongLyrics from "./SongLyrics";
@@ -60,12 +61,12 @@ export default function SongDetail({ song, onClose }: SongDetailProps) {
           <div className="relative h-20 w-20 rounded-lg overflow-hidden shrink-0">
             {song.coverUrl ? (
               <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   src={song.coverUrl}
                   alt={song.name}
-                  className="h-full w-full object-cover bg-muted"
-                  style={{ display: "none" }}
+                  className="h-full w-full object-cover bg-muted opacity-0 transition-opacity duration-300"
+                  fill
+                  sizes="80px"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     const parent = target.parentElement;
@@ -93,7 +94,7 @@ export default function SongDetail({ song, onClose }: SongDetailProps) {
                         (fallback as HTMLElement).style.display = "none";
                       }
                     }
-                    target.style.display = "block";
+                    target.style.opacity = "1";
                   }}
                 />
                 {/* Loading skeleton - shown while image is loading */}

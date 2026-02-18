@@ -160,7 +160,10 @@ function InstallationsContent() {
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+                      <Badge
+                        variant="secondary"
+                        className="flex items-center gap-1 w-fit"
+                      >
                         <Music className="h-3 w-3" />
                         {inst.songCount}
                       </Badge>
@@ -194,9 +197,9 @@ function InstallationsContent() {
                             </AlertDialogCancel>
                             <AlertDialogAction
                               onClick={() => handleDelete(inst.id)}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              className="bg-destructive hover:bg-destructive/90"
                             >
-                              {t("admin.confirmDelete")}
+                              {t("admin.installations.deleteInstallation")}
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
