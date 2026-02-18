@@ -135,73 +135,6 @@
       "copiedPaths": "{count} caminhos copiados para a área de transferência"
     }
   },
-  "provider": {
-    "title": "Controle de Provedores",
-    "description": "Buscar partituras musicais do Enchor.us e Rhythmverse",
-    "uploadStatus": "Status do Upload",
-    "fetchStatus": "Status do Fetch",
-    "uploadProgress": "Progresso do Upload",
-    "source": "Fonte",
-    "phase": "Fase",
-    "clear": "Limpar",
-    "stats": {
-      "added": "Adicionado",
-      "updated": "Atualizado",
-      "ignored": "Ignorado"
-    },
-    "uploadCompleted": "Upload concluído! Adicionado: {added}, Atualizado: {updated}, Ignorado: {ignored}",
-    "uploadFailed": "Falha no upload: {error}",
-    "phases": {
-      "running": "Executando",
-      "fetching": "Buscando",
-      "processing": "Processando",
-      "saving": "Salvando músicas",
-      "completed": "Concluído",
-      "failed": "Falhou",
-      "uploading": "Enviando arquivo",
-      "deduplicating songs": "Deduplicando músicas",
-      "fetching existing songs": "Buscando músicas existentes",
-      "pre-resolving metadata": "Pré-resolvendo metadados",
-      "building transactions": "Construindo transações",
-      "saving songs": "Salvando músicas",
-      "noDetailsAvailable": "Nenhum detalhe disponível"
-    },
-    "reasons": {
-      "less than 4 instruments": "Menos de 4 instrumentos",
-      "existing version has more instruments": "Versão existente tem mais instrumentos",
-      "no changes needed": "Nenhuma alteração necessária"
-    },
-    "status": {
-      "fetched": "Página {page} - {count} músicas buscadas",
-      "running": "Executando",
-      "starting": "Iniciando"
-    },
-    "songs": "músicas",
-    "never": "Nunca buscado",
-    "fetchFromApi": "Buscar da API",
-    "uploadZip": "Enviar ZIP"
-  },
-  "community": {
-    "title": "Comunidade",
-    "searchPlaceholder": "Buscar usuários...",
-    "noUsersFound": "Nenhum usuário encontrado",
-    "joined": "Entrou em {date}"
-  },
-  "songActions": {
-    "addedToFavorites": "Adicionado aos favoritos",
-    "removedFromFavorites": "Removido dos favoritos",
-    "failedToUpdateFavorites": "Falha ao atualizar favoritos",
-    "addedToList": "Adicionado a {listName}",
-    "failedToAddToList": "Falha ao adicionar a {listName}",
-    "removeFromFavorites": "Remover dos favoritos",
-    "addToFavorites": "Adicionar aos favoritos",
-    "addToList": "Adicionar à lista"
-  },
-  "installationSelector": {
-    "selectPlaceholder": "Selecione a instalação...",
-    "loading": "Carregando...",
-    "noInstallation": "Nenhuma instalação"
-  },
   "auth": {
     "login": {
       "title": "Entrar",
@@ -278,6 +211,58 @@
       "generic": "Algo deu errado. Por favor, tente novamente."
     }
   },
+  "provider": {
+    "title": "Controle de Provedores",
+    "description": "Buscar partituras musicais do Enchor.us e Rhythmverse",
+    "uploadStatus": "Status do Upload",
+    "fetchStatus": "Status do Fetch",
+    "uploadProgress": "Progresso do Upload",
+    "source": "Fonte",
+    "phase": "Fase",
+    "clear": "Limpar",
+    "stats": {
+      "added": "Adicionado",
+      "updated": "Atualizado",
+      "ignored": "Ignorado"
+    },
+    "uploadCompleted": "Upload concluído! Adicionado: {added}, Atualizado: {updated}, Ignorado: {ignored}",
+    "uploadFailed": "Falha no upload: {error}",
+    "phases": {
+      "running": "Executando",
+      "fetching": "Buscando",
+      "processing": "Processando",
+      "saving": "Salvando músicas",
+      "completed": "Concluído",
+      "failed": "Falhou",
+      "uploading": "Enviando arquivo",
+      "deduplicating songs": "Deduplicando músicas",
+      "fetching existing songs": "Buscando músicas existentes",
+      "pre-resolving metadata": "Pré-resolvendo metadados",
+      "building transactions": "Construindo transações",
+      "saving songs": "Salvando músicas",
+      "noDetailsAvailable": "Nenhum detalhe disponível"
+    },
+    "reasons": {
+      "less than 4 instruments": "Menos de 4 instrumentos",
+      "existing version has more instruments": "Versão existente tem mais instrumentos",
+      "no changes needed": "Nenhuma alteração necessária"
+    },
+    "status": {
+      "fetched": "Página {page} - {count} músicas buscadas",
+      "running": "Executando",
+      "starting": "Iniciando"
+    },
+    "songs": "músicas",
+    "never": "Nunca buscado",
+    "fetchFromApi": "Buscar da API",
+    "uploadZip": "Enviar ZIP"
+  },
+  "community": {
+    "title": "Comunidade",
+    "searchPlaceholder": "Buscar usuários...",
+    "noUsersFound": "Nenhum usuário encontrado",
+    "joined": "Entrou em {date}"
+  },
   "profile": {
     "viewProfile": "Ver Perfil",
     "myLists": "Minhas Listas",
@@ -323,6 +308,16 @@
     "noPublicLists": "Este usuário não tem listas públicas.",
     "backToProfile": "Voltar ao Perfil"
   },
+  "songActions": {
+    "addedToFavorites": "Adicionado aos favoritos",
+    "removedFromFavorites": "Removido dos favoritos",
+    "failedToUpdateFavorites": "Falha ao atualizar favoritos",
+    "addedToList": "Adicionado a {listName}",
+    "failedToAddToList": "Falha ao adicionar a {listName}",
+    "removeFromFavorites": "Remover dos favoritos",
+    "addToFavorites": "Adicionar aos favoritos",
+    "addToList": "Adicionar à lista"
+  },
   "lists": {
     "myLists": "Minhas Listas",
     "myListsDescription": "Organize suas músicas favoritas em listas personalizadas.",
@@ -340,8 +335,8 @@
     "noLists": "Você ainda não criou nenhuma lista.",
     "public": "Pública",
     "private": "Privada",
-    "song": "música",
-    "songs": "músicas",
+    "song": "Música",
+    "songs": "Músicas",
     "listSettings": "Configurações da Lista",
     "listSettingsDescription": "Atualize o nome e a visibilidade da sua lista.",
     "favoritesCannotRename": "A lista de Favoritos não pode ser renomeada.",
@@ -372,6 +367,11 @@
     "downloadAllBlocked": "Popups bloqueados. Permita popups para este site e tente novamente.",
     "downloadAllNoLinks": "Algumas músicas não possuem links de download",
     "confirm": "Confirmar"
+  },
+  "installationSelector": {
+    "selectPlaceholder": "Selecione a instalação...",
+    "loading": "Carregando...",
+    "noInstallation": "Nenhuma instalação"
   },
   "admin": {
     "dashboard": "Painel Admin",

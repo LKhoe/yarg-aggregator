@@ -135,73 +135,6 @@
       "copiedPaths": "Copied {count} paths to clipboard"
     }
   },
-  "provider": {
-    "title": "Provider Control",
-    "description": "Fetch music charts from Enchor.us and Rhythmverse",
-    "uploadStatus": "Upload Status",
-    "fetchStatus": "Fetch Status",
-    "uploadProgress": "Upload Progress",
-    "source": "Source",
-    "phase": "Phase",
-    "clear": "Clear",
-    "stats": {
-      "added": "Added",
-      "updated": "Updated",
-      "ignored": "Ignored"
-    },
-    "uploadCompleted": "Upload completed! Added: {added}, Updated: {updated}, Ignored: {ignored}",
-    "uploadFailed": "Upload failed: {error}",
-    "phases": {
-      "running": "Running",
-      "fetching": "Fetching",
-      "processing": "Processing",
-      "saving": "Saving songs",
-      "completed": "Completed",
-      "failed": "Failed",
-      "uploading": "Uploading file",
-      "deduplicating songs": "Deduplicating songs",
-      "fetching existing songs": "Fetching existing songs",
-      "pre-resolving metadata": "Pre-resolving metadata",
-      "building transactions": "Building transactions",
-      "saving songs": "Saving songs",
-      "noDetailsAvailable": "No details available"
-    },
-    "reasons": {
-      "less than 4 instruments": "Less than 4 instruments",
-      "existing version has more instruments": "Existing version has more instruments",
-      "no changes needed": "No changes needed"
-    },
-    "status": {
-      "fetched": "Page {page} - {count} songs fetched",
-      "running": "Running",
-      "starting": "Starting"
-    },
-    "songs": "songs",
-    "never": "Never fetched",
-    "fetchFromApi": "Fetch from API",
-    "uploadZip": "Upload ZIP"
-  },
-  "community": {
-    "title": "Community",
-    "searchPlaceholder": "Search users...",
-    "noUsersFound": "No users found",
-    "joined": "Joined {date}"
-  },
-  "songActions": {
-    "addedToFavorites": "Added to favorites",
-    "removedFromFavorites": "Removed from favorites",
-    "failedToUpdateFavorites": "Failed to update favorites",
-    "addedToList": "Added to {listName}",
-    "failedToAddToList": "Failed to add to {listName}",
-    "removeFromFavorites": "Remove from favorites",
-    "addToFavorites": "Add to favorites",
-    "addToList": "Add to list"
-  },
-  "installationSelector": {
-    "selectPlaceholder": "Select installation...",
-    "loading": "Loading...",
-    "noInstallation": "No installation"
-  },
   "auth": {
     "login": {
       "title": "Sign In",
@@ -278,6 +211,58 @@
       "generic": "Something went wrong. Please try again."
     }
   },
+  "provider": {
+    "title": "Provider Control",
+    "description": "Fetch music charts from Enchor.us and Rhythmverse",
+    "uploadStatus": "Upload Status",
+    "fetchStatus": "Fetch Status",
+    "uploadProgress": "Upload Progress",
+    "source": "Source",
+    "phase": "Phase",
+    "clear": "Clear",
+    "stats": {
+      "added": "Added",
+      "updated": "Updated",
+      "ignored": "Ignored"
+    },
+    "uploadCompleted": "Upload completed! Added: {added}, Updated: {updated}, Ignored: {ignored}",
+    "uploadFailed": "Upload failed: {error}",
+    "phases": {
+      "running": "Running",
+      "fetching": "Fetching",
+      "processing": "Processing",
+      "saving": "Saving songs",
+      "completed": "Completed",
+      "failed": "Failed",
+      "uploading": "Uploading file",
+      "deduplicating songs": "Deduplicating songs",
+      "fetching existing songs": "Fetching existing songs",
+      "pre-resolving metadata": "Pre-resolving metadata",
+      "building transactions": "Building transactions",
+      "saving songs": "Saving songs",
+      "noDetailsAvailable": "No details available"
+    },
+    "reasons": {
+      "less than 4 instruments": "Less than 4 instruments",
+      "existing version has more instruments": "Existing version has more instruments",
+      "no changes needed": "No changes needed"
+    },
+    "status": {
+      "fetched": "Page {page} - {count} songs fetched",
+      "running": "Running",
+      "starting": "Starting"
+    },
+    "songs": "songs",
+    "never": "Never fetched",
+    "fetchFromApi": "Fetch from API",
+    "uploadZip": "Upload ZIP"
+  },
+  "community": {
+    "title": "Community",
+    "searchPlaceholder": "Search users...",
+    "noUsersFound": "No users found",
+    "joined": "Joined {date}"
+  },
   "profile": {
     "viewProfile": "View Profile",
     "myLists": "My Lists",
@@ -323,6 +308,16 @@
     "noPublicLists": "This user has no public lists.",
     "backToProfile": "Back to Profile"
   },
+  "songActions": {
+    "addedToFavorites": "Added to favorites",
+    "removedFromFavorites": "Removed from favorites",
+    "failedToUpdateFavorites": "Failed to update favorites",
+    "addedToList": "Added to {listName}",
+    "failedToAddToList": "Failed to add to {listName}",
+    "removeFromFavorites": "Remove from favorites",
+    "addToFavorites": "Add to favorites",
+    "addToList": "Add to list"
+  },
   "lists": {
     "myLists": "My Lists",
     "myListsDescription": "Organize your favorite songs into custom lists.",
@@ -340,8 +335,8 @@
     "noLists": "You haven't created any lists yet.",
     "public": "Public",
     "private": "Private",
-    "song": "song",
-    "songs": "songs",
+    "song": "Song",
+    "songs": "Songs",
     "listSettings": "List Settings",
     "listSettingsDescription": "Update your list name and visibility.",
     "favoritesCannotRename": "The Favorites list cannot be renamed.",
@@ -372,6 +367,11 @@
     "downloadAllBlocked": "Popups blocked. Please allow popups for this site and try again.",
     "downloadAllNoLinks": "Some songs don't have download links",
     "confirm": "Confirm"
+  },
+  "installationSelector": {
+    "selectPlaceholder": "Select installation...",
+    "loading": "Loading...",
+    "noInstallation": "No installation"
   },
   "admin": {
     "dashboard": "Admin Dashboard",
