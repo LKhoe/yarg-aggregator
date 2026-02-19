@@ -55,7 +55,7 @@ function ListsContent() {
   // Handle OAuth callback redirect with ?import=provider
   useEffect(() => {
     const provider = searchParams.get("import");
-    if (provider === "spotify" || provider === "google") {
+    if (provider === "spotify" || provider === "google" || provider === "lastfm") {
       setImportProvider(provider);
       setIsImportOpen(true);
       // Clean up URL

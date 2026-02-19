@@ -20,6 +20,7 @@ export function LoginForm() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isSpotifyLoading, setIsSpotifyLoading] = useState(false);
   const [isAppleLoading, setIsAppleLoading] = useState(false);
+  const [isLastfmLoading, setIsLastfmLoading] = useState(false);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,6 +88,11 @@ export function LoginForm() {
     }
   };
 
+  const handleLastfmLogin = () => {
+    setIsLastfmLoading(true);
+    window.location.href = "/api/auth/lastfm/signin";
+  };
+
   return (
     <div className="w-full max-w-md space-y-6">
       <div className="text-center">
@@ -125,6 +131,13 @@ export function LoginForm() {
           disabled={isAppleLoading}
           isLoading={isAppleLoading}
           invertOnDark
+        />
+        <SocialProviderButton
+          logos={[{ src: "/social-providers/lastfm.svg", alt: "Last.fm" }]}
+          label={t("auth.login.lastfmButton")}
+          onClick={handleLastfmLogin}
+          disabled={isLastfmLoading}
+          isLoading={isLastfmLoading}
         />
       </div>
 

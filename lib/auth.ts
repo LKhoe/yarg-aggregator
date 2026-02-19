@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { userProfile, songList } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { createSign } from "crypto";
+import { lastfmPlugin } from "@ley0x/better-auth-lastfm";
 
 /**
  * Generate an Apple client secret JWT signed with the ES256 private key.
@@ -81,6 +82,18 @@ export const auth = betterAuth({
       trustedProviders: ["google", "spotify", "apple"],
     },
   },
+
+  plugins: [
+    ...(process.env.LASTFM_API_KEY && process.env.LASTFM_API_SECRET
+      ? [
+          lastfmPlugin({
+            apiKey: process.env.LASTFM_API_KEY,
+            sharedSecret: process.env.LASTFM_API_SECRET,
+            redirectTo: "/",
+          }),
+        ]
+      : []),
+  ],
 
   databaseHooks: {
     user: {

@@ -7,6 +7,7 @@ const REQUIRED_SCOPES: Record<string, string[]> = {
   google: ["https://www.googleapis.com/auth/youtube.readonly"],
   spotify: ["playlist-read-private", "playlist-read-collaborative"],
   apple: [], // No OAuth scopes — just needs a stored music user token
+  lastfm: [], // No OAuth scopes — session key stored in accessToken
 };
 
 const TOKEN_ENDPOINTS: Record<string, string> = {
@@ -89,12 +90,22 @@ export function hasRequiredScopes(
   return required.every((scope) => granted.includes(scope));
 }
 
+export async function getLastfmUsername(userId: string): Promise<string | null> {
+  const acc = await getLinkedAccount(userId, "lastfm");
+  return acc?.accountId ?? null;
+}
+
 export async function getValidAccessToken(
   userId: string,
   providerId: string,
 ): Promise<string | null> {
   const acc = await getLinkedAccount(userId, providerId);
   if (!acc || !acc.accessToken) return null;
+
+  // No expiry set — token doesn't expire (e.g. Last.fm session keys)
+  if (!acc.accessTokenExpiresAt) {
+    return acc.accessToken;
+  }
 
   // Check if token is still valid (with 5-minute buffer)
   if (acc.accessTokenExpiresAt) {

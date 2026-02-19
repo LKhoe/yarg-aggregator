@@ -22,6 +22,7 @@ export function SignupForm() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isSpotifyLoading, setIsSpotifyLoading] = useState(false);
   const [isAppleLoading, setIsAppleLoading] = useState(false);
+  const [isLastfmLoading, setIsLastfmLoading] = useState(false);
 
   const handleEmailSignup = async (e: React.SubmitEvent) => {
     e.preventDefault();
@@ -134,6 +135,11 @@ export function SignupForm() {
     }
   };
 
+  const handleLastfmSignup = () => {
+    setIsLastfmLoading(true);
+    window.location.href = "/api/auth/lastfm/signin";
+  };
+
   return (
     <div className="w-full max-w-md space-y-6">
       <div className="text-center">
@@ -174,6 +180,13 @@ export function SignupForm() {
           disabled={isAppleLoading}
           isLoading={isAppleLoading}
           invertOnDark
+        />
+        <SocialProviderButton
+          logos={[{ src: "/social-providers/lastfm.svg", alt: "Last.fm" }]}
+          label={t("auth.signup.lastfmButton")}
+          onClick={handleLastfmSignup}
+          disabled={isLastfmLoading}
+          isLoading={isLastfmLoading}
         />
       </div>
 

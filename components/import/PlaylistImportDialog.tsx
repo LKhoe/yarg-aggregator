@@ -58,6 +58,7 @@ import {
   ArrowRight,
   Loader2,
   ExternalLink,
+  Tag,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -66,6 +67,7 @@ interface ProviderAccount {
   provider: string;
   linked: boolean;
   hasScopes: boolean;
+  username: string | null;
 }
 
 interface Playlist {
@@ -113,7 +115,10 @@ const PROVIDER_PLATFORM_ICON: Record<string, string> = {
   google: "/social-providers/youtube-music.svg",
   spotify: "/social-providers/spotify.svg",
   apple: "/social-providers/apple-music.svg",
+  lastfm: "/social-providers/lastfm.svg",
 };
+
+const LASTFM_USERNAME_KEY = "lastfm_import_username";
 
 export function PlaylistImportDialog({
   open,
@@ -155,6 +160,15 @@ export function PlaylistImportDialog({
   // Apple Music MusicKit state
   const [appleMusicConnecting, setAppleMusicConnecting] = useState(false);
 
+  // Last.fm state
+  const [lastfmUsername, setLastfmUsername] = useState<string>("");
+  const [lastfmUsernameInput, setLastfmUsernameInput] = useState<string>("");
+  const [showLastfmInput, setShowLastfmInput] = useState(false);
+
+  // Last.fm Personal Tags state
+  const [showTagInput, setShowTagInput] = useState(false);
+  const [tagInputValue, setTagInputValue] = useState("");
+
   // Fetch linked accounts
   const fetchAccounts = useCallback(async () => {
     setAccountsLoading(true);
@@ -163,6 +177,17 @@ export function PlaylistImportDialog({
       if (res.ok) {
         const data = await res.json();
         setAccounts(data);
+
+        // Pre-fill Last.fm username from linked account or localStorage
+        const lastfmAcc = data.find(
+          (a: ProviderAccount) => a.provider === "lastfm",
+        );
+        if (lastfmAcc?.username) {
+          setLastfmUsername(lastfmAcc.username);
+        } else {
+          const stored = localStorage.getItem(LASTFM_USERNAME_KEY);
+          if (stored) setLastfmUsername(stored);
+        }
       }
     } catch {
       toast.error(t("import.error"));
@@ -205,8 +230,14 @@ export function PlaylistImportDialog({
   const fetchPlaylists = async (provider: string) => {
     setPlaylistsLoading(true);
     setPlaylists([]);
+    setShowTagInput(false);
+    setTagInputValue("");
     try {
-      const res = await fetch(`/api/import/playlists?provider=${provider}`);
+      const url =
+        provider === "lastfm"
+          ? `/api/import/playlists?provider=${provider}&username=${encodeURIComponent(lastfmUsername)}`
+          : `/api/import/playlists?provider=${provider}`;
+      const res = await fetch(url);
       if (res.status === 401) {
         const data = await res.json();
         if (data.error === "reauth_required") {
@@ -242,6 +273,18 @@ export function PlaylistImportDialog({
     const acc = accounts.find((a) => a.provider === provider);
     if (!acc) return;
 
+    // Last.fm: check if we have a username, else show username input
+    if (provider === "lastfm") {
+      if (lastfmUsername) {
+        setSelectedProvider(provider);
+        setStep(2);
+      } else {
+        setShowLastfmInput(true);
+        setLastfmUsernameInput("");
+      }
+      return;
+    }
+
     if (!acc.linked || !acc.hasScopes) {
       if (provider === "apple") {
         handleAppleMusicConnect();
@@ -259,20 +302,41 @@ export function PlaylistImportDialog({
     setStep(2);
   };
 
+  const handleLastfmUsernameConfirm = () => {
+    const trimmed = lastfmUsernameInput.trim();
+    if (!trimmed) return;
+    setLastfmUsername(trimmed);
+    localStorage.setItem(LASTFM_USERNAME_KEY, trimmed);
+    setShowLastfmInput(false);
+    setSelectedProvider("lastfm");
+    setStep(2);
+  };
+
   const handlePlaylistSelect = async (playlist: Playlist) => {
+    // Special handling for Last.fm "Personal Tags" — needs a tag name
+    if (selectedProvider === "lastfm" && playlist.id === "tags") {
+      setShowTagInput(true);
+      return;
+    }
+
     setSelectedPlaylist(playlist);
     setListName(playlist.name);
     setMatchLoading(true);
     setStep(3);
 
     try {
+      const body: Record<string, unknown> = {
+        provider: selectedProvider,
+        playlistId: playlist.id,
+      };
+      if (selectedProvider === "lastfm") {
+        body.lastfmUsername = lastfmUsername;
+      }
+
       const res = await fetch("/api/import/match", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          provider: selectedProvider,
-          playlistId: playlist.id,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (res.status === 401) {
@@ -300,6 +364,19 @@ export function PlaylistImportDialog({
     } finally {
       setMatchLoading(false);
     }
+  };
+
+  const handleTagConfirm = () => {
+    const tag = tagInputValue.trim();
+    if (!tag) return;
+    handlePlaylistSelect({
+      id: `tags:${tag}`,
+      name: `${t("import.personalTags")}: ${tag}`,
+      imageUrl: null,
+      trackCount: 0,
+    });
+    setShowTagInput(false);
+    setTagInputValue("");
   };
 
   const toggleSong = (songId: string) => {
@@ -370,6 +447,10 @@ export function PlaylistImportDialog({
     setImportedListId(null);
     setImportedCount(0);
     setAppleMusicConnecting(false);
+    setShowLastfmInput(false);
+    setLastfmUsernameInput("");
+    setShowTagInput(false);
+    setTagInputValue("");
   };
 
   const handleOpenChange = (newOpen: boolean) => {
@@ -382,6 +463,7 @@ export function PlaylistImportDialog({
   const providerLabel = (provider: string) => {
     if (provider === "spotify") return t("import.spotify");
     if (provider === "google") return t("import.youtube");
+    if (provider === "lastfm") return t("import.lastfm");
     return t("import.appleMusic");
   };
 
@@ -436,9 +518,19 @@ export function PlaylistImportDialog({
   }, [fetchAccounts, t]);
 
   const getProviderStatus = (acc: ProviderAccount) => {
+    if (acc.provider === "lastfm") {
+      return lastfmUsername ? "ready" : "notLinked";
+    }
     if (!acc.linked) return "notLinked";
     if (!acc.hasScopes) return "missingScopes";
     return "ready";
+  };
+
+  const getLastfmCollectionLabel = (id: string) => {
+    if (id === "loved") return t("import.lovedTracks");
+    if (id === "recent") return t("import.recentTracks");
+    if (id === "tags") return t("import.personalTags");
+    return id;
   };
 
   return (
@@ -496,57 +588,135 @@ export function PlaylistImportDialog({
                     const status = getProviderStatus(acc);
                     const isConnecting =
                       acc.provider === "apple" && appleMusicConnecting;
+                    const isLastfm = acc.provider === "lastfm";
                     return (
-                      <button
-                        key={acc.provider}
-                        onClick={() => handleProviderSelect(acc.provider)}
-                        disabled={isConnecting}
-                        className={`w-full flex items-center gap-4 p-4 rounded-lg border transition-colors text-left ${
-                          status === "ready"
-                            ? "hover:border-primary/50 cursor-pointer"
-                            : "hover:border-primary/30 cursor-pointer"
-                        } disabled:opacity-60 disabled:cursor-not-allowed`}
-                      >
-                        <Image
-                          key={PROVIDER_PLATFORM_ICON[acc.provider]}
-                          src={PROVIDER_PLATFORM_ICON[acc.provider]}
-                          alt={acc.provider}
-                          width={20}
-                          height={20}
-                          className="h-5 w-5 object-contain"
-                        />
-                        <div className="flex-1">
-                          <div className="font-medium">
-                            {providerLabel(acc.provider)}
+                      <div key={acc.provider}>
+                        <button
+                          onClick={() => handleProviderSelect(acc.provider)}
+                          disabled={isConnecting}
+                          className={`w-full flex items-center gap-4 p-4 rounded-lg border transition-colors text-left ${
+                            status === "ready"
+                              ? "hover:border-primary/50 cursor-pointer"
+                              : "hover:border-primary/30 cursor-pointer"
+                          } disabled:opacity-60 disabled:cursor-not-allowed`}
+                        >
+                          <Image
+                            key={PROVIDER_PLATFORM_ICON[acc.provider]}
+                            src={PROVIDER_PLATFORM_ICON[acc.provider]}
+                            alt={acc.provider}
+                            width={20}
+                            height={20}
+                            className="h-5 w-5 object-contain"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium">
+                              {providerLabel(acc.provider)}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {isLastfm && lastfmUsername
+                                ? `@${lastfmUsername}`
+                                : status === "notLinked" &&
+                                    t("import.notLinked")}
+                              {status === "missingScopes" &&
+                                t("import.missingScopes")}
+                              {status === "ready" &&
+                                !isLastfm &&
+                                t("import.ready")}
+                            </div>
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            {status === "notLinked" && t("import.notLinked")}
-                            {status === "missingScopes" &&
-                              t("import.missingScopes")}
-                            {status === "ready" && t("import.ready")}
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isConnecting ? (
+                              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                            ) : status === "ready" ? (
+                              <>
+                                <Check className="h-5 w-5 text-green-500" />
+                                {isLastfm && (
+                                  <span
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setLastfmUsernameInput(lastfmUsername);
+                                      setShowLastfmInput(true);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" || e.key === " ") {
+                                        e.stopPropagation();
+                                        setLastfmUsernameInput(lastfmUsername);
+                                        setShowLastfmInput(true);
+                                      }
+                                    }}
+                                    className="text-xs text-muted-foreground hover:text-primary cursor-pointer underline underline-offset-2"
+                                  >
+                                    {t("import.changeUsername")}
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-sm text-primary">
+                                {isLastfm
+                                  ? t("import.enterUsername")
+                                  : status === "notLinked"
+                                    ? t("import.connect")
+                                    : t("import.reauthorize")}
+                              </span>
+                            )}
                           </div>
-                        </div>
-                        <div>
-                          {isConnecting ? (
-                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                          ) : status === "ready" ? (
-                            <Check className="h-5 w-5 text-green-500" />
-                          ) : (
-                            <span className="text-sm text-primary">
-                              {status === "notLinked"
-                                ? t("import.connect")
-                                : t("import.reauthorize")}
-                            </span>
-                          )}
-                        </div>
-                      </button>
+                        </button>
+
+                        {/* Inline Last.fm username input */}
+                        {isLastfm && showLastfmInput && (
+                          <div className="mt-2 p-3 rounded-lg border bg-muted/30 space-y-2">
+                            <Label className="text-sm font-medium">
+                              {t("import.enterLastfmUsername")}
+                            </Label>
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder={t(
+                                  "import.lastfmUsernamePlaceholder",
+                                )}
+                                value={lastfmUsernameInput}
+                                onChange={(e) =>
+                                  setLastfmUsernameInput(e.target.value)
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter")
+                                    handleLastfmUsernameConfirm();
+                                  if (e.key === "Escape" && lastfmUsername)
+                                    setShowLastfmInput(false);
+                                }}
+                                autoFocus
+                              />
+                              <Button
+                                size="sm"
+                                onClick={handleLastfmUsernameConfirm}
+                                disabled={!lastfmUsernameInput.trim()}
+                              >
+                                {t("import.continueWithUsername")}
+                              </Button>
+                              {lastfmUsername && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setShowLastfmInput(false)}
+                                >
+                                  {t("lists.cancel")}
+                                </Button>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {t("import.lastfmPublicNote")}
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     );
                   })
                 )}
               </div>
             </StepperContent>
 
-            {/* Step 2: Select Playlist */}
+            {/* Step 2: Select Playlist / Collection */}
             <StepperContent value={2}>
               <div className="space-y-3">
                 {playlistsLoading ? (
@@ -560,80 +730,145 @@ export function PlaylistImportDialog({
                   </div>
                 ) : (
                   <div className="max-h-[400px] overflow-y-auto space-y-2">
-                    {playlists.map((playlist) => (
-                      <button
-                        key={playlist.id}
-                        onClick={() => handlePlaylistSelect(playlist)}
-                        className="w-full flex items-center gap-3 p-3 rounded-lg border hover:border-primary/50 transition-colors cursor-pointer text-left"
-                      >
-                        {playlist.imageUrl ? (
-                          <div className="relative h-12 w-12 rounded shrink-0">
-                            <Image
-                              src={playlist.imageUrl}
-                              alt={playlist.name}
-                              className="h-12 w-12 rounded object-cover bg-muted opacity-0 transition-opacity duration-300"
-                              width={48}
-                              height={48}
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                const parent = target.parentElement;
-                                if (parent) {
-                                  const skeleton =
-                                    parent.querySelector(".loading-skeleton");
-                                  const fallback =
-                                    parent.querySelector(".error-fallback");
-                                  if (skeleton)
-                                    (skeleton as HTMLElement).style.display =
-                                      "none";
-                                  if (fallback)
-                                    (fallback as HTMLElement).style.display =
-                                      "flex";
-                                }
-                              }}
-                              onLoad={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                const parent = target.parentElement;
-                                if (parent) {
-                                  const skeleton =
-                                    parent.querySelector(".loading-skeleton");
-                                  const fallback =
-                                    parent.querySelector(".error-fallback");
-                                  if (skeleton)
-                                    (skeleton as HTMLElement).style.display =
-                                      "none";
-                                  if (fallback)
-                                    (fallback as HTMLElement).style.display =
-                                      "none";
-                                }
-                                target.style.opacity = "1";
-                              }}
-                            />
-                            <div className="loading-skeleton absolute inset-0 h-12 w-12 rounded">
-                              <Skeleton className="h-full w-full rounded" />
+                    {playlists.map((playlist) => {
+                      const isTagsItem =
+                        selectedProvider === "lastfm" &&
+                        playlist.id === "tags";
+                      return (
+                        <div key={playlist.id}>
+                          <button
+                            onClick={() => handlePlaylistSelect(playlist)}
+                            className="w-full flex items-center gap-3 p-3 rounded-lg border hover:border-primary/50 transition-colors cursor-pointer text-left"
+                          >
+                            {selectedProvider === "lastfm" ? (
+                              <div className="h-12 w-12 rounded bg-muted flex items-center justify-center shrink-0">
+                                {playlist.id === "tags" ? (
+                                  <Tag className="h-6 w-6 text-muted-foreground" />
+                                ) : (
+                                  <Music className="h-6 w-6 text-muted-foreground" />
+                                )}
+                              </div>
+                            ) : playlist.imageUrl ? (
+                              <div className="relative h-12 w-12 rounded shrink-0">
+                                <Image
+                                  src={playlist.imageUrl}
+                                  alt={playlist.name}
+                                  className="h-12 w-12 rounded object-cover bg-muted opacity-0 transition-opacity duration-300"
+                                  width={48}
+                                  height={48}
+                                  onError={(e) => {
+                                    const target =
+                                      e.target as HTMLImageElement;
+                                    const parent = target.parentElement;
+                                    if (parent) {
+                                      const skeleton =
+                                        parent.querySelector(
+                                          ".loading-skeleton",
+                                        );
+                                      const fallback =
+                                        parent.querySelector(".error-fallback");
+                                      if (skeleton)
+                                        (
+                                          skeleton as HTMLElement
+                                        ).style.display = "none";
+                                      if (fallback)
+                                        (
+                                          fallback as HTMLElement
+                                        ).style.display = "flex";
+                                    }
+                                  }}
+                                  onLoad={(e) => {
+                                    const target =
+                                      e.target as HTMLImageElement;
+                                    const parent = target.parentElement;
+                                    if (parent) {
+                                      const skeleton =
+                                        parent.querySelector(
+                                          ".loading-skeleton",
+                                        );
+                                      const fallback =
+                                        parent.querySelector(".error-fallback");
+                                      if (skeleton)
+                                        (
+                                          skeleton as HTMLElement
+                                        ).style.display = "none";
+                                      if (fallback)
+                                        (
+                                          fallback as HTMLElement
+                                        ).style.display = "none";
+                                    }
+                                    target.style.opacity = "1";
+                                  }}
+                                />
+                                <div className="loading-skeleton absolute inset-0 h-12 w-12 rounded">
+                                  <Skeleton className="h-full w-full rounded" />
+                                </div>
+                                <div
+                                  className="error-fallback absolute inset-0 h-12 w-12 rounded bg-muted flex items-center justify-center"
+                                  style={{ display: "none" }}
+                                >
+                                  <Music className="h-6 w-6 text-muted-foreground" />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="h-12 w-12 rounded bg-muted flex items-center justify-center">
+                                <Music className="h-6 w-6 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">
+                                {selectedProvider === "lastfm"
+                                  ? getLastfmCollectionLabel(playlist.id)
+                                  : playlist.name}
+                              </div>
+                              {!isTagsItem && (
+                                <div className="text-sm text-muted-foreground">
+                                  {selectedProvider !== "lastfm" &&
+                                    t("import.tracks", {
+                                      count: playlist.trackCount,
+                                    })}
+                                  {playlist.owner && ` · ${playlist.owner}`}
+                                </div>
+                              )}
+                              {isTagsItem && (
+                                <div className="text-sm text-muted-foreground">
+                                  {t("import.personalTagsDescription")}
+                                </div>
+                              )}
                             </div>
-                            <div
-                              className="error-fallback absolute inset-0 h-12 w-12 rounded bg-muted flex items-center justify-center"
-                              style={{ display: "none" }}
-                            >
-                              <Music className="h-6 w-6 text-muted-foreground" />
+                          </button>
+
+                          {/* Inline tag input for Personal Tags */}
+                          {isTagsItem && showTagInput && (
+                            <div className="mt-2 p-3 rounded-lg border bg-muted/30 space-y-2">
+                              <Label className="text-sm font-medium">
+                                {t("import.enterTag")}
+                              </Label>
+                              <div className="flex gap-2">
+                                <Input
+                                  placeholder={t("import.tagInputPlaceholder")}
+                                  value={tagInputValue}
+                                  onChange={(e) =>
+                                    setTagInputValue(e.target.value)
+                                  }
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") handleTagConfirm();
+                                  }}
+                                  autoFocus
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={handleTagConfirm}
+                                  disabled={!tagInputValue.trim()}
+                                >
+                                  {t("import.browseTag")}
+                                </Button>
+                              </div>
                             </div>
-                          </div>
-                        ) : (
-                          <div className="h-12 w-12 rounded bg-muted flex items-center justify-center">
-                            <Music className="h-6 w-6 text-muted-foreground" />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium truncate">
-                            {playlist.name}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {t("import.tracks", { count: playlist.trackCount })}
-                            {playlist.owner && ` · ${playlist.owner}`}
-                          </div>
+                          )}
                         </div>
-                      </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
                 <div className="flex justify-start pt-2">

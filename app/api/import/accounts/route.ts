@@ -5,7 +5,7 @@ import {
   hasRequiredScopes,
 } from "@/lib/services/platform-auth";
 
-const PROVIDERS = ["spotify", "google", "apple"] as const;
+const PROVIDERS = ["spotify", "google", "apple", "lastfm"] as const;
 
 export async function GET(request: NextRequest) {
   const authUser = await getAuthenticatedUser(request);
@@ -17,10 +17,21 @@ export async function GET(request: NextRequest) {
     const accounts = await Promise.all(
       PROVIDERS.map(async (providerId) => {
         const acc = await getLinkedAccount(authUser.id, providerId);
+
+        if (providerId === "lastfm") {
+          return {
+            provider: providerId,
+            linked: !!acc,
+            hasScopes: true,
+            username: acc?.accountId ?? null,
+          };
+        }
+
         return {
           provider: providerId,
           linked: !!acc,
           hasScopes: acc ? hasRequiredScopes(acc.scope, providerId) : false,
+          username: null,
         };
       }),
     );

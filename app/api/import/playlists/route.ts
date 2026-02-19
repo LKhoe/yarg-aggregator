@@ -15,11 +15,48 @@ export async function GET(request: NextRequest) {
   }
 
   const provider = request.nextUrl.searchParams.get("provider");
-  if (provider !== "spotify" && provider !== "google" && provider !== "apple") {
+  if (
+    provider !== "spotify" &&
+    provider !== "google" &&
+    provider !== "apple" &&
+    provider !== "lastfm"
+  ) {
     return NextResponse.json({ error: "Invalid provider" }, { status: 400 });
   }
 
   try {
+    // Last.fm has static collections, no OAuth token needed
+    if (provider === "lastfm") {
+      const username = request.nextUrl.searchParams.get("username");
+      if (!username) {
+        return NextResponse.json(
+          { error: "Missing username" },
+          { status: 400 },
+        );
+      }
+
+      return NextResponse.json([
+        {
+          id: "loved",
+          name: "Loved Tracks",
+          imageUrl: null,
+          trackCount: 0,
+        },
+        {
+          id: "recent",
+          name: "Recent Tracks",
+          imageUrl: null,
+          trackCount: 0,
+        },
+        {
+          id: "tags",
+          name: "Personal Tags",
+          imageUrl: null,
+          trackCount: 0,
+        },
+      ]);
+    }
+
     const accessToken = await getValidAccessToken(authUser.id, provider);
     if (!accessToken) {
       return NextResponse.json(
