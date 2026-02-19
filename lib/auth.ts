@@ -3,6 +3,39 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@/lib/db";
 import { userProfile, songList } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { createSign } from "crypto";
+
+/**
+ * Generate an Apple client secret JWT signed with the ES256 private key.
+ * Apple requires this JWT as the OAuth client_secret for Sign in with Apple.
+ * Set expiry to 180 days (Apple maximum). The server must restart before expiry to regenerate.
+ */
+function generateAppleClientSecret(): string {
+  const privateKey = process.env.APPLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const teamId = process.env.APPLE_TEAM_ID;
+  const clientId = process.env.APPLE_CLIENT_ID;
+  const keyId = process.env.APPLE_KEY_ID;
+
+  if (!privateKey || !teamId || !clientId || !keyId) return "";
+
+  const now = Math.floor(Date.now() / 1000);
+  const header = Buffer.from(JSON.stringify({ alg: "ES256", kid: keyId })).toString("base64url");
+  const payload = Buffer.from(
+    JSON.stringify({
+      iss: teamId,
+      iat: now,
+      exp: now + 15552000, // 180 days
+      aud: "https://appleid.apple.com",
+      sub: clientId,
+    }),
+  ).toString("base64url");
+
+  const signingInput = `${header}.${payload}`;
+  const sign = createSign("SHA256");
+  sign.update(signingInput);
+  const signature = sign.sign({ key: privateKey, dsaEncoding: "ieee-p1363" }, "base64url");
+  return `${signingInput}.${signature}`;
+}
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -27,6 +60,14 @@ export const auth = betterAuth({
       clientSecret: process.env.SPOTIFY_CLIENT_SECRET!,
       scope: ["playlist-read-private", "playlist-read-collaborative"],
     },
+    ...(process.env.APPLE_CLIENT_ID
+      ? {
+          apple: {
+            clientId: process.env.APPLE_CLIENT_ID,
+            clientSecret: generateAppleClientSecret(),
+          },
+        }
+      : {}),
   },
 
   session: {
@@ -37,7 +78,7 @@ export const auth = betterAuth({
   account: {
     accountLinking: {
       enabled: true,
-      trustedProviders: ["google", "spotify"],
+      trustedProviders: ["google", "spotify", "apple"],
     },
   },
 

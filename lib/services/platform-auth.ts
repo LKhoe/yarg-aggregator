@@ -1,10 +1,12 @@
 import { db } from "@/lib/db";
 import { account } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
+import { createSign } from "crypto";
 
 const REQUIRED_SCOPES: Record<string, string[]> = {
   google: ["https://www.googleapis.com/auth/youtube.readonly"],
   spotify: ["playlist-read-private", "playlist-read-collaborative"],
+  apple: [], // No OAuth scopes — just needs a stored music user token
 };
 
 const TOKEN_ENDPOINTS: Record<string, string> = {
@@ -26,6 +28,44 @@ const CLIENT_CREDENTIALS: Record<
   },
 };
 
+/**
+ * Generate a MusicKit developer token JWT (server-side, used as Bearer token
+ * alongside the user's Music-User-Token to call Apple Music API).
+ * Uses APPLE_TEAM_ID, APPLE_MUSIC_KEY_ID, APPLE_MUSIC_PRIVATE_KEY env vars.
+ */
+export function generateAppleMusicDeveloperToken(): string {
+  const privateKey = process.env.APPLE_MUSIC_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const teamId = process.env.APPLE_TEAM_ID;
+  const keyId = process.env.APPLE_MUSIC_KEY_ID;
+
+  if (!privateKey || !teamId || !keyId) {
+    throw new Error(
+      "Apple Music not configured: missing APPLE_TEAM_ID, APPLE_MUSIC_KEY_ID, or APPLE_MUSIC_PRIVATE_KEY",
+    );
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const header = Buffer.from(
+    JSON.stringify({ alg: "ES256", kid: keyId }),
+  ).toString("base64url");
+  const payload = Buffer.from(
+    JSON.stringify({
+      iss: teamId,
+      iat: now,
+      exp: now + 15552000, // 180 days
+    }),
+  ).toString("base64url");
+
+  const signingInput = `${header}.${payload}`;
+  const sign = createSign("SHA256");
+  sign.update(signingInput);
+  const signature = sign.sign(
+    { key: privateKey, dsaEncoding: "ieee-p1363" },
+    "base64url",
+  );
+  return `${signingInput}.${signature}`;
+}
+
 export async function getLinkedAccount(userId: string, providerId: string) {
   const [acc] = await db
     .select()
@@ -39,9 +79,11 @@ export function hasRequiredScopes(
   accountScope: string | null,
   providerId: string,
 ): boolean {
-  if (!accountScope) return false;
   const required = REQUIRED_SCOPES[providerId];
   if (!required) return false;
+  // No scopes required (e.g. apple-music uses a music user token, not OAuth scopes)
+  if (required.length === 0) return true;
+  if (!accountScope) return false;
   // Better Auth stores scopes as comma-separated
   const granted = accountScope.split(",");
   return required.every((scope) => granted.includes(scope));

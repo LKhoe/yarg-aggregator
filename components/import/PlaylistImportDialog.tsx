@@ -1,5 +1,21 @@
 "use client";
 
+// MusicKit JS global type declarations
+declare global {
+  interface Window {
+    MusicKit: {
+      configure(config: {
+        developerToken: string;
+        app: { name: string; build?: string };
+      }): Promise<MusicKitInstance>;
+      getInstance(): MusicKitInstance;
+    };
+  }
+}
+interface MusicKitInstance {
+  authorize(): Promise<string>;
+}
+
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "@/hooks/use-translations";
 import { signIn } from "@/lib/auth-client";
@@ -93,6 +109,12 @@ interface PlaylistImportDialogProps {
   initialProvider?: string | null;
 }
 
+const PROVIDER_PLATFORM_ICON: Record<string, string> = {
+  google: "/social-providers/youtube-music.svg",
+  spotify: "/social-providers/spotify.svg",
+  apple: "/social-providers/apple-music.svg",
+};
+
 export function PlaylistImportDialog({
   open,
   onOpenChange,
@@ -129,6 +151,9 @@ export function PlaylistImportDialog({
   // Step 4 state
   const [importedListId, setImportedListId] = useState<string | null>(null);
   const [importedCount, setImportedCount] = useState(0);
+
+  // Apple Music MusicKit state
+  const [appleMusicConnecting, setAppleMusicConnecting] = useState(false);
 
   // Fetch linked accounts
   const fetchAccounts = useCallback(async () => {
@@ -218,9 +243,13 @@ export function PlaylistImportDialog({
     if (!acc) return;
 
     if (!acc.linked || !acc.hasScopes) {
-      // Need to connect or re-authorize
+      if (provider === "apple") {
+        handleAppleMusicConnect();
+        return;
+      }
+      // Need to connect or re-authorize via standard OAuth
       signIn.social({
-        provider: provider as "google" | "spotify",
+        provider: provider as "google" | "spotify" | "apple",
         callbackURL: `/lists?import=${provider}`,
       });
       return;
@@ -340,6 +369,7 @@ export function PlaylistImportDialog({
     setExistingListId("");
     setImportedListId(null);
     setImportedCount(0);
+    setAppleMusicConnecting(false);
   };
 
   const handleOpenChange = (newOpen: boolean) => {
@@ -349,8 +379,61 @@ export function PlaylistImportDialog({
     onOpenChange(newOpen);
   };
 
-  const providerLabel = (provider: string) =>
-    provider === "spotify" ? t("import.spotify") : t("import.youtube");
+  const providerLabel = (provider: string) => {
+    if (provider === "spotify") return t("import.spotify");
+    if (provider === "google") return t("import.youtube");
+    return t("import.appleMusic");
+  };
+
+  const loadMusicKit = (): Promise<void> =>
+    new Promise((resolve, reject) => {
+      if (typeof window !== "undefined" && window.MusicKit) {
+        resolve();
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://js-cdn.music.apple.com/musickit/v3/musickit.js";
+      script.onload = () => resolve();
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+
+  const handleAppleMusicConnect = useCallback(async () => {
+    setAppleMusicConnecting(true);
+    try {
+      const tokenRes = await fetch("/api/import/apple-music/developer-token");
+      if (!tokenRes.ok) {
+        toast.error(t("import.appleMusicNotConfigured"));
+        return;
+      }
+      const { token: developerToken } = await tokenRes.json();
+
+      await loadMusicKit();
+      const mk = await window.MusicKit.configure({
+        developerToken,
+        app: { name: "YARG Aggregator", build: "1" },
+      });
+
+      const musicUserToken = await mk.authorize();
+
+      const connectRes = await fetch("/api/import/apple-music/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ musicUserToken }),
+      });
+
+      if (!connectRes.ok) throw new Error("Failed to store token");
+
+      await fetchAccounts();
+      setSelectedProvider("apple");
+      setStep(2);
+    } catch {
+      toast.error(t("import.error"));
+    } finally {
+      setAppleMusicConnecting(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchAccounts, t]);
 
   const getProviderStatus = (acc: ProviderAccount) => {
     if (!acc.linked) return "notLinked";
@@ -411,16 +494,27 @@ export function PlaylistImportDialog({
                 ) : (
                   accounts.map((acc) => {
                     const status = getProviderStatus(acc);
+                    const isConnecting =
+                      acc.provider === "apple" && appleMusicConnecting;
                     return (
                       <button
                         key={acc.provider}
                         onClick={() => handleProviderSelect(acc.provider)}
+                        disabled={isConnecting}
                         className={`w-full flex items-center gap-4 p-4 rounded-lg border transition-colors text-left ${
                           status === "ready"
                             ? "hover:border-primary/50 cursor-pointer"
                             : "hover:border-primary/30 cursor-pointer"
-                        }`}
+                        } disabled:opacity-60 disabled:cursor-not-allowed`}
                       >
+                        <Image
+                          key={PROVIDER_PLATFORM_ICON[acc.provider]}
+                          src={PROVIDER_PLATFORM_ICON[acc.provider]}
+                          alt={acc.provider}
+                          width={20}
+                          height={20}
+                          className="h-5 w-5 object-contain"
+                        />
                         <div className="flex-1">
                           <div className="font-medium">
                             {providerLabel(acc.provider)}
@@ -433,7 +527,9 @@ export function PlaylistImportDialog({
                           </div>
                         </div>
                         <div>
-                          {status === "ready" ? (
+                          {isConnecting ? (
+                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                          ) : status === "ready" ? (
                             <Check className="h-5 w-5 text-green-500" />
                           ) : (
                             <span className="text-sm text-primary">
@@ -483,21 +579,15 @@ export function PlaylistImportDialog({
                                 const parent = target.parentElement;
                                 if (parent) {
                                   const skeleton =
-                                    parent.querySelector(
-                                      ".loading-skeleton",
-                                    );
+                                    parent.querySelector(".loading-skeleton");
                                   const fallback =
-                                    parent.querySelector(
-                                      ".error-fallback",
-                                    );
+                                    parent.querySelector(".error-fallback");
                                   if (skeleton)
-                                    (
-                                      skeleton as HTMLElement
-                                    ).style.display = "none";
+                                    (skeleton as HTMLElement).style.display =
+                                      "none";
                                   if (fallback)
-                                    (
-                                      fallback as HTMLElement
-                                    ).style.display = "flex";
+                                    (fallback as HTMLElement).style.display =
+                                      "flex";
                                 }
                               }}
                               onLoad={(e) => {
@@ -505,21 +595,15 @@ export function PlaylistImportDialog({
                                 const parent = target.parentElement;
                                 if (parent) {
                                   const skeleton =
-                                    parent.querySelector(
-                                      ".loading-skeleton",
-                                    );
+                                    parent.querySelector(".loading-skeleton");
                                   const fallback =
-                                    parent.querySelector(
-                                      ".error-fallback",
-                                    );
+                                    parent.querySelector(".error-fallback");
                                   if (skeleton)
-                                    (
-                                      skeleton as HTMLElement
-                                    ).style.display = "none";
+                                    (skeleton as HTMLElement).style.display =
+                                      "none";
                                   if (fallback)
-                                    (
-                                      fallback as HTMLElement
-                                    ).style.display = "none";
+                                    (fallback as HTMLElement).style.display =
+                                      "none";
                                 }
                                 target.style.opacity = "1";
                               }}
@@ -614,7 +698,8 @@ export function PlaylistImportDialog({
                                       width={32}
                                       height={32}
                                       onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
+                                        const target =
+                                          e.target as HTMLImageElement;
                                         const parent = target.parentElement;
                                         if (parent) {
                                           const skeleton =
@@ -636,7 +721,8 @@ export function PlaylistImportDialog({
                                         }
                                       }}
                                       onLoad={(e) => {
-                                        const target = e.target as HTMLImageElement;
+                                        const target =
+                                          e.target as HTMLImageElement;
                                         const parent = target.parentElement;
                                         if (parent) {
                                           const skeleton =

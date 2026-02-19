@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/middleware/auth";
-import { getValidAccessToken } from "@/lib/services/platform-auth";
+import {
+  getValidAccessToken,
+  generateAppleMusicDeveloperToken,
+} from "@/lib/services/platform-auth";
 import { getPlaylistTracks } from "@/services/platforms/spotify-user";
 import { getPlaylistItems } from "@/services/platforms/youtube-user";
+import { getPlaylistTracks as getAppleMusicPlaylistTracks } from "@/services/platforms/apple-music-user";
 import { PlaylistMatcherService } from "@/lib/services/playlist-matcher";
 
 export async function POST(request: NextRequest) {
@@ -16,16 +20,26 @@ export async function POST(request: NextRequest) {
     const { provider, playlistId } = body;
 
     if (!provider || !playlistId) {
-      return NextResponse.json({ error: "Missing provider or playlistId" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing provider or playlistId" },
+        { status: 400 },
+      );
     }
 
-    if (provider !== "spotify" && provider !== "google") {
+    if (
+      provider !== "spotify" &&
+      provider !== "google" &&
+      provider !== "apple"
+    ) {
       return NextResponse.json({ error: "Invalid provider" }, { status: 400 });
     }
 
     const accessToken = await getValidAccessToken(authUser.id, provider);
     if (!accessToken) {
-      return NextResponse.json({ error: "reauth_required", provider }, { status: 401 });
+      return NextResponse.json(
+        { error: "reauth_required", provider },
+        { status: 401 },
+      );
     }
 
     // Fetch tracks from the platform
@@ -34,8 +48,15 @@ export async function POST(request: NextRequest) {
     if (provider === "spotify") {
       const spotifyTracks = await getPlaylistTracks(accessToken, playlistId);
       tracks = spotifyTracks.map((t) => ({ title: t.title, artist: t.artist }));
-    } else {
+    } else if (provider === "google") {
       tracks = await getPlaylistItems(accessToken, playlistId);
+    } else {
+      const developerToken = generateAppleMusicDeveloperToken();
+      tracks = await getAppleMusicPlaylistTracks(
+        developerToken,
+        accessToken,
+        playlistId,
+      );
     }
 
     // Match tracks against our database
@@ -52,6 +73,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error matching playlist:", error);
-    return NextResponse.json({ error: "Failed to match playlist" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to match playlist" },
+      { status: 500 },
+    );
   }
 }

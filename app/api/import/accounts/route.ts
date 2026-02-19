@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/middleware/auth";
-import { getLinkedAccount, hasRequiredScopes } from "@/lib/services/platform-auth";
+import {
+  getLinkedAccount,
+  hasRequiredScopes,
+} from "@/lib/services/platform-auth";
 
-const PROVIDERS = ["spotify", "google"] as const;
+const PROVIDERS = ["spotify", "google", "apple"] as const;
 
 export async function GET(request: NextRequest) {
   const authUser = await getAuthenticatedUser(request);
@@ -25,6 +28,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(accounts);
   } catch (error) {
     console.error("Error fetching import accounts:", error);
-    return NextResponse.json({ error: "Failed to fetch accounts" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch accounts" },
+      { status: 500 },
+    );
   }
 }
