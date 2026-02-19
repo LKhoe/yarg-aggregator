@@ -240,10 +240,10 @@ export default function SongDetail({ song, onClose }: SongDetailProps) {
         )}
 
         {/* Platform Links */}
-        <PlatformLinks songName={song.name} artistName={song.artist} />
+        <PlatformLinks key={`platform-${song.name}-${song.artist}`} songName={song.name} artistName={song.artist} />
 
         {/* Lyrics */}
-        <SongLyrics songName={song.name} artistName={song.artist} />
+        <SongLyrics key={`lyrics-${song.name}-${song.artist}`} songName={song.name} artistName={song.artist} />
       </CardContent>
     </Card>
   );

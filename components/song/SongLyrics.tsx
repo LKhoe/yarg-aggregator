@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useReducer, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -15,31 +15,52 @@ interface SongLyricsProps {
   artistName: string;
 }
 
+type State = {
+  open: boolean;
+  lyrics: string | null;
+  source: string | null;
+  loading: boolean;
+  error: string | null;
+  fetched: boolean;
+};
+
+type Action =
+  | { type: "open"; payload: boolean }
+  | { type: "fetch_start" }
+  | { type: "fetch_success"; payload: { lyrics: string; source: string } }
+  | { type: "fetch_error"; payload: string };
+
+const initialState: State = {
+  open: false,
+  lyrics: null,
+  source: null,
+  loading: false,
+  error: null,
+  fetched: false,
+};
+
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case "open":
+      return { ...state, open: action.payload };
+    case "fetch_start":
+      return { ...state, loading: true, error: null, fetched: true };
+    case "fetch_success":
+      return { ...state, loading: false, lyrics: action.payload.lyrics, source: action.payload.source };
+    case "fetch_error":
+      return { ...state, loading: false, error: action.payload };
+  }
+}
+
 export default function SongLyrics({ songName, artistName }: SongLyricsProps) {
   const t = useTranslations("songLyrics");
   const { isAuthenticated } = useAuth();
-  const [open, setOpen] = useState(false);
-  const [lyrics, setLyrics] = useState<string | null>(null);
-  const [source, setSource] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [fetched, setFetched] = useState(false);
-
-  // Reset state when song changes
-  useEffect(() => {
-    setOpen(false);
-    setLyrics(null);
-    setSource(null);
-    setLoading(false);
-    setError(null);
-    setFetched(false);
-  }, [songName, artistName]);
+  const [state, dispatch] = useReducer(reducer, initialState);
+  const { open, lyrics, source, loading, error, fetched } = state;
 
   const fetchLyrics = useCallback(async () => {
     if (fetched) return;
-    setLoading(true);
-    setError(null);
-    setFetched(true);
+    dispatch({ type: "fetch_start" });
 
     try {
       const params = new URLSearchParams({
@@ -49,23 +70,20 @@ export default function SongLyrics({ songName, artistName }: SongLyricsProps) {
       const res = await fetch(`/api/music/lyrics?${params}`);
 
       if (!res.ok) {
-        setError(t("notFound"));
+        dispatch({ type: "fetch_error", payload: t("notFound") });
         return;
       }
 
       const json = await res.json();
-      setLyrics(json.lyrics);
-      setSource(json.source);
+      dispatch({ type: "fetch_success", payload: { lyrics: json.lyrics, source: json.source } });
     } catch {
-      setError(t("fetchError"));
-    } finally {
-      setLoading(false);
+      dispatch({ type: "fetch_error", payload: t("fetchError") });
     }
   }, [songName, artistName, fetched, t]);
 
   const handleOpenChange = useCallback(
     (isOpen: boolean) => {
-      setOpen(isOpen);
+      dispatch({ type: "open", payload: isOpen });
       if (isOpen && !fetched) {
         fetchLyrics();
       }

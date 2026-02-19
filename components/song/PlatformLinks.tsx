@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import type { MusicPlatform, PlatformLink } from "@/types";
 import { useTranslations } from "@/hooks/use-translations";
 import { useAuth } from "@/contexts/AuthContext";
@@ -69,14 +69,6 @@ export default function PlatformLinks({
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PlatformLink | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  // Reset when song changes
-  useEffect(() => {
-    setActivePlatform(null);
-    setResult(null);
-    setError(null);
-    setLoading(false);
-  }, [songName, artistName]);
 
   const handleClick = useCallback(
     async (platform: MusicPlatform) => {
