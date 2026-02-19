@@ -138,9 +138,6 @@ export default function MusicTable({
   // Genre combobox data
   const { genres: genreOptions } = useGenres();
 
-  // Memoize instrument list to prevent recreation
-  const instrumentList = useMemo(() => INSTRUMENTS, []);
-
   // Track the sort the user had before we auto-switched to relevance
   const sortBeforeQueryRef = useRef<{
     sortBy: string;
@@ -441,7 +438,7 @@ export default function MusicTable({
               </MultiSelectTrigger>
               <MultiSelectContent>
                 <MultiSelectGroup>
-                  {instrumentList.map((inst) => (
+                  {INSTRUMENTS.map((inst: string) => (
                     <MultiSelectItem
                       key={inst}
                       value={inst}
@@ -785,8 +782,8 @@ export default function MusicTable({
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">
                     <div className="flex gap-1 sm:gap-2">
-                      {instrumentList.map((inst) => {
-                        const diff = music.instruments[inst];
+                      {INSTRUMENTS.map((inst: string) => {
+                        const diff = music.instruments[inst as keyof typeof music.instruments];
                         if (diff === null) return null;
                         return (
                           <div

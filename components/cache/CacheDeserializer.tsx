@@ -760,6 +760,16 @@ export default function CacheDeserializer() {
                     importStats.details.added.length > 0 &&
                     setDetailType("added")
                   }
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      if (importStats.details.added.length > 0) {
+                        setDetailType("added");
+                      }
+                    }
+                  }}
+                  role="button"
+                  tabIndex={importStats.details.added.length > 0 ? 0 : -1}
                   className={`p-3 bg-green-500/10 rounded-lg ${importStats.details.added.length > 0 ? "cursor-pointer hover:opacity-80" : ""}`}
                 >
                   <div className="text-2xl font-bold text-green-600">
@@ -774,6 +784,16 @@ export default function CacheDeserializer() {
                     importStats.details.updated.length > 0 &&
                     setDetailType("updated")
                   }
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      if (importStats.details.updated.length > 0) {
+                        setDetailType("updated");
+                      }
+                    }
+                  }}
+                  role="button"
+                  tabIndex={importStats.details.updated.length > 0 ? 0 : -1}
                   className={`p-3 bg-blue-500/10 rounded-lg ${importStats.details.updated.length > 0 ? "cursor-pointer hover:opacity-80" : ""}`}
                 >
                   <div className="text-2xl font-bold text-blue-600">
@@ -788,6 +808,16 @@ export default function CacheDeserializer() {
                     importStats.details.linked.length > 0 &&
                     setDetailType("linked")
                   }
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      if (importStats.details.linked.length > 0) {
+                        setDetailType("linked");
+                      }
+                    }
+                  }}
+                  role="button"
+                  tabIndex={importStats.details.linked.length > 0 ? 0 : -1}
                   className={`p-3 bg-purple-500/10 rounded-lg ${importStats.details.linked.length > 0 ? "cursor-pointer hover:opacity-80" : ""}`}
                 >
                   <div className="text-2xl font-bold text-purple-600">
@@ -815,9 +845,9 @@ export default function CacheDeserializer() {
                 <div className="overflow-y-auto max-h-[60vh] pr-2">
                   {detailType && importStats?.details[detailType]?.length ? (
                     <div className="space-y-1">
-                      {importStats.details[detailType].map((song, i) => (
+                      {importStats.details[detailType].map((song) => (
                         <div
-                          key={i}
+                          key={`${song.title}-${song.artist}`}
                           className="text-[10px] text-muted-foreground truncate"
                           title={`${song.title} - ${song.artist}`}
                         >
@@ -847,7 +877,7 @@ export default function CacheDeserializer() {
               <div className="grid grid-cols-1 gap-1 p-2">
                 {songs.map((song, index) => (
                   <div
-                    key={index}
+                    key={`${song._metadata.Name || `Song ${index + 1}`}-${song._metadata.Artist || 'unknown'}`}
                     className="p-3 bg-muted/50 rounded-md hover:bg-muted transition-colors"
                   >
                     <div className="flex items-center justify-between">

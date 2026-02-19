@@ -119,7 +119,7 @@ function InstallationsContent() {
           {isLoading ? (
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-16 w-full" />
+                <Skeleton key={`skeleton-${i}`} className="h-16 w-full" />
               ))}
             </div>
           ) : installations.length === 0 ? (

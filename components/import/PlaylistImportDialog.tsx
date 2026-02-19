@@ -555,7 +555,7 @@ export function PlaylistImportDialog({
               { title: t("import.step4Title") },
             ].map((s, index) => (
               <StepperItem
-                key={index}
+                key={`step-${index + 1}`}
                 step={index + 1}
                 className="relative flex-1 items-start"
               >
@@ -721,7 +721,7 @@ export function PlaylistImportDialog({
               <div className="space-y-3">
                 {playlistsLoading ? (
                   Array.from({ length: 4 }).map((_, i) => (
-                    <Skeleton key={i} className="h-16 w-full" />
+                    <Skeleton key={`skeleton-${i}`} className="h-16 w-full" />
                   ))
                 ) : playlists.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
@@ -913,9 +913,9 @@ export function PlaylistImportDialog({
                         <div className="max-h-50 overflow-y-auto space-y-1 border rounded-lg p-2">
                           {matchResults.results
                             .filter((r) => r.match)
-                            .map((r, i) => (
+                            .map((r) => (
                               <div
-                                key={i}
+                                key={r.match!.songId}
                                 className="flex items-center gap-2 py-1.5 px-1"
                               >
                                 <Checkbox
@@ -1020,8 +1020,8 @@ export function PlaylistImportDialog({
                           <div className="max-h-30 overflow-y-auto space-y-1 border rounded-lg p-2 opacity-60">
                             {matchResults.results
                               .filter((r) => !r.match)
-                              .map((r, i) => (
-                                <div key={i} className="text-sm py-1 px-1">
+                              .map((r) => (
+                                <div key={`${r.externalTrack.title}-${r.externalTrack.artist}`} className="text-sm py-1 px-1">
                                   <span>{r.externalTrack.title}</span>
                                   <span className="text-muted-foreground">
                                     {" "}

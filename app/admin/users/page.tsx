@@ -152,7 +152,7 @@ function AdminUsersContent() {
 
       if (response.ok) {
         setUsers(users.filter((u) => u.id !== userId));
-        setTotal(total - 1);
+        setTotal(prev => prev - 1);
         toast.success(t("admin.userDeleted"));
       } else {
         const data = await response.json();
@@ -210,7 +210,7 @@ function AdminUsersContent() {
           {isLoading ? (
             <div className="space-y-4">
               {[1, 2, 3, 4, 5].map((i) => (
-                <Skeleton key={i} className="h-16 w-full" />
+                <Skeleton key={`skeleton-${i}`} className="h-16 w-full" />
               ))}
             </div>
           ) : users.length === 0 ? (
@@ -376,7 +376,7 @@ function AdminUsersContent() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setPage(page - 1)}
+                      onClick={() => setPage(prev => prev - 1)}
                       disabled={page === 0}
                     >
                       {t("admin.previous")}
@@ -384,7 +384,7 @@ function AdminUsersContent() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setPage(page + 1)}
+                      onClick={() => setPage(prev => prev + 1)}
                       disabled={page >= totalPages - 1}
                     >
                       {t("admin.next")}

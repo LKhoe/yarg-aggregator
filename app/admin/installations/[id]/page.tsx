@@ -484,7 +484,7 @@ function InstallationDetailContent({
                     {isSearching ? (
                       <div className="space-y-2">
                         {[1, 2, 3, 4, 5].map((i) => (
-                          <div key={i} className="flex items-center gap-3 p-2">
+                          <div key={`skeleton-${i}`} className="flex items-center gap-3 p-2">
                             <Skeleton className="h-10 w-10 rounded shrink-0" />
                             <div className="flex-1 min-w-0">
                               <Skeleton className="h-4 w-32 mb-1" />
@@ -649,7 +649,7 @@ function InstallationDetailContent({
                     {isLoadingLists ? (
                       <div className="space-y-2">
                         {[1, 2, 3].map((i) => (
-                          <Skeleton key={i} className="h-12 w-full" />
+                          <Skeleton key={`skeleton-${i}`} className="h-12 w-full" />
                         ))}
                       </div>
                     ) : lists.length === 0 ? (

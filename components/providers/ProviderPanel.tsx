@@ -636,7 +636,7 @@ export default function ProviderPanel() {
                 <StepperNav>
                   {FETCH_STEPS.map((step, i) => (
                     <StepperItem
-                      key={i}
+                      key={`step-${i + 1}`}
                       step={i + 1}
                       loading={
                         isRunning && getStepFromPhase(progress.phase) === i + 1
@@ -692,6 +692,14 @@ export default function ProviderPanel() {
                 <div className="grid grid-cols-3 gap-2 text-sm">
                   <div
                     onClick={() => openDetails("added", progress.details)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        openDetails("added", progress.details);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
                     className="text-center p-2 bg-green-50 dark:bg-green-950 rounded cursor-pointer hover:opacity-80"
                   >
                     <div className="font-medium text-green-600 dark:text-green-400">
@@ -703,6 +711,14 @@ export default function ProviderPanel() {
                   </div>
                   <div
                     onClick={() => openDetails("updated", progress.details)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        openDetails("updated", progress.details);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
                     className="text-center p-2 bg-blue-50 dark:bg-blue-950 rounded cursor-pointer hover:opacity-80"
                   >
                     <div className="font-medium text-blue-600 dark:text-blue-400">
@@ -714,7 +730,15 @@ export default function ProviderPanel() {
                   </div>
                   <div
                     onClick={() => openDetails("ignored", progress.details)}
-                    className="text-center p-2 bg-gray-50 dark:bg-gray-950 rounded cursor-pointer hover:opacity-80"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        openDetails("ignored", progress.details);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    className="text-center p-2 bg-orange-50 dark:bg-orange-950 rounded cursor-pointer hover:opacity-80"
                   >
                     <div className="font-medium text-gray-600 dark:text-gray-400">
                       {progress.stats.ignored}
@@ -790,6 +814,9 @@ export default function ProviderPanel() {
               <div className="grid grid-cols-3 gap-2 text-sm">
                 <div
                   onClick={() => openDetails("added")}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetails("added"); } }}
+                  role="button"
+                  tabIndex={uploadProgress.status === "completed" ? 0 : -1}
                   className={`text-center p-2 bg-green-50 dark:bg-green-950 rounded ${
                     uploadProgress.status === "completed"
                       ? "cursor-pointer hover:opacity-80"
@@ -805,6 +832,9 @@ export default function ProviderPanel() {
                 </div>
                 <div
                   onClick={() => openDetails("updated")}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetails("updated"); } }}
+                  role="button"
+                  tabIndex={uploadProgress.status === "completed" ? 0 : -1}
                   className={`text-center p-2 bg-blue-50 dark:bg-blue-950 rounded ${
                     uploadProgress.status === "completed"
                       ? "cursor-pointer hover:opacity-80"
@@ -820,6 +850,9 @@ export default function ProviderPanel() {
                 </div>
                 <div
                   onClick={() => openDetails("ignored")}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetails("ignored"); } }}
+                  role="button"
+                  tabIndex={uploadProgress.status === "completed" ? 0 : -1}
                   className={`text-center p-2 bg-gray-50 dark:bg-gray-950 rounded ${
                     uploadProgress.status === "completed"
                       ? "cursor-pointer hover:opacity-80"
@@ -863,9 +896,9 @@ export default function ProviderPanel() {
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <div className="space-y-1 pl-4 pt-1 pb-2 pr-2">
-                        {(songs as SongDetail[]).map((song, i) => (
+                        {(songs as SongDetail[]).map((song) => (
                           <div
-                            key={i}
+                            key={`${song.title}-${song.artist}`}
                             className="text-[10px] text-muted-foreground truncate"
                             title={`${song.title} - ${song.artist}`}
                           >
@@ -878,9 +911,9 @@ export default function ProviderPanel() {
                 ))
               ) : detailData && Array.isArray(detailData) ? (
                 <div className="space-y-1">
-                  {detailData.map((song: SongDetail, i: number) => (
+                  {detailData.map((song: SongDetail) => (
                     <div
-                      key={i}
+                      key={`${song.title}-${song.artist}`}
                       className="text-[10px] text-muted-foreground truncate"
                       title={`${song.title} - ${song.artist}`}
                     >

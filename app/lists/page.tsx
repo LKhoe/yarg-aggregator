@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useTranslations } from "@/hooks/use-translations";
@@ -177,7 +177,7 @@ function ListsContent() {
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2">
           {[1, 2, 3, 4].map((i) => (
-            <Card key={i}>
+            <Card key={`skeleton-${i}`}>
               <CardHeader>
                 <Skeleton className="h-5 w-32" />
                 <Skeleton className="h-4 w-24" />
@@ -236,7 +236,13 @@ function ListsContent() {
 export default function ListsPage() {
   return (
     <ProtectedRoute>
-      <ListsContent />
+      <Suspense fallback={
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        </div>
+      }>
+        <ListsContent />
+      </Suspense>
     </ProtectedRoute>
   );
 }

@@ -216,9 +216,9 @@ export default function SongDetail({ song, onClose }: SongDetailProps) {
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="flex flex-col gap-1.5 mt-2">
-                {song.downloadUrls.map((dl, i) => (
+                {song.downloadUrls.map((dl) => (
                   <Button
-                    key={i}
+                    key={dl.url}
                     variant="outline"
                     size="sm"
                     className="w-full justify-start text-xs"

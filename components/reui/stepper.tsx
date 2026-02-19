@@ -72,14 +72,17 @@ interface StepperProps extends HTMLAttributes<HTMLDivElement> {
   indicators?: StepIndicators
 }
 
+const DEFAULT_STEP_VALUE = 1;
+const EMPTY_INDICATORS: StepIndicators = {};
+
 function Stepper({
-  defaultValue = 1,
+  defaultValue = DEFAULT_STEP_VALUE,
   value,
   onValueChange,
   orientation = "horizontal",
   className,
   children,
-  indicators = {},
+  indicators = EMPTY_INDICATORS,
   ...props
 }: StepperProps) {
   const [activeStep, setActiveStep] = useState(defaultValue)
