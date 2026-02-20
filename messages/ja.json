@@ -523,7 +523,14 @@
     "close": "閉じる",
     "error": "エラーが発生しました。もう一度お試しください。",
     "reauthRequired": "セッションが期限切れです。再認証してください。",
-    "noPlaylists": "アカウントにプレイリストが見つかりません。"
+    "noPlaylists": "アカウントにプレイリストが見つかりません。",
+    "urlImport": "URLからインポート",
+    "urlImportDescription": "SpotifyまたはYouTube Musicの公開プレイリストURLを貼り付けてください",
+    "urlPlaceholder": "プレイリストURLを貼り付け...",
+    "urlFetch": "取得",
+    "urlFetching": "プレイリストを取得中...",
+    "invalidUrl": "無効またはサポートされていないURLです。対応: SpotifyおよびYouTube Musicのプレイリスト。",
+    "urlNotConfigured": "このサーバーではURLインポートが設定されていません。"
   },
   "songDetail": {
     "title": "楽曲詳細",

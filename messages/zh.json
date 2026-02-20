@@ -523,7 +523,14 @@
     "close": "关闭",
     "error": "出现错误，请重试。",
     "reauthRequired": "您的会话已过期，请重新授权。",
-    "noPlaylists": "您的账户中未找到播放列表。"
+    "noPlaylists": "您的账户中未找到播放列表。",
+    "urlImport": "从URL导入",
+    "urlImportDescription": "粘贴Spotify或YouTube Music的公开播放列表URL",
+    "urlPlaceholder": "粘贴播放列表URL...",
+    "urlFetch": "获取",
+    "urlFetching": "正在获取播放列表...",
+    "invalidUrl": "无效或不支持的URL。支持：Spotify和YouTube Music播放列表。",
+    "urlNotConfigured": "此服务器未配置URL导入功能。"
   },
   "songDetail": {
     "title": "歌曲详情",

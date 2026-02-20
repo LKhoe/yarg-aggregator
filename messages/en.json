@@ -523,7 +523,14 @@
     "close": "Close",
     "error": "Something went wrong. Please try again.",
     "reauthRequired": "Your session has expired. Please re-authorize.",
-    "noPlaylists": "No playlists found on your account."
+    "noPlaylists": "No playlists found on your account.",
+    "urlImport": "Import from URL",
+    "urlImportDescription": "Paste a public Spotify or YouTube Music playlist URL",
+    "urlPlaceholder": "Paste playlist URL...",
+    "urlFetch": "Fetch",
+    "urlFetching": "Fetching playlist...",
+    "invalidUrl": "Invalid or unsupported URL. Supported: Spotify and YouTube Music playlists.",
+    "urlNotConfigured": "URL import is not configured on this server."
   },
   "songDetail": {
     "title": "Song Details",

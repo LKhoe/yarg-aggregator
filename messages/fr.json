@@ -523,7 +523,14 @@
     "close": "Fermer",
     "error": "Une erreur est survenue. Veuillez réessayer.",
     "reauthRequired": "Votre session a expiré. Veuillez vous réautoriser.",
-    "noPlaylists": "Aucune playlist trouvée sur votre compte."
+    "noPlaylists": "Aucune playlist trouvée sur votre compte.",
+    "urlImport": "Importer depuis une URL",
+    "urlImportDescription": "Collez une URL publique de playlist Spotify ou YouTube Music",
+    "urlPlaceholder": "Coller l'URL de la playlist...",
+    "urlFetch": "Récupérer",
+    "urlFetching": "Récupération de la playlist...",
+    "invalidUrl": "URL invalide ou non prise en charge. Compatibles : playlists Spotify et YouTube Music.",
+    "urlNotConfigured": "L'importation par URL n'est pas configurée sur ce serveur."
   },
   "songDetail": {
     "title": "Détails de la Chanson",

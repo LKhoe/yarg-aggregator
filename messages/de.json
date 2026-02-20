@@ -523,7 +523,14 @@
     "close": "Schließen",
     "error": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
     "reauthRequired": "Deine Sitzung ist abgelaufen. Bitte erneut autorisieren.",
-    "noPlaylists": "Keine Playlists auf deinem Konto gefunden."
+    "noPlaylists": "Keine Playlists auf deinem Konto gefunden.",
+    "urlImport": "Von URL importieren",
+    "urlImportDescription": "Füge eine öffentliche Spotify- oder YouTube Music-Playlist-URL ein",
+    "urlPlaceholder": "Playlist-URL einfügen...",
+    "urlFetch": "Laden",
+    "urlFetching": "Playlist wird geladen...",
+    "invalidUrl": "Ungültige oder nicht unterstützte URL. Unterstützt: Spotify- und YouTube Music-Playlists.",
+    "urlNotConfigured": "URL-Import ist auf diesem Server nicht konfiguriert."
   },
   "songDetail": {
     "title": "Song-Details",
