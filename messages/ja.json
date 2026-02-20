@@ -133,6 +133,18 @@
       "description": "これらの曲は楽器が4つ未満で、フルバンド体験を提供できない可能性があります。",
       "copyPaths": "{count} パスをコピー",
       "copiedPaths": "{count} パスをクリップボードにコピーしました"
+    },
+    "songcacheDialog": {
+      "title": "songcache.binの場所",
+      "windows": "Windows",
+      "macos": "MacOS", 
+      "linux": "Linux",
+      "quickAccess": "クイックアクセス：押す",
+      "andPaste": "して貼り付け：",
+      "devBuildNote": "開発ビルドでプレイしている場合、フォルダにある可能性があります",
+      "insteadOf": "の代わりに",
+      "copiedToClipboard": "クリップボードにコピーしました",
+      "yourUsername": "あなたのユーザー名"
     }
   },
   "auth": {

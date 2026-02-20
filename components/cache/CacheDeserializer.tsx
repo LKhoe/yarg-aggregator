@@ -43,6 +43,7 @@ import {
   Plus,
   Trash2,
   Trophy,
+  HelpCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { SongEntry } from "@/services/cache-reader/Song/Entries/SongEntry";
@@ -54,6 +55,7 @@ import {
   type SerializedSongEntry,
 } from "@/services/songs/serialization";
 import { useTranslations } from "@/hooks/use-translations";
+import Image from "next/image";
 
 interface SongDetail {
   title: string;
@@ -120,10 +122,7 @@ function getSongDirectory(entry: SongEntry): string {
 
 function countInstruments(parts: AvailableParts): number {
   let count = 0;
-  if (
-    parts.FiveFretGuitar.Intensity >= 0 ||
-    parts.SixFretGuitar.Intensity >= 0
-  )
+  if (parts.FiveFretGuitar.Intensity >= 0 || parts.SixFretGuitar.Intensity >= 0)
     count++;
   if (parts.FiveFretBass.Intensity >= 0 || parts.SixFretBass.Intensity >= 0)
     count++;
@@ -140,7 +139,14 @@ function countInstruments(parts: AvailableParts): number {
 }
 
 function findDuplicates(songs: SongEntry[]): DuplicateGroup[] {
-  const groups = new Map<string, { name: string; artist: string; entries: { song: SongEntry; index: number }[] }>();
+  const groups = new Map<
+    string,
+    {
+      name: string;
+      artist: string;
+      entries: { song: SongEntry; index: number }[];
+    }
+  >();
 
   for (let i = 0; i < songs.length; i++) {
     const song = songs[i];
@@ -174,7 +180,9 @@ function findDuplicates(songs: SongEntry[]): DuplicateGroup[] {
     for (let i = 1; i < entries.length; i++) {
       if (entries[i].instrumentCount > entries[bestIdx].instrumentCount) {
         bestIdx = i;
-      } else if (entries[i].instrumentCount === entries[bestIdx].instrumentCount) {
+      } else if (
+        entries[i].instrumentCount === entries[bestIdx].instrumentCount
+      ) {
         // Tiebreak: more metadata fields filled
         const metaCount = (s: SongEntry) => {
           let c = 0;
@@ -212,6 +220,7 @@ export default function CacheDeserializer() {
   const [detailType, setDetailType] = useState<
     "added" | "updated" | "linked" | null
   >(null);
+  const [showPathHelp, setShowPathHelp] = useState(false);
 
   const duplicates = useMemo(() => findDuplicates(songs), [songs]);
 
@@ -338,15 +347,15 @@ export default function CacheDeserializer() {
       // Prepare installation info
       const installation = isCreatingNew
         ? {
-          name: newInstallationName.trim(),
-          path: newInstallationPath.trim() || undefined,
-        }
+            name: newInstallationName.trim(),
+            path: newInstallationPath.trim() || undefined,
+          }
         : {
-          id: selectedInstallationId,
-          name:
-            installations.find((i) => i.id === selectedInstallationId)
-              ?.name || "",
-        };
+            id: selectedInstallationId,
+            name:
+              installations.find((i) => i.id === selectedInstallationId)
+                ?.name || "",
+          };
 
       const response = await fetch("/api/installed-songs", {
         method: "POST",
@@ -400,9 +409,7 @@ export default function CacheDeserializer() {
           <FileText className="h-5 w-5" />
           {t("cacheDeserializer.title")}
         </CardTitle>
-        <CardDescription>
-          {t("cacheDeserializer.description")}
-        </CardDescription>
+        <CardDescription>{t("cacheDeserializer.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* File Input */}
@@ -424,6 +431,15 @@ export default function CacheDeserializer() {
                   {t("cacheDeserializer.deserialize")}
                 </>
               )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => setShowPathHelp(true)}
+              title="Where to find songcache.bin"
+            >
+              <HelpCircle className="h-4 w-4" />
             </Button>
           </div>
           {selectedFile && (
@@ -553,7 +569,9 @@ export default function CacheDeserializer() {
                 size="sm"
                 className="w-full text-amber-700 dark:text-amber-300 border-amber-500/30 hover:bg-amber-500/10"
                 onClick={() => {
-                  navigator.clipboard.writeText(pathsToDelete.join("\n"));
+                  navigator.clipboard.writeText(
+                    pathsToDelete.sort().join("\n"),
+                  );
                   toast.success(
                     t("cacheDeserializer.duplicates.copiedPaths", {
                       count: pathsToDelete.length,
@@ -621,7 +639,8 @@ export default function CacheDeserializer() {
                 onClick={() => {
                   const paths = lowInstrumentSongs
                     .filter((e) => e.directory)
-                    .map((e) => e.directory);
+                    .map((e) => e.directory)
+                    .sort();
                   navigator.clipboard.writeText(paths.join("\n"));
                   toast.success(
                     t("cacheDeserializer.lowInstruments.copiedPaths", {
@@ -761,7 +780,7 @@ export default function CacheDeserializer() {
                     setDetailType("added")
                   }
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
+                    if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
                       if (importStats.details.added.length > 0) {
                         setDetailType("added");
@@ -785,7 +804,7 @@ export default function CacheDeserializer() {
                     setDetailType("updated")
                   }
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
+                    if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
                       if (importStats.details.updated.length > 0) {
                         setDetailType("updated");
@@ -809,7 +828,7 @@ export default function CacheDeserializer() {
                     setDetailType("linked")
                   }
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
+                    if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
                       if (importStats.details.linked.length > 0) {
                         setDetailType("linked");
@@ -838,8 +857,7 @@ export default function CacheDeserializer() {
               <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
                 <DialogHeader>
                   <DialogTitle className="capitalize">
-                    {detailType &&
-                      t(`cacheDeserializer.stats.${detailType}`)}
+                    {detailType && t(`cacheDeserializer.stats.${detailType}`)}
                   </DialogTitle>
                 </DialogHeader>
                 <div className="overflow-y-auto max-h-[60vh] pr-2">
@@ -877,7 +895,7 @@ export default function CacheDeserializer() {
               <div className="grid grid-cols-1 gap-1 p-2">
                 {songs.map((song, index) => (
                   <div
-                    key={`${song._metadata.Name || `Song ${index + 1}`}-${song._metadata.Artist || 'unknown'}`}
+                    key={`${song._metadata.Name || `Song ${index + 1}`}-${song._metadata.Artist || "unknown"}-${index}`}
                     className="p-3 bg-muted/50 rounded-md hover:bg-muted transition-colors"
                   >
                     <div className="flex items-center justify-between">
@@ -910,7 +928,147 @@ export default function CacheDeserializer() {
           </div>
         )}
       </CardContent>
+
+      {/* Path Help Dialog */}
+      <Dialog open={showPathHelp} onOpenChange={setShowPathHelp}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {t("cacheDeserializer.songcacheDialog.title")}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <div className="space-y-1">
+              <div className="flex items-center gap-1">
+                <Image
+                  src="/operational-systems/windows.svg"
+                  alt="Windows"
+                  className="h-4 w-4"
+                  width={16}
+                  height={16}
+                />
+                <p className="font-semibold">
+                  {t("cacheDeserializer.songcacheDialog.windows")}
+                </p>
+              </div>
+              <code className="block bg-muted rounded px-3 py-2 text-xs break-all">
+                C:\Users\&lt;{t("cacheDeserializer.songcacheDialog.yourUsername")}&gt;\AppData\LocalLow\YARC\YARG\release\songcache.bin
+              </code>
+              <p className="text-muted-foreground text-xs">
+                {t("cacheDeserializer.songcacheDialog.quickAccess")}{" "}
+                <kbd className="rounded border px-1 py-px text-xs font-mono bg-muted">
+                  Win
+                </kbd>{" "}
+                +{" "}
+                <kbd className="rounded border px-1 py-px text-xs font-mono bg-muted">
+                  R
+                </kbd>{" "}
+                {t("cacheDeserializer.songcacheDialog.andPaste")}
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-muted rounded px-3 py-2 text-xs break-all">
+                  %userprofile%\AppData\LocalLow\YARC\YARG\release\songcache.bin
+                </code>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      "%userprofile%\\AppData\\LocalLow\\YARC\\YARG\\release\\songcache.bin",
+                    );
+                    toast.success(
+                      t("cacheDeserializer.songcacheDialog.copiedToClipboard"),
+                    );
+                  }}
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-1">
+                <Image
+                  src="/operational-systems/macos.svg"
+                  alt="MacOS"
+                  className="h-4 w-4"
+                  width={16}
+                  height={16}
+                />
+                <p className="font-semibold">
+                  {t("cacheDeserializer.songcacheDialog.macos")}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-muted rounded px-3 py-2 text-xs break-all">
+                  ~/Library/Application Support/YARC/YARG/release/songcache.bin
+                </code>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      "~/Library/Application Support/YARC/YARG/release/songcache.bin",
+                    );
+                    toast.success(
+                      t("cacheDeserializer.songcacheDialog.copiedToClipboard"),
+                    );
+                  }}
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-1">
+                <Image
+                  src="/operational-systems/linux.svg"
+                  alt="Linux"
+                  className="h-4 w-4"
+                  width={16}
+                  height={16}
+                />
+                <p className="font-semibold">
+                  {t("cacheDeserializer.songcacheDialog.linux")}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-muted rounded px-3 py-2 text-xs break-all">
+                  ~/.config/unity3d/YARC/YARG/release/songcache.bin
+                </code>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      "~/.config/unity3d/YARC/YARG/release/songcache.bin",
+                    );
+                    toast.success(
+                      t("cacheDeserializer.songcacheDialog.copiedToClipboard"),
+                    );
+                  }}
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+
+            <p className="text-muted-foreground text-xs border-t pt-3">
+              {t("cacheDeserializer.songcacheDialog.devBuildNote")}{" "}
+              <code className="bg-muted rounded px-1">dev</code>{" "}
+              {t("cacheDeserializer.songcacheDialog.insteadOf")}{" "}
+              <code className="bg-muted rounded px-1">release</code>.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
-

@@ -6,7 +6,7 @@ export const authClient = createAuthClient({
   plugins: [lastfmClientPlugin()],
 });
 
-export const forgotPassword = async ({
+export const forgetPassword = async ({
   email,
   redirectTo,
 }: {
@@ -46,8 +46,6 @@ export const forgotPassword = async ({
   // Always succeed for mock purposes
   return { success: true };
 };
-
-export const forgetPassword = forgotPassword;
 
 export const {
   signIn,

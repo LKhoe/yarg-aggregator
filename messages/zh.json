@@ -133,6 +133,18 @@
       "description": "这些歌曲的乐器少于4种，可能无法提供完整的乐队体验。",
       "copyPaths": "复制 {count} 个路径",
       "copiedPaths": "已复制 {count} 个路径到剪贴板"
+    },
+    "songcacheDialog": {
+      "title": "在哪里找到 songcache.bin",
+      "windows": "Windows",
+      "macos": "MacOS", 
+      "linux": "Linux",
+      "quickAccess": "快速访问：按",
+      "andPaste": "并粘贴：",
+      "devBuildNote": "如果您在开发版本上玩游戏，它可能在",
+      "insteadOf": "文件夹而不是",
+      "copiedToClipboard": "已复制到剪贴板",
+      "yourUsername": "您的用户名"
     }
   },
   "auth": {

@@ -177,25 +177,9 @@ function InstallationDetailContent({
     }
   };
 
-  // Debounce search query
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setDebouncedSearchQuery("");
-      setSearchResults([]);
-      setSearchNextCursor(null);
-      setSearchHasMore(false);
-      return;
-    }
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery.trim());
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  // Fetch search results when debounced query changes
   const fetchSearchResults = useCallback(
-    async (cursor?: string | null) => {
-      if (!debouncedSearchQuery) return;
+    async (query: string, cursor?: string | null) => {
+      if (!query) return;
       const isLoadMore = !!cursor;
       if (isLoadMore) {
         setIsLoadingMoreSearch(true);
@@ -204,7 +188,7 @@ function InstallationDetailContent({
       }
       try {
         const params = new URLSearchParams({
-          query: debouncedSearchQuery,
+          query,
           limit: "20",
           sortBy: "relevance",
           sortOrder: "desc",
@@ -229,14 +213,25 @@ function InstallationDetailContent({
         setIsLoadingMoreSearch(false);
       }
     },
-    [debouncedSearchQuery, t],
+    [t],
   );
 
+  // Debounce search query and trigger fetch
   useEffect(() => {
-    if (debouncedSearchQuery) {
-      fetchSearchResults();
+    if (!searchQuery.trim()) {
+      setDebouncedSearchQuery("");
+      setSearchResults([]);
+      setSearchNextCursor(null);
+      setSearchHasMore(false);
+      return;
     }
-  }, [debouncedSearchQuery, fetchSearchResults]);
+    const timer = setTimeout(() => {
+      const trimmed = searchQuery.trim();
+      setDebouncedSearchQuery(trimmed);
+      fetchSearchResults(trimmed);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, fetchSearchResults]);
 
   // Intersection observer for infinite scroll in search results
   useEffect(() => {
@@ -251,7 +246,7 @@ function InstallationDetailContent({
           searchHasMore &&
           !isLoadingMoreSearch
         ) {
-          fetchSearchResults(searchNextCursor);
+          fetchSearchResults(debouncedSearchQuery, searchNextCursor);
         }
       },
       { root: searchScrollRef.current, rootMargin: "200px", threshold: 0.1 },

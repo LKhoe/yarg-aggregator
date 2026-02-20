@@ -133,6 +133,18 @@
       "description": "Estas canciones tienen menos de 4 instrumentos y pueden no ofrecer una experiencia de banda completa.",
       "copyPaths": "Copiar {count} rutas",
       "copiedPaths": "{count} rutas copiadas al portapapeles"
+    },
+    "songcacheDialog": {
+      "title": "Dónde encontrar songcache.bin",
+      "windows": "Windows",
+      "macos": "MacOS", 
+      "linux": "Linux",
+      "quickAccess": "Acceso rápido: presiona",
+      "andPaste": "y pega:",
+      "devBuildNote": "Si estás jugando en una versión de desarrollo, puede estar en la carpeta",
+      "insteadOf": "en lugar de",
+      "copiedToClipboard": "Copiado al portapapeles",
+      "yourUsername": "tu"
     }
   },
   "auth": {
