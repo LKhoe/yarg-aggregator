@@ -490,64 +490,152 @@ export default function CacheDeserializer() {
 
         {/* Duplicates Section */}
         {duplicates.length > 0 && (
-          <div className="space-y-3 p-4 border rounded-lg bg-amber-500/5 border-amber-500/20">
-            <h3 className="text-lg font-semibold flex items-center gap-2 text-amber-600 dark:text-amber-400">
-              <Copy className="h-5 w-5" />
-              {t("cacheDeserializer.duplicates.title", {
-                count: duplicates.length,
-              })}
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              {t("cacheDeserializer.duplicates.description")}
-            </p>
+          <Collapsible defaultOpen>
+            <div className="border rounded-lg bg-amber-500/5 border-amber-500/20">
+              <CollapsibleTrigger className="w-full flex items-center gap-2 p-4 text-left group cursor-pointer">
+                <ChevronRight className="h-5 w-5 transition-transform duration-200 group-data-[state=open]:rotate-90 text-amber-600 dark:text-amber-400 shrink-0" />
+                <Copy className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span className="text-lg font-semibold text-amber-600 dark:text-amber-400 flex-1">
+                  {t("cacheDeserializer.duplicates.title", {
+                    count: duplicates.length,
+                  })}
+                </span>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="space-y-3 px-4 pb-4">
+                  <p className="text-sm text-muted-foreground">
+                    {t("cacheDeserializer.duplicates.description")}
+                  </p>
 
-            <div className="space-y-1">
-              {duplicates.map((group, groupIdx) => (
-                <Collapsible key={groupIdx}>
-                  <CollapsibleTrigger className="w-full flex items-center gap-2 font-medium text-sm bg-muted/50 p-2 rounded cursor-pointer hover:bg-muted/70 group text-left transition-colors">
-                    <ChevronRight className="h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-90 text-muted-foreground shrink-0" />
-                    <span className="truncate flex-1">
-                      {group.name} - {group.artist}
-                    </span>
-                    <span className="text-xs text-muted-foreground shrink-0">
-                      {group.entries.length}x
-                    </span>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <div className="space-y-1 pl-6 pt-1 pb-2">
-                      {group.entries.map((entry, entryIdx) => (
-                        <div
-                          key={entryIdx}
-                          className={`flex items-start gap-2 text-xs p-2 rounded ${
-                            entry.isBest
-                              ? "bg-green-500/10 border border-green-500/20"
-                              : "bg-red-500/5 border border-red-500/10"
-                          }`}
-                        >
-                          {entry.isBest ? (
-                            <Trophy className="h-3.5 w-3.5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
-                          ) : (
-                            <Trash2 className="h-3.5 w-3.5 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`font-medium ${entry.isBest ? "text-green-700 dark:text-green-300" : "text-red-600 dark:text-red-400"}`}
+                  <div className="space-y-1">
+                    {duplicates.map((group, groupIdx) => (
+                      <Collapsible key={groupIdx}>
+                        <CollapsibleTrigger className="w-full flex items-center gap-2 font-medium text-sm bg-muted/50 p-2 rounded cursor-pointer hover:bg-muted/70 group text-left transition-colors">
+                          <ChevronRight className="h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-90 text-muted-foreground shrink-0" />
+                          <span className="truncate flex-1">
+                            {group.name} - {group.artist}
+                          </span>
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            {group.entries.length}x
+                          </span>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="space-y-1 pl-6 pt-1 pb-2">
+                            {group.entries.map((entry, entryIdx) => (
+                              <div
+                                key={entryIdx}
+                                className={`flex items-start gap-2 text-xs p-2 rounded ${
+                                  entry.isBest
+                                    ? "bg-green-500/10 border border-green-500/20"
+                                    : "bg-red-500/5 border border-red-500/10"
+                                }`}
                               >
-                                {entry.isBest
-                                  ? t("cacheDeserializer.duplicates.keep")
-                                  : t("cacheDeserializer.duplicates.delete")}
-                              </span>
-                              <span className="text-muted-foreground">
-                                {t(
-                                  "cacheDeserializer.duplicates.instrumentCount",
-                                  { count: entry.instrumentCount },
+                                {entry.isBest ? (
+                                  <Trophy className="h-3.5 w-3.5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
+                                ) : (
+                                  <Trash2 className="h-3.5 w-3.5 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
                                 )}
-                              </span>
-                            </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className={`font-medium ${entry.isBest ? "text-green-700 dark:text-green-300" : "text-red-600 dark:text-red-400"}`}
+                                    >
+                                      {entry.isBest
+                                        ? t("cacheDeserializer.duplicates.keep")
+                                        : t(
+                                            "cacheDeserializer.duplicates.delete",
+                                          )}
+                                    </span>
+                                    <span className="text-muted-foreground">
+                                      {t(
+                                        "cacheDeserializer.duplicates.instrumentCount",
+                                        { count: entry.instrumentCount },
+                                      )}
+                                    </span>
+                                  </div>
+                                  {entry.directory && (
+                                    <p
+                                      className="text-muted-foreground truncate mt-0.5"
+                                      title={entry.directory}
+                                    >
+                                      {entry.directory}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    ))}
+                  </div>
+
+                  {/* Copy all paths to delete */}
+                  {pathsToDelete.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-amber-700 dark:text-amber-300 border-amber-500/30 hover:bg-amber-500/10"
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          pathsToDelete.sort().join("\n"),
+                        );
+                        toast.success(
+                          t("cacheDeserializer.duplicates.copiedPaths", {
+                            count: pathsToDelete.length,
+                          }),
+                        );
+                      }}
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      {t("cacheDeserializer.duplicates.copyPaths", {
+                        count: pathsToDelete.length,
+                      })}
+                    </Button>
+                  )}
+                </div>
+              </CollapsibleContent>
+            </div>
+          </Collapsible>
+        )}
+
+        {/* Low Instrument Songs Section */}
+        {lowInstrumentSongs.length > 0 && (
+          <Collapsible defaultOpen>
+            <div className="border rounded-lg bg-orange-500/5 border-orange-500/20">
+              <CollapsibleTrigger className="w-full flex items-center gap-2 p-4 text-left group cursor-pointer">
+                <ChevronRight className="h-5 w-5 transition-transform duration-200 group-data-[state=open]:rotate-90 text-orange-600 dark:text-orange-400 shrink-0" />
+                <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400 shrink-0" />
+                <span className="text-lg font-semibold text-orange-600 dark:text-orange-400 flex-1">
+                  {t("cacheDeserializer.lowInstruments.title", {
+                    count: lowInstrumentSongs.length,
+                  })}
+                </span>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="space-y-3 px-4 pb-4">
+                  <p className="text-sm text-muted-foreground">
+                    {t("cacheDeserializer.lowInstruments.description")}
+                  </p>
+
+                  <div className="border rounded-lg max-h-64 overflow-y-auto">
+                    <div className="space-y-1 p-2">
+                      {lowInstrumentSongs.map((entry) => (
+                        <div
+                          key={entry.index}
+                          className="flex items-start gap-2 text-xs p-2 rounded bg-muted/50"
+                        >
+                          <span className="shrink-0 font-mono text-orange-600 dark:text-orange-400 mt-0.5">
+                            {entry.instrumentCount}/5
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">
+                              {entry.song._metadata.Name} -{" "}
+                              {entry.song._metadata.Artist}
+                            </p>
                             {entry.directory && (
                               <p
-                                className="text-muted-foreground truncate mt-0.5"
+                                className="text-muted-foreground truncate"
                                 title={entry.directory}
                               >
                                 {entry.directory}
@@ -557,105 +645,38 @@ export default function CacheDeserializer() {
                         </div>
                       ))}
                     </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              ))}
-            </div>
-
-            {/* Copy all paths to delete */}
-            {pathsToDelete.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full text-amber-700 dark:text-amber-300 border-amber-500/30 hover:bg-amber-500/10"
-                onClick={() => {
-                  navigator.clipboard.writeText(
-                    pathsToDelete.sort().join("\n"),
-                  );
-                  toast.success(
-                    t("cacheDeserializer.duplicates.copiedPaths", {
-                      count: pathsToDelete.length,
-                    }),
-                  );
-                }}
-              >
-                <Copy className="h-4 w-4 mr-2" />
-                {t("cacheDeserializer.duplicates.copyPaths", {
-                  count: pathsToDelete.length,
-                })}
-              </Button>
-            )}
-          </div>
-        )}
-
-        {/* Low Instrument Songs Section */}
-        {lowInstrumentSongs.length > 0 && (
-          <div className="space-y-3 p-4 border rounded-lg bg-orange-500/5 border-orange-500/20">
-            <h3 className="text-lg font-semibold flex items-center gap-2 text-orange-600 dark:text-orange-400">
-              <AlertCircle className="h-5 w-5" />
-              {t("cacheDeserializer.lowInstruments.title", {
-                count: lowInstrumentSongs.length,
-              })}
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              {t("cacheDeserializer.lowInstruments.description")}
-            </p>
-
-            <div className="border rounded-lg max-h-64 overflow-y-auto">
-              <div className="space-y-1 p-2">
-                {lowInstrumentSongs.map((entry) => (
-                  <div
-                    key={entry.index}
-                    className="flex items-start gap-2 text-xs p-2 rounded bg-muted/50"
-                  >
-                    <span className="shrink-0 font-mono text-orange-600 dark:text-orange-400 mt-0.5">
-                      {entry.instrumentCount}/5
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">
-                        {entry.song._metadata.Name} -{" "}
-                        {entry.song._metadata.Artist}
-                      </p>
-                      {entry.directory && (
-                        <p
-                          className="text-muted-foreground truncate"
-                          title={entry.directory}
-                        >
-                          {entry.directory}
-                        </p>
-                      )}
-                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Copy paths */}
-            {lowInstrumentSongs.some((e) => e.directory) && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full text-orange-700 dark:text-orange-300 border-orange-500/30 hover:bg-orange-500/10"
-                onClick={() => {
-                  const paths = lowInstrumentSongs
-                    .filter((e) => e.directory)
-                    .map((e) => e.directory)
-                    .sort();
-                  navigator.clipboard.writeText(paths.join("\n"));
-                  toast.success(
-                    t("cacheDeserializer.lowInstruments.copiedPaths", {
-                      count: paths.length,
-                    }),
-                  );
-                }}
-              >
-                <Copy className="h-4 w-4 mr-2" />
-                {t("cacheDeserializer.lowInstruments.copyPaths", {
-                  count: lowInstrumentSongs.filter((e) => e.directory).length,
-                })}
-              </Button>
-            )}
-          </div>
+                  {/* Copy paths */}
+                  {lowInstrumentSongs.some((e) => e.directory) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-orange-700 dark:text-orange-300 border-orange-500/30 hover:bg-orange-500/10"
+                      onClick={() => {
+                        const paths = lowInstrumentSongs
+                          .filter((e) => e.directory)
+                          .map((e) => e.directory)
+                          .sort();
+                        navigator.clipboard.writeText(paths.join("\n"));
+                        toast.success(
+                          t("cacheDeserializer.lowInstruments.copiedPaths", {
+                            count: paths.length,
+                          }),
+                        );
+                      }}
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      {t("cacheDeserializer.lowInstruments.copyPaths", {
+                        count: lowInstrumentSongs.filter((e) => e.directory)
+                          .length,
+                      })}
+                    </Button>
+                  )}
+                </div>
+              </CollapsibleContent>
+            </div>
+          </Collapsible>
         )}
 
         {/* Installation Selection & Save Section */}
@@ -668,58 +689,53 @@ export default function CacheDeserializer() {
 
             {/* Installation Selector */}
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <Label htmlFor="installation">
-                    {t("cacheDeserializer.installation")}
-                  </Label>
-                  <Select
-                    value={isCreatingNew ? "new" : selectedInstallationId}
-                    onValueChange={(value) => {
-                      if (value === "new") {
-                        setIsCreatingNew(true);
-                        setSelectedInstallationId("");
-                      } else {
-                        setIsCreatingNew(false);
-                        setSelectedInstallationId(value);
-                      }
-                    }}
-                    disabled={isSaving}
-                  >
-                    <SelectTrigger id="installation">
-                      <SelectValue
-                        placeholder={t("cacheDeserializer.selectInstallation")}
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {installations.map((installation) => (
-                        <SelectItem
-                          key={installation.id}
-                          value={installation.id}
-                        >
-                          {installation.name}
-                          {installation.path && (
-                            <span className="text-muted-foreground ml-2 text-xs">
-                              ({installation.path})
-                            </span>
-                          )}
-                        </SelectItem>
-                      ))}
-                      <SelectItem value="new">
-                        <span className="flex items-center gap-1">
-                          <Plus className="h-3 w-3" />
-                          {t("cacheDeserializer.createInstallation")}
-                        </span>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="installation">
+                  {t("cacheDeserializer.installation")}
+                </Label>
+                <Select
+                  value={isCreatingNew ? "new" : selectedInstallationId}
+                  onValueChange={(value) => {
+                    if (value === "new") {
+                      setIsCreatingNew(true);
+                      setSelectedInstallationId("");
+                    } else {
+                      setIsCreatingNew(false);
+                      setSelectedInstallationId(value);
+                    }
+                  }}
+                  disabled={isSaving}
+                >
+                  <SelectTrigger id="installation" className="w-full">
+                    <SelectValue
+                      placeholder={t("cacheDeserializer.selectInstallation")}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {installations.map((installation) => (
+                      <SelectItem key={installation.id} value={installation.id}>
+                        {installation.name}
+                        {installation.path && (
+                          <span className="text-muted-foreground ml-2 text-xs">
+                            ({installation.path})
+                          </span>
+                        )}
                       </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                    ))}
+                    <SelectItem value="new">
+                      <span className="flex items-center gap-1">
+                        <Plus className="h-3 w-3" />
+                        {t("cacheDeserializer.createInstallation")}
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* New Installation Fields */}
               {isCreatingNew && (
                 <div className="space-y-3 pl-4 border-l-2 border-primary/30">
-                  <div>
+                  <div className="flex flex-col gap-2">
                     <Label htmlFor="new-name">
                       {t("cacheDeserializer.installationName")}
                     </Label>
@@ -733,7 +749,7 @@ export default function CacheDeserializer() {
                       disabled={isSaving}
                     />
                   </div>
-                  <div>
+                  <div className="flex flex-col gap-2">
                     <Label htmlFor="new-path">
                       {t("cacheDeserializer.installationPath")}
                     </Label>
@@ -952,7 +968,9 @@ export default function CacheDeserializer() {
                 </p>
               </div>
               <code className="block bg-muted rounded px-3 py-2 text-xs break-all">
-                C:\Users\&lt;{t("cacheDeserializer.songcacheDialog.yourUsername")}&gt;\AppData\LocalLow\YARC\YARG\release\songcache.bin
+                C:\Users\&lt;
+                {t("cacheDeserializer.songcacheDialog.yourUsername")}
+                &gt;\AppData\LocalLow\YARC\YARG\release\songcache.bin
               </code>
               <p className="text-muted-foreground text-xs">
                 {t("cacheDeserializer.songcacheDialog.quickAccess")}{" "}
