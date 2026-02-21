@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useTranslations } from "@/hooks/use-translations";
 import { PlaylistImportDialog } from "@/components/import/PlaylistImportDialog";
+import { PlaylistIntersectionDialog } from "@/components/intersection/PlaylistIntersectionDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,7 +28,15 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Heart, List, Lock, Globe, Download } from "lucide-react";
+import {
+  Plus,
+  Heart,
+  List,
+  Lock,
+  Globe,
+  Download,
+  GitMerge,
+} from "lucide-react";
 import Link from "next/link";
 
 interface SongList {
@@ -51,11 +60,16 @@ function ListsContent() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importProvider, setImportProvider] = useState<string | null>(null);
+  const [isIntersectionOpen, setIsIntersectionOpen] = useState(false);
 
   // Handle OAuth callback redirect with ?import=provider
   useEffect(() => {
     const provider = searchParams.get("import");
-    if (provider === "spotify" || provider === "google" || provider === "lastfm") {
+    if (
+      provider === "spotify" ||
+      provider === "google" ||
+      provider === "lastfm"
+    ) {
       setImportProvider(provider);
       setIsImportOpen(true);
       // Clean up URL
@@ -111,17 +125,21 @@ function ListsContent() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">{t("lists.myLists")}</h1>
           <p className="text-muted-foreground">
             {t("lists.myListsDescription")}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 sm:flex-nowrap">
           <Button variant="outline" onClick={() => setIsImportOpen(true)}>
             <Download className="h-4 w-4 mr-2" />
             {t("import.button")}
+          </Button>
+          <Button variant="outline" onClick={() => setIsIntersectionOpen(true)}>
+            <GitMerge className="h-4 w-4 mr-2" />
+            {t("intersection.button")}
           </Button>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -130,47 +148,51 @@ function ListsContent() {
                 {t("lists.createList")}
               </Button>
             </DialogTrigger>
-          <DialogContent>
-            <form onSubmit={handleCreateList}>
-              <DialogHeader>
-                <DialogTitle>{t("lists.createNewList")}</DialogTitle>
-                <DialogDescription>
-                  {t("lists.createNewListDescription")}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex flex-col gap-2 py-4">
-                <Label htmlFor="listName">{t("lists.listName")}</Label>
-                <Input
-                  id="listName"
-                  value={newListName}
-                  onChange={(e) => setNewListName(e.target.value)}
-                  placeholder={t("lists.listNamePlaceholder")}
-                  disabled={isCreating}
-                  minLength={1}
-                  maxLength={50}
-                  required
-                />
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
-                >
-                  {t("lists.cancel")}
-                </Button>
-                <Button type="submit" disabled={isCreating}>
-                  {isCreating ? t("lists.creating") : t("lists.create")}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+            <DialogContent>
+              <form onSubmit={handleCreateList}>
+                <DialogHeader>
+                  <DialogTitle>{t("lists.createNewList")}</DialogTitle>
+                  <DialogDescription>
+                    {t("lists.createNewListDescription")}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-2 py-4">
+                  <Label htmlFor="listName">{t("lists.listName")}</Label>
+                  <Input
+                    id="listName"
+                    value={newListName}
+                    onChange={(e) => setNewListName(e.target.value)}
+                    placeholder={t("lists.listNamePlaceholder")}
+                    disabled={isCreating}
+                    minLength={1}
+                    maxLength={50}
+                    required
+                  />
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsDialogOpen(false)}
+                  >
+                    {t("lists.cancel")}
+                  </Button>
+                  <Button type="submit" disabled={isCreating}>
+                    {isCreating ? t("lists.creating") : t("lists.create")}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
         <PlaylistImportDialog
           open={isImportOpen}
           onOpenChange={setIsImportOpen}
           initialProvider={importProvider}
+        />
+        <PlaylistIntersectionDialog
+          open={isIntersectionOpen}
+          onOpenChange={setIsIntersectionOpen}
         />
       </div>
 
@@ -236,11 +258,13 @@ function ListsContent() {
 export default function ListsPage() {
   return (
     <ProtectedRoute>
-      <Suspense fallback={
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-        </div>
-      }>
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center min-h-[50vh]">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        }
+      >
         <ListsContent />
       </Suspense>
     </ProtectedRoute>

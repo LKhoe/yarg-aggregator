@@ -382,7 +382,11 @@
     "downloading": "Ouverture des téléchargements...",
     "downloadAllBlocked": "Popups bloqués. Veuillez autoriser les popups pour ce site et réessayer.",
     "downloadAllNoLinks": "Certaines chansons n'ont pas de liens de téléchargement",
-    "confirm": "Confirmer"
+    "confirm": "Confirmer",
+    "noDownloadLink": "Pas de lien de téléchargement",
+    "installed": "Installé",
+    "downloadUninstalled": "Télécharger Non Installés",
+    "selectInstallation": "Vérifier l'installation..."
   },
   "installationSelector": {
     "selectPlaceholder": "Sélectionner l'installation...",
@@ -544,5 +548,40 @@
     "notConfigured": "{platform} n'est pas configuré",
     "noPreview": "Aperçu non disponible",
     "unauthorized": "Connectez-vous pour écouter sur les plateformes"
+  },
+  "intersection": {
+    "button": "Trouver l'Intersection",
+    "title": "Trouver l'Intersection des Playlists",
+    "step1Title": "Mes Listes",
+    "step2Title": "Listes Publiques",
+    "step3Title": "Seuil",
+    "step4Title": "Résultats",
+    "step1Description": "Sélectionnez vos playlists à inclure dans l'intersection.",
+    "step2Description": "Recherchez et ajoutez des playlists publiques d'autres utilisateurs.",
+    "step3Description": "Définissez combien de playlists une chanson doit apparaître dans.",
+    "searchPlaceholder": "Rechercher par nom de liste ou nom d'utilisateur...",
+    "noResults": "Aucune liste publique trouvée.",
+    "searching": "Recherche...",
+    "myListsSummary": "{count} de mes listes",
+    "publicListsSummary": "{count} listes publiques",
+    "totalSelected": "{total} listes sélectionnées au total",
+    "minThreshold": "Les chansons doivent apparaître dans au moins {n} de {total} playlists",
+    "calculate": "Calculer l'Intersection",
+    "calculating": "Calcul...",
+    "songsFound": "{count} chansons trouvées",
+    "saveAsPlaylist": "Sauvegarder comme Playlist",
+    "savePlaylistName": "Nom de la playlist",
+    "saving": "Sauvegarde...",
+    "saved": "Sauvegardé !",
+    "downloadAll": "Tout Télécharger",
+    "downloadUninstalled": "Télécharger Non Installés",
+    "selectInstallation": "Vérifier l'installation...",
+    "noInstallation": "Aucune installation",
+    "inXLists": "Dans {count} listes",
+    "installed": "Installé",
+    "noSongsFound": "Aucune chanson trouvée correspondant au seuil.",
+    "fetchError": "Échec du chargement des listes.",
+    "saveError": "Échec de la sauvegarde de la playlist.",
+    "saveSuccess": "Playlist sauvegardée avec succès !"
   }
 }

@@ -382,7 +382,11 @@
     "downloading": "正在打开下载...",
     "downloadAllBlocked": "弹出窗口被阻止。请允许此网站的弹出窗口，然后重试。",
     "downloadAllNoLinks": "部分歌曲没有下载链接",
-    "confirm": "确认"
+    "confirm": "确认",
+    "noDownloadLink": "无下载链接",
+    "installed": "已安装",
+    "downloadUninstalled": "仅下载未安装的",
+    "selectInstallation": "检查安装..."
   },
   "installationSelector": {
     "selectPlaceholder": "选择安装...",
@@ -544,5 +548,40 @@
     "notConfigured": "{platform}未配置",
     "noPreview": "无法预览",
     "unauthorized": "登录以在平台上收听"
+  },
+  "intersection": {
+    "button": "查找交集",
+    "title": "查找播放列表交集",
+    "step1Title": "我的列表",
+    "step2Title": "公开列表",
+    "step3Title": "阈值",
+    "step4Title": "结果",
+    "step1Description": "选择要包含在交集中的播放列表。",
+    "step2Description": "搜索并添加其他用户的公开播放列表。",
+    "step3Description": "设置歌曲必须出现在多少个播放列表中。",
+    "searchPlaceholder": "按列表名称或用户名搜索...",
+    "noResults": "未找到公开列表。",
+    "searching": "搜索中...",
+    "myListsSummary": "我的{count}个列表",
+    "publicListsSummary": "{count}个公开列表",
+    "totalSelected": "总共选择了{total}个列表",
+    "minThreshold": "歌曲必须出现在至少{n}个{total}播放列表中",
+    "calculate": "计算交集",
+    "calculating": "计算中...",
+    "songsFound": "找到{count}首歌曲",
+    "saveAsPlaylist": "保存为播放列表",
+    "savePlaylistName": "播放列表名称",
+    "saving": "保存中...",
+    "saved": "已保存！",
+    "downloadAll": "全部下载",
+    "downloadUninstalled": "仅下载未安装的",
+    "selectInstallation": "检查安装...",
+    "noInstallation": "无安装",
+    "inXLists": "在{count}个列表中",
+    "installed": "已安装",
+    "noSongsFound": "未找到符合阈值的歌曲。",
+    "fetchError": "加载列表失败。",
+    "saveError": "保存播放列表失败。",
+    "saveSuccess": "播放列表保存成功！"
   }
 }

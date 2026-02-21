@@ -1,6 +1,5 @@
 "use client";
 
-import { Music } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { LanguageSwitcher } from "@/components/language/language-switcher";
 import { UserMenu } from "@/components/auth/UserMenu";
@@ -21,7 +20,6 @@ export default function Header() {
               src="/logo-simple.svg"
               alt="YargAggregator"
               className="h-10 w-10"
-              style={{ opacity: 0.9, filter: "contrast(0.98)" }}
               preload={true}
               width={40}
               height={40}

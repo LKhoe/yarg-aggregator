@@ -382,7 +382,11 @@
     "downloading": "Abriendo descargas...",
     "downloadAllBlocked": "Ventanas emergentes bloqueadas. Permite las ventanas emergentes para este sitio e inténtalo de nuevo.",
     "downloadAllNoLinks": "Algunas canciones no tienen enlaces de descarga",
-    "confirm": "Confirmar"
+    "confirm": "Confirmar",
+    "noDownloadLink": "Sin enlace de descarga",
+    "installed": "Instalado",
+    "downloadUninstalled": "Descargar No Instaladas",
+    "selectInstallation": "Verificar instalación..."
   },
   "installationSelector": {
     "selectPlaceholder": "Selecciona instalación...",
@@ -544,5 +548,40 @@
     "notConfigured": "{platform} no está configurado",
     "noPreview": "Vista previa no disponible",
     "unauthorized": "Inicia sesión para escuchar en plataformas"
+  },
+  "intersection": {
+    "button": "Encontrar Intersección",
+    "title": "Encontrar Intersección de Playlists",
+    "step1Title": "Mis Listas",
+    "step2Title": "Listas Públicas",
+    "step3Title": "Umbral",
+    "step4Title": "Resultados",
+    "step1Description": "Selecciona tus playlists para incluir en la intersección.",
+    "step2Description": "Busca y añade playlists públicas de otros usuarios.",
+    "step3Description": "Establece cuántas playlists debe aparecer una canción.",
+    "searchPlaceholder": "Buscar por nombre de lista o nombre de usuario...",
+    "noResults": "No se encontraron listas públicas.",
+    "searching": "Buscando...",
+    "myListsSummary": "{count} de mis listas",
+    "publicListsSummary": "{count} listas públicas",
+    "totalSelected": "{total} listas seleccionadas en total",
+    "minThreshold": "Las canciones deben aparecer en al menos {n} de {total} playlists",
+    "calculate": "Calcular Intersección",
+    "calculating": "Calculando...",
+    "songsFound": "{count} canciones encontradas",
+    "saveAsPlaylist": "Guardar como Playlist",
+    "savePlaylistName": "Nombre de la playlist",
+    "saving": "Guardando...",
+    "saved": "¡Guardado!",
+    "downloadAll": "Descargar Todo",
+    "downloadUninstalled": "Descargar No Instaladas",
+    "selectInstallation": "Verificar instalación...",
+    "noInstallation": "Sin instalación",
+    "inXLists": "En {count} listas",
+    "installed": "Instalado",
+    "noSongsFound": "No se encontraron canciones que coincidan con el umbral.",
+    "fetchError": "Error al cargar las listas.",
+    "saveError": "Error al guardar la playlist.",
+    "saveSuccess": "¡Playlist guardada exitosamente!"
   }
 }

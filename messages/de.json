@@ -382,7 +382,11 @@
     "downloading": "Downloads werden geöffnet...",
     "downloadAllBlocked": "Popups blockiert. Bitte erlauben Sie Popups für diese Seite und versuchen Sie es erneut.",
     "downloadAllNoLinks": "Einige Lieder haben keine Download-Links",
-    "confirm": "Bestätigen"
+    "confirm": "Bestätigen",
+    "noDownloadLink": "Kein Download-Link",
+    "installed": "Installiert",
+    "downloadUninstalled": "Nur nicht installierte herunterladen",
+    "selectInstallation": "Installation prüfen..."
   },
   "installationSelector": {
     "selectPlaceholder": "Installation auswählen...",
@@ -544,5 +548,40 @@
     "notConfigured": "{platform} ist nicht konfiguriert",
     "noPreview": "Keine Vorschau verfügbar",
     "unauthorized": "Melde dich an, um auf Plattformen zu hören"
+  },
+  "intersection": {
+    "button": "Schnittmenge finden",
+    "title": "Playlist-Schnittmenge finden",
+    "step1Title": "Meine Listen",
+    "step2Title": "Öffentliche Listen",
+    "step3Title": "Schwellenwert",
+    "step4Title": "Ergebnisse",
+    "step1Description": "Wähle deine Playlists für die Schnittmenge aus.",
+    "step2Description": "Suche und füge öffentliche Playlists von anderen Benutzern hinzu.",
+    "step3Description": "Lege fest, in wie vielen Playlisten ein Song erscheinen muss.",
+    "searchPlaceholder": "Nach Listenname oder Benutzernamen suchen...",
+    "noResults": "Keine öffentlichen Listen gefunden.",
+    "searching": "Suchen...",
+    "myListsSummary": "{count} meiner Listen",
+    "publicListsSummary": "{count} öffentliche Listen",
+    "totalSelected": "{total} Listen insgesamt ausgewählt",
+    "minThreshold": "Songs müssen in mindestens {n} von {total} Playlists erscheinen",
+    "calculate": "Schnittmenge berechnen",
+    "calculating": "Berechnen...",
+    "songsFound": "{count} Songs gefunden",
+    "saveAsPlaylist": "Als Playlist speichern",
+    "savePlaylistName": "Playlist-Name",
+    "saving": "Speichern...",
+    "saved": "Gespeichert!",
+    "downloadAll": "Alle herunterladen",
+    "downloadUninstalled": "Nur nicht installierte herunterladen",
+    "selectInstallation": "Installation prüfen...",
+    "noInstallation": "Keine Installation",
+    "inXLists": "In {count} Listen",
+    "installed": "Installiert",
+    "noSongsFound": "Keine Songs gefunden, die dem Schwellenwert entsprechen.",
+    "fetchError": "Fehler beim Laden der Listen.",
+    "saveError": "Fehler beim Speichern der Playlist.",
+    "saveSuccess": "Playlist erfolgreich gespeichert!"
   }
 }

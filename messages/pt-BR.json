@@ -382,7 +382,11 @@
     "downloading": "Abrindo downloads...",
     "downloadAllBlocked": "Popups bloqueados. Permita popups para este site e tente novamente.",
     "downloadAllNoLinks": "Algumas músicas não possuem links de download",
-    "confirm": "Confirmar"
+    "confirm": "Confirmar",
+    "noDownloadLink": "Sem link de download",
+    "installed": "Instalado",
+    "downloadUninstalled": "Baixar Não Instaladas",
+    "selectInstallation": "Verificar instalação..."
   },
   "installationSelector": {
     "selectPlaceholder": "Selecione a instalação...",
@@ -544,5 +548,40 @@
     "notConfigured": "{platform} não está configurado",
     "noPreview": "Pré-visualização não disponível",
     "unauthorized": "Entre para ouvir nas plataformas"
+  },
+  "intersection": {
+    "button": "Encontrar Interseção",
+    "title": "Encontrar Interseção de Playlists",
+    "step1Title": "Minhas Listas",
+    "step2Title": "Listas Públicas",
+    "step3Title": "Limite",
+    "step4Title": "Resultados",
+    "step1Description": "Selecione suas playlists para incluir na interseção.",
+    "step2Description": "Busque e adicione playlists públicas de outros usuários.",
+    "step3Description": "Defina em quantas playlists uma música deve aparecer.",
+    "searchPlaceholder": "Buscar por nome da lista ou nome de usuário...",
+    "noResults": "Nenhuma lista pública encontrada.",
+    "searching": "Buscando...",
+    "myListsSummary": "{count} das minhas listas",
+    "publicListsSummary": "{count} listas públicas",
+    "totalSelected": "{total} listas selecionadas no total",
+    "minThreshold": "Músicas devem aparecer em pelo menos {n} de {total} playlists",
+    "calculate": "Calcular Interseção",
+    "calculating": "Calculando...",
+    "songsFound": "{count} músicas encontradas",
+    "saveAsPlaylist": "Salvar como Playlist",
+    "savePlaylistName": "Nome da playlist",
+    "saving": "Salvando...",
+    "saved": "Salvo!",
+    "downloadAll": "Baixar Tudo",
+    "downloadUninstalled": "Baixar Não Instaladas",
+    "selectInstallation": "Verificar instalação...",
+    "noInstallation": "Nenhuma instalação",
+    "inXLists": "Em {count} listas",
+    "installed": "Instalado",
+    "noSongsFound": "Nenhuma música encontrada correspondente ao limite.",
+    "fetchError": "Falha ao carregar as listas.",
+    "saveError": "Falha ao salvar a playlist.",
+    "saveSuccess": "Playlist salva com sucesso!"
   }
 }

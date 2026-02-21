@@ -1,10 +1,28 @@
 import { db } from "@/lib/db";
-import { songList, songListItem, song, artist, album, downloadUrl } from "@/lib/db/schema";
-import { eq, and, sql, or, desc, inArray, ne } from "drizzle-orm";
+import { songList, songListItem, song, artist, album, downloadUrl, userProfile, installationSong } from "@/lib/db/schema";
+import { eq, and, sql, or, desc, inArray, ne, ilike } from "drizzle-orm";
 import type { SongList, SongListItem, Song } from "@/lib/db/schema";
 
 export type ListWithItemCount = SongList & {
   itemCount: number;
+};
+
+export type PublicListResult = {
+  id: string;
+  name: string;
+  ownerDisplayName: string;
+  itemCount: number;
+};
+
+export type IntersectionSong = {
+  songId: string;
+  title: string;
+  artist: string;
+  album: string | null;
+  albumImageUrl: string | null;
+  downloadUrls: { url: string; source: string }[];
+  count: number;
+  installed: boolean;
 };
 
 export type ListWithItems = SongList & {
@@ -438,6 +456,122 @@ export class ListService {
     const item = itemResult[0];
 
     return !!item;
+  }
+
+  static async searchPublicLists(query: string, excludeUserId: string): Promise<PublicListResult[]> {
+    if (query.length < 2) return [];
+
+    const pattern = `%${query}%`;
+
+    const results = await db
+      .select({
+        id: songList.id,
+        name: songList.name,
+        ownerDisplayName: userProfile.displayName,
+      })
+      .from(songList)
+      .innerJoin(userProfile, eq(songList.userId, userProfile.userId))
+      .where(
+        and(
+          eq(songList.isPublic, true),
+          ne(songList.userId, excludeUserId),
+          or(
+            ilike(songList.name, pattern),
+            ilike(userProfile.displayName, pattern),
+          ),
+        ),
+      )
+      .limit(50);
+
+    const listsWithCounts = await Promise.all(
+      results.map(async (list) => {
+        const [countResult] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(songListItem)
+          .where(eq(songListItem.listId, list.id));
+
+        return {
+          id: list.id,
+          name: list.name,
+          ownerDisplayName: list.ownerDisplayName,
+          itemCount: Number(countResult?.count ?? 0),
+        };
+      }),
+    );
+
+    return listsWithCounts;
+  }
+
+  static async getIntersectionSongs(
+    listIds: string[],
+    minCount: number,
+    installationId?: string | null,
+  ): Promise<IntersectionSong[]> {
+    if (listIds.length === 0) return [];
+
+    const items = await db
+      .select({ songId: songListItem.songId })
+      .from(songListItem)
+      .where(inArray(songListItem.listId, listIds));
+
+    const countMap = new Map<string, number>();
+    for (const item of items) {
+      countMap.set(item.songId, (countMap.get(item.songId) ?? 0) + 1);
+    }
+
+    const qualifyingSongIds = Array.from(countMap.entries())
+      .filter(([, count]) => count >= minCount)
+      .map(([songId]) => songId);
+
+    if (qualifyingSongIds.length === 0) return [];
+
+    const songs = await db.select().from(song).where(inArray(song.id, qualifyingSongIds));
+
+    const artistIds = songs.map((s) => s.artistId).filter(Boolean);
+    const artists = artistIds.length > 0
+      ? await db.select().from(artist).where(inArray(artist.id, artistIds))
+      : [];
+
+    const albumIds = songs.map((s) => s.albumId).filter((id): id is string => id !== null);
+    const albums = albumIds.length > 0
+      ? await db.select().from(album).where(inArray(album.id, albumIds))
+      : [];
+
+    const downloadUrls = await db
+      .select()
+      .from(downloadUrl)
+      .where(inArray(downloadUrl.songId, qualifyingSongIds));
+
+    const installedSongIds = new Set<string>();
+    if (installationId) {
+      const installed = await db
+        .select({ songId: installationSong.songId })
+        .from(installationSong)
+        .where(eq(installationSong.installationId, installationId));
+      for (const i of installed) installedSongIds.add(i.songId);
+    }
+
+    const artistMap = new Map(artists.map((a) => [a.id, a]));
+    const albumMap = new Map(albums.map((a) => [a.id, a]));
+    const downloadUrlMap = new Map<string, { url: string; source: string }[]>();
+    for (const dl of downloadUrls) {
+      const existing = downloadUrlMap.get(dl.songId) ?? [];
+      existing.push({ url: dl.url, source: dl.source });
+      downloadUrlMap.set(dl.songId, existing);
+    }
+
+    return songs
+      .map((s) => ({
+        songId: s.id,
+        title: s.title,
+        artist: artistMap.get(s.artistId)?.name ?? "Unknown",
+        album: s.albumId ? (albumMap.get(s.albumId)?.name ?? null) : null,
+        albumImageUrl: s.albumImageUrl,
+        downloadUrls: downloadUrlMap.get(s.id) ?? [],
+        count: countMap.get(s.id) ?? 0,
+        installed: installedSongIds.has(s.id),
+      }))
+      .sort((a, b) => b.count - a.count);
   }
 
   static async toggleFavorite(

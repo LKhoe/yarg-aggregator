@@ -25,7 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Music, ArrowLeft, User, Download } from "lucide-react";
+import { Music, ArrowLeft, User, Download, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -84,10 +84,6 @@ export default function PublicListPage() {
 
     fetchList();
   }, [username, slug]);
-
-  const allSongsHaveDownloads = list
-    ? list.songs.length > 0 && list.songs.every((song) => song.downloadUrls.length > 0)
-    : false;
 
   const downloadUrls = list
     ? list.songs
@@ -187,8 +183,7 @@ export default function PublicListPage() {
                 <AlertDialogTrigger asChild>
                   <Button
                     size="sm"
-                    disabled={!allSongsHaveDownloads || isDownloading}
-                    title={!allSongsHaveDownloads ? t("lists.downloadAllNoLinks") : undefined}
+                    disabled={downloadUrls.length === 0 || isDownloading}
                   >
                     <Download className="h-4 w-4 mr-2" />
                     {isDownloading ? t("lists.downloading") : t("lists.downloadAll")}
@@ -221,7 +216,9 @@ export default function PublicListPage() {
             </p>
           ) : (
             <div className="space-y-2">
-              {list.songs.map((song) => (
+              {list.songs.map((song) => {
+                const hasDownload = song.downloadUrls.length > 0;
+                return (
                 <div
                   key={song.id}
                   className="flex items-center justify-between p-3 border rounded-lg"
@@ -298,8 +295,18 @@ export default function PublicListPage() {
                       </p>
                     </div>
                   </div>
+                  {!hasDownload && (
+                    <Badge
+                      variant="outline"
+                      className="text-xs text-muted-foreground gap-1 shrink-0 ml-2"
+                    >
+                      <AlertCircle className="h-3 w-3" />
+                      {t("lists.noDownloadLink")}
+                    </Badge>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
