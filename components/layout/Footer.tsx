@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useTranslations } from "@/hooks/use-translations";
 
 export default function Footer() {
@@ -12,6 +13,15 @@ export default function Footer() {
         <p className="mt-2 text-[10px] sm:text-xs opacity-70">
           {t("footer.disclaimer")}
         </p>
+        <div className="mt-3 flex items-center justify-center gap-3 text-[10px] sm:text-xs opacity-60">
+          <Link href="/privacy" className="hover:opacity-100 hover:underline transition-opacity">
+            {t("footer.privacyPolicy")}
+          </Link>
+          <span aria-hidden="true">·</span>
+          <Link href="/terms" className="hover:opacity-100 hover:underline transition-opacity">
+            {t("footer.termsOfService")}
+          </Link>
+        </div>
       </div>
     </footer>
   );

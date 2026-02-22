@@ -47,7 +47,9 @@
   },
   "footer": {
     "text": "YARG聚合器 — 为YARG社区构建",
-    "disclaimer": "这是一个社区制作的工具，与YARG项目无关。"
+    "disclaimer": "这是一个社区制作的工具，与YARG项目无关。",
+    "privacyPolicy": "隐私政策",
+    "termsOfService": "服务条款"
   },
   "theme": {
     "toggle": "切换主题",

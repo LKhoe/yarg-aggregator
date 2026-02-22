@@ -47,7 +47,9 @@
   },
   "footer": {
     "text": "YARGアグリゲーター — YARGコミュニティのために構築",
-    "disclaimer": "これはコミュニティ制作ツールであり、YARGプロジェクトとは関係ありません。"
+    "disclaimer": "これはコミュニティ制作ツールであり、YARGプロジェクトとは関係ありません。",
+    "privacyPolicy": "プライバシーポリシー",
+    "termsOfService": "利用規約"
   },
   "theme": {
     "toggle": "テーマ切り替え",

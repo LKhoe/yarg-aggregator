@@ -47,7 +47,9 @@
   },
   "footer": {
     "text": "YARG Aggregator — Construit pour la communauté YARG",
-    "disclaimer": "Ceci est un outil créé par la communauté et n'est pas affilié au projet YARG."
+    "disclaimer": "Ceci est un outil créé par la communauté et n'est pas affilié au projet YARG.",
+    "privacyPolicy": "Politique de Confidentialité",
+    "termsOfService": "Conditions d'Utilisation"
   },
   "theme": {
     "toggle": "Basculer le thème",

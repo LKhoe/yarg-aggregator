@@ -47,7 +47,9 @@
   },
   "footer": {
     "text": "YARG Aggregator — Built for YARG community",
-    "disclaimer": "This is a community-made tool and is not affiliated with the YARG project."
+    "disclaimer": "This is a community-made tool and is not affiliated with the YARG project.",
+    "privacyPolicy": "Privacy Policy",
+    "termsOfService": "Terms of Service"
   },
   "theme": {
     "toggle": "Toggle theme",

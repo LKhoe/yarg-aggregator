@@ -197,6 +197,16 @@ export function LoginForm() {
           {t("auth.login.signUp")}
         </Link>
       </p>
+
+      <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground/60">
+        <Link href="/privacy" className="hover:text-muted-foreground transition-colors">
+          {t("footer.privacyPolicy")}
+        </Link>
+        <span aria-hidden="true">·</span>
+        <Link href="/terms" className="hover:text-muted-foreground transition-colors">
+          {t("footer.termsOfService")}
+        </Link>
+      </div>
     </div>
   );
 }
