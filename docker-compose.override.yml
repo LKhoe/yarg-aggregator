@@ -1,0 +1,14 @@
+# Dev overrides — applied automatically by `docker compose up`
+# In prod, use: docker compose -f docker-compose.yml up -d --build
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+networks:
+  tunnel:
+    external: false

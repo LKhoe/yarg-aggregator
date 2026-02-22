@@ -24,7 +24,7 @@ ssh -p "${PI_PORT}" "${PI_USER}@${PI_HOST}" "
   set -euo pipefail
   cd ${REMOTE_DIR}
   git pull origin main
-  docker compose up -d --build
+  docker compose -f docker-compose.yml up -d --build
 "
 
 echo "==> Done."
