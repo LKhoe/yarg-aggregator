@@ -69,6 +69,9 @@ export interface SearchParams {
   cursor: string | null; // For cursor-based pagination
   installationId?: string | null; // For filtering by installation's installed songs
   installed?: boolean; // For filtering by installed status (true = only installed)
+  artist?: string;
+  album?: string;
+  charter?: string;
 }
 
 export interface PaginatedResponse<T> {

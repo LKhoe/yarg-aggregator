@@ -38,9 +38,10 @@ const INSTRUMENTS = ["guitar", "bass", "drums", "vocals", "keys"] as const;
 interface SongDetailProps {
   song: ProviderMusic | null;
   onClose: () => void;
+  onApplyFilters?: (filters: { artist?: string; genre?: string; album?: string; charter?: string }) => void;
 }
 
-export default function SongDetail({ song, onClose }: SongDetailProps) {
+export default function SongDetail({ song, onClose, onApplyFilters }: SongDetailProps) {
   const { t } = useTranslations();
 
   if (!song) return null;
@@ -124,13 +125,19 @@ export default function SongDetail({ song, onClose }: SongDetailProps) {
               )}
               {song.name}
             </h3>
-            <p className="text-sm text-muted-foreground truncate">
+            <button
+              className="block text-sm text-muted-foreground truncate cursor-pointer hover:underline text-left"
+              onClick={() => onApplyFilters?.({ artist: song.artist })}
+            >
               {song.artist}
-            </p>
+            </button>
             {song.album && (
-              <p className="text-xs text-muted-foreground truncate">
+              <button
+                className="block text-xs text-muted-foreground truncate cursor-pointer hover:underline text-left"
+                onClick={() => onApplyFilters?.({ album: song.album ?? undefined })}
+              >
                 {song.album}
-              </p>
+              </button>
             )}
           </div>
         </div>
@@ -138,7 +145,11 @@ export default function SongDetail({ song, onClose }: SongDetailProps) {
         {/* Metadata */}
         <div className="flex flex-wrap gap-1.5">
           {song.genre && (
-            <Badge variant="secondary" className="text-xs">
+            <Badge
+              variant="secondary"
+              className="text-xs cursor-pointer hover:opacity-80"
+              onClick={() => onApplyFilters?.({ genre: song.genre ?? undefined })}
+            >
               {song.genre}
             </Badge>
           )}
@@ -149,7 +160,11 @@ export default function SongDetail({ song, onClose }: SongDetailProps) {
             </Badge>
           )}
           {song.charter && (
-            <Badge variant="outline" className="text-xs">
+            <Badge
+              variant="outline"
+              className="text-xs cursor-pointer hover:opacity-80"
+              onClick={() => onApplyFilters?.({ charter: song.charter ?? undefined })}
+            >
               <User className="h-3 w-3 mr-1" />
               {song.charter}
             </Badge>

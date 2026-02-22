@@ -28,7 +28,9 @@ import {
   Download,
   Music,
   CheckCircle,
+  X,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Combobox,
@@ -66,6 +68,7 @@ import { SongActions } from "@/components/data-table/SongActions";
 interface MusicTableProps {
   onTotalChange: (total: number) => void;
   onSongSelect?: (song: ProviderMusic) => void;
+  externalFilter?: { artist?: string; genre?: string; album?: string; charter?: string } | null;
 }
 
 const INSTRUMENTS = ["guitar", "bass", "drums", "vocals", "keys"] as const;
@@ -106,6 +109,7 @@ const LoadingSkeleton = () =>
 export default function MusicTable({
   onTotalChange,
   onSongSelect,
+  externalFilter,
 }: MusicTableProps) {
   const { t } = useTranslations();
   const [data, setData] = useState<ProviderMusic[]>([]);
@@ -120,10 +124,12 @@ export default function MusicTable({
   const [source, setSource] = useState<string>("");
   const [genre, setGenre] = useState<string>("");
   const [instruments, setInstruments] = useState<string[]>([]);
+  const [artist, setArtist] = useState<string>("");
+  const [albumFilter, setAlbumFilter] = useState<string>("");
+  const [charter, setCharter] = useState<string>("");
   const [showOnlyInstalled, setShowOnlyInstalled] = useState<boolean>(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
-  const isFirstRender = useRef(true);
   const isMounted = useRef(false);
   const requestIdRef = useRef(0);
 
@@ -144,57 +150,45 @@ export default function MusicTable({
     sortOrder: "asc" | "desc";
   } | null>(null);
 
-  // Keep track of latest state for the debounce effect without triggering it
-  const stateRef = useRef({ debouncedQuery, sortBy, sortOrder });
+  // Ref to read current sort without adding to effect deps
+  const sortRef = useRef({ sortBy, sortOrder });
+  useEffect(() => { sortRef.current = { sortBy, sortOrder }; }, [sortBy, sortOrder]);
+
+  // Simple debounce — only updates debouncedQuery
   useEffect(() => {
-    stateRef.current = { debouncedQuery, sortBy, sortOrder };
-  }, [debouncedQuery, sortBy, sortOrder]);
-
-  // Debounce search query
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    const timer = setTimeout(() => {
-      const {
-        debouncedQuery: currentDebouncedQuery,
-        sortBy: currentSortBy,
-        sortOrder: currentSortOrder,
-      } = stateRef.current;
-
-      const hadQuery = !!currentDebouncedQuery;
-      const hasQuery = !!query;
-
-      setDebouncedQuery(query);
-      setData([]); // Reset data for new search
-      setNextCursor(null);
-      setHasMore(true);
-
-      // Auto-switch to relevance sort when query is entered
-      if (!hadQuery && hasQuery) {
-        sortBeforeQueryRef.current = {
-          sortBy: currentSortBy,
-          sortOrder: currentSortOrder,
-        };
-        setSortBy("relevance");
-        setSortOrder("desc");
-      }
-
-      // Revert sort when query is cleared
-      if (hadQuery && !hasQuery) {
-        if (sortBeforeQueryRef.current) {
-          setSortBy(sortBeforeQueryRef.current.sortBy);
-          setSortOrder(sortBeforeQueryRef.current.sortOrder as "asc" | "desc");
-          sortBeforeQueryRef.current = null;
-        } else {
-          setSortBy("createdAt");
-          setSortOrder("desc");
-        }
-      }
-    }, 300);
+    const timer = setTimeout(() => setDebouncedQuery(query), 300);
     return () => clearTimeout(timer);
   }, [query]);
+
+  // React to debouncedQuery changes: reset pagination + auto-switch sort
+  const prevDebouncedQueryRef = useRef(debouncedQuery);
+  useEffect(() => {
+    const prev = prevDebouncedQueryRef.current;
+    prevDebouncedQueryRef.current = debouncedQuery;
+    if (prev === debouncedQuery) return;
+
+    setData([]);
+    setNextCursor(null);
+    setHasMore(true);
+
+    const hadQuery = !!prev;
+    const hasQuery = !!debouncedQuery;
+
+    if (!hadQuery && hasQuery) {
+      sortBeforeQueryRef.current = { ...sortRef.current };
+      setSortBy("relevance");
+      setSortOrder("desc");
+    } else if (hadQuery && !hasQuery) {
+      if (sortBeforeQueryRef.current) {
+        setSortBy(sortBeforeQueryRef.current.sortBy);
+        setSortOrder(sortBeforeQueryRef.current.sortOrder as "asc" | "desc");
+        sortBeforeQueryRef.current = null;
+      } else {
+        setSortBy("createdAt");
+        setSortOrder("desc");
+      }
+    }
+  }, [debouncedQuery]);
 
   const fetchData = useCallback(
     async (isLoadMore = false, cursor?: string | null) => {
@@ -222,6 +216,9 @@ export default function MusicTable({
           params.set("installationId", selectedInstallationId);
         if (showOnlyInstalled && selectedInstallationId)
           params.set("installed", "true");
+        if (artist) params.set("artist", artist);
+        if (albumFilter) params.set("album", albumFilter);
+        if (charter) params.set("charter", charter);
 
         if (isLoadMore && cursor) {
           params.set("cursor", cursor);
@@ -271,6 +268,9 @@ export default function MusicTable({
       instruments,
       selectedInstallationId,
       showOnlyInstalled,
+      artist,
+      albumFilter,
+      charter,
     ],
   );
 
@@ -364,8 +364,8 @@ export default function MusicTable({
   };
 
   const loadMore = useCallback(() => {
-    if (hasMore && !loadingMore && !loading) {
-      fetchData(true, nextCursor ?? undefined);
+    if (hasMore && !loadingMore && !loading && nextCursor) {
+      fetchData(true, nextCursor);
     }
   }, [hasMore, loadingMore, loading, fetchData, nextCursor]);
 
@@ -375,6 +375,18 @@ export default function MusicTable({
     setNextCursor(null);
     setHasMore(true);
   }, []);
+
+  // Apply external filters (e.g. from SongDetail click-to-filter)
+  useEffect(() => {
+    if (!externalFilter) return;
+    setQuery("");
+    setDebouncedQuery("");
+    if (externalFilter.genre !== undefined) setGenre(externalFilter.genre);
+    if (externalFilter.artist !== undefined) setArtist(externalFilter.artist);
+    if (externalFilter.album !== undefined) setAlbumFilter(externalFilter.album);
+    if (externalFilter.charter !== undefined) setCharter(externalFilter.charter);
+    handleFilterChange();
+  }, [externalFilter, handleFilterChange]);
 
   // Intersection Observer for infinite scroll
   useEffect(() => {
@@ -421,6 +433,48 @@ export default function MusicTable({
             className="pl-10 h-10 text-sm w-full"
           />
         </div>
+
+        {/* Active exact-match filter badges */}
+        {(artist || albumFilter || charter) && (
+          <div className="flex flex-wrap gap-1.5">
+            {artist && (
+              <Badge variant="secondary" className="text-xs gap-1 pr-1">
+                {artist}
+                <button
+                  onClick={() => { setArtist(""); handleFilterChange(); }}
+                  className="ml-1 hover:opacity-70"
+                  aria-label="Clear artist filter"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+            {albumFilter && (
+              <Badge variant="secondary" className="text-xs gap-1 pr-1">
+                {albumFilter}
+                <button
+                  onClick={() => { setAlbumFilter(""); handleFilterChange(); }}
+                  className="ml-1 hover:opacity-70"
+                  aria-label="Clear album filter"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+            {charter && (
+              <Badge variant="secondary" className="text-xs gap-1 pr-1">
+                {charter}
+                <button
+                  onClick={() => { setCharter(""); handleFilterChange(); }}
+                  className="ml-1 hover:opacity-70"
+                  aria-label="Clear charter filter"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+          </div>
+        )}
 
         {/* Other filters - second row */}
         <div className="flex flex-col sm:flex-row gap-2">

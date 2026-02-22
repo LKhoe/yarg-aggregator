@@ -64,6 +64,9 @@ export async function GET(request: NextRequest) {
       cursor: searchParams.get("cursor"),
       installationId: searchParams.get("installationId") || null,
       installed: searchParams.get("installed") === "true",
+      artist: searchParams.get("artist") || undefined,
+      album: searchParams.get("album") || undefined,
+      charter: searchParams.get("charter") || undefined,
     };
 
     const response = await MusicService.search(params, authUser?.id);

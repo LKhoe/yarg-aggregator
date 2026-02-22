@@ -39,6 +39,12 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 export default function HomePage() {
   const [totalSongs, setTotalSongs] = useState(0);
   const [selectedSong, setSelectedSong] = useState<ProviderMusic | null>(null);
+  const [externalFilter, setExternalFilter] = useState<{
+    artist?: string;
+    genre?: string;
+    album?: string;
+    charter?: string;
+  } | null>(null);
   const { t, loading } = useTranslations();
   const isDesktop = useMediaQuery("(min-width: 1024px)");
 
@@ -67,14 +73,16 @@ export default function HomePage() {
               <MusicTable
                 onTotalChange={setTotalSongs}
                 onSongSelect={setSelectedSong}
+                externalFilter={externalFilter}
               />
             </div>
 
-            <aside className="hidden lg:block space-y-4 lg:space-y-6 sticky top-20 self-start max-h-[calc(100vh-2rem)] overflow-y-hidden">
+            <aside className="hidden lg:block space-y-4 lg:space-y-6 sticky top-20 self-start max-h-[calc(100vh-2rem)] overflow-y-auto">
               {selectedSong && (
                 <SongDetail
                   song={selectedSong}
                   onClose={() => setSelectedSong(null)}
+                  onApplyFilters={setExternalFilter}
                 />
               )}
               <UsersCard />
@@ -98,6 +106,7 @@ export default function HomePage() {
                 <SongDetail
                   song={selectedSong}
                   onClose={() => setSelectedSong(null)}
+                  onApplyFilters={setExternalFilter}
                 />
               </div>
             </DrawerContent>

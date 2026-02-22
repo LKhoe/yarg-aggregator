@@ -70,13 +70,6 @@ export class MusicService {
     params: SearchParams,
     userId?: string | null,
   ): Promise<PaginatedResponse<ProviderMusic>> {
-    return this.searchWithCursor(params, userId);
-  }
-
-  static async searchWithCursor(
-    params: SearchParams,
-    userId?: string | null,
-  ): Promise<PaginatedResponse<ProviderMusic>> {
     const {
       query,
       limit = 20,
@@ -88,6 +81,9 @@ export class MusicService {
       cursor,
       installationId,
       installed,
+      artist: artistFilter,
+      album: albumFilter,
+      charter: charterFilter,
     } = params;
 
     const conditions = [];
@@ -137,6 +133,18 @@ export class MusicService {
       conditions.push(eq(genre.name, genreFilter));
     }
 
+    if (artistFilter) {
+      conditions.push(eq(artist.name, artistFilter));
+    }
+
+    if (albumFilter) {
+      conditions.push(eq(album.name, albumFilter));
+    }
+
+    if (charterFilter) {
+      conditions.push(eq(song.charter, charterFilter));
+    }
+
     if (source) {
       conditions.push(eq(downloadUrl.source, source));
     }
@@ -168,25 +176,8 @@ export class MusicService {
     if (useRelevanceSort) {
       orderByPrimary = desc(relevanceScore!);
     } else {
-      switch (sortBy === "relevance" ? "createdAt" : sortBy) {
-        case "name":
-          orderByPrimary =
-            sortOrder === "asc" ? asc(song.title) : desc(song.title);
-          break;
-        case "artist":
-          orderByPrimary =
-            sortOrder === "asc" ? asc(artist.name) : desc(artist.name);
-          break;
-        case "album":
-          orderByPrimary =
-            sortOrder === "asc" ? asc(album.name) : desc(album.name);
-          break;
-        case "createdAt":
-        default:
-          orderByPrimary =
-            sortOrder === "asc" ? asc(song.createdAt) : desc(song.createdAt);
-          break;
-      }
+      const field = this.getSortField(sortBy);
+      orderByPrimary = sortOrder === "asc" ? asc(field) : desc(field);
     }
 
     // Parse cursor to get the last seen values
@@ -199,22 +190,7 @@ export class MusicService {
         const { lastScore } = cursorData;
         cursorCondition = sql`((${relevanceScore} < ${lastScore}) OR (${relevanceScore} = ${lastScore} AND ${song.id} > ${lastId}))`;
       } else {
-        let sortField;
-        switch (sortBy === "relevance" ? "createdAt" : sortBy) {
-          case "name":
-            sortField = song.title;
-            break;
-          case "artist":
-            sortField = artist.name;
-            break;
-          case "album":
-            sortField = album.name;
-            break;
-          case "createdAt":
-          default:
-            sortField = song.createdAt;
-            break;
-        }
+        const sortField = this.getSortField(sortBy);
 
         if (sortOrder === "desc") {
           cursorCondition = sql`((${sortField} < ${lastValue}) OR (${sortField} = ${lastValue} AND ${song.id} > ${lastId}))`;
@@ -308,19 +284,15 @@ export class MusicService {
       artist.name,
       album.name,
       genre.name,
-      ...(relevanceScore ? [] : []),
     ];
 
-    const data = finalWhereClause
-      ? await baseDataQuery
-          .where(finalWhereClause)
-          .groupBy(...groupByClause)
-          .orderBy(orderByPrimary, asc(song.id))
-          .limit(limit + 1)
-      : await baseDataQuery
-          .groupBy(...groupByClause)
-          .orderBy(orderByPrimary, asc(song.id))
-          .limit(limit + 1);
+    const filteredQuery = finalWhereClause
+      ? baseDataQuery.where(finalWhereClause)
+      : baseDataQuery;
+    const data = await filteredQuery
+      .groupBy(...groupByClause)
+      .orderBy(orderByPrimary, asc(song.id))
+      .limit(limit + 1);
 
     const hasMore = data.length > limit;
     const resultData = hasMore ? data.slice(0, limit) : data;
@@ -360,21 +332,14 @@ export class MusicService {
         };
         nextCursor = btoa(JSON.stringify(cursorData));
       } else {
-        switch (sortBy === "relevance" ? "createdAt" : sortBy) {
-          case "name":
-            lastValue = lastItem.title;
-            break;
-          case "artist":
-            lastValue = lastItem.artist;
-            break;
-          case "album":
-            lastValue = lastItem.album;
-            break;
-          case "createdAt":
-          default:
-            lastValue = lastItem.createdAt;
-            break;
-        }
+        const sortField = sortBy === "relevance" ? "createdAt" : sortBy;
+        const fieldMap: Record<string, unknown> = {
+          name: lastItem.title,
+          artist: lastItem.artist,
+          album: lastItem.album,
+          createdAt: lastItem.createdAt,
+        };
+        lastValue = fieldMap[sortField] ?? lastItem.createdAt;
 
         const cursorData = { lastValue, lastId: lastItem.id, total: count };
         nextCursor = btoa(JSON.stringify(cursorData));
@@ -474,6 +439,20 @@ export class MusicService {
 
     // Single query - could be either song or artist
     return { songQuery: trimmedQuery, isCombined: false };
+  }
+
+  private static getSortField(sortBy: string) {
+    switch (sortBy === "relevance" ? "createdAt" : sortBy) {
+      case "name":
+        return song.title;
+      case "artist":
+        return artist.name;
+      case "album":
+        return album.name;
+      case "createdAt":
+      default:
+        return song.createdAt;
+    }
   }
 
   private static getDifficultyField(instrument: string) {
