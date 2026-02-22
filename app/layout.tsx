@@ -43,9 +43,11 @@ export const metadata: Metadata = {
     description: "Your ultimate music chart library for YARG",
     type: "website",
   },
-  verification: {
-    google: "lm08Ffaqx5JAWv1xBoMC-H8dtfaSl2zyZNDAMwBovV0",
-  },
+  ...(process.env.GOOGLE_SITE_VERIFICATION && {
+    verification: {
+      google: process.env.GOOGLE_SITE_VERIFICATION,
+    },
+  }),
   manifest: "/manifest.json",
   icons: {
     icon: "/icons/icon-192.png",

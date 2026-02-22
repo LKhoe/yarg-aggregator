@@ -163,3 +163,47 @@
         @apply text-base;
     }
 }
+
+@property --glow-angle {
+    syntax: "<angle>";
+    initial-value: 0deg;
+    inherits: false;
+}
+
+@keyframes glow-rotate {
+    to {
+        --glow-angle: 360deg;
+    }
+}
+
+.active-filter {
+    box-shadow: 0 0 8px 2px oklch(from var(--primary) l c h / 40%);
+    border-color: oklch(from var(--primary) l c h / 50%);
+    border-color: transparent !important;
+    background:
+        linear-gradient(var(--background), var(--background)) padding-box,
+        conic-gradient(
+                from var(--glow-angle),
+                var(--primary),
+                var(--accent),
+                var(--primary)
+            )
+            border-box !important;
+    animation: glow-rotate 3s linear infinite;
+}
+
+.active-filter-badge {
+    box-shadow: 0 0 8px 2px oklch(from var(--primary) l c h / 40%);
+    border-color: oklch(from var(--primary) l c h / 50%);
+    border: 1px solid transparent;
+    background:
+        linear-gradient(var(--secondary), var(--secondary)) padding-box,
+        conic-gradient(
+                from var(--glow-angle),
+                var(--primary),
+                var(--accent),
+                var(--primary)
+            )
+            border-box !important;
+    animation: glow-rotate 3s linear infinite;
+}

@@ -377,8 +377,19 @@ export default function MusicTable({
   }, []);
 
   // Apply external filters (e.g. from SongDetail click-to-filter)
+  const prevExternalFilterRef = useRef<typeof externalFilter>(null);
   useEffect(() => {
     if (!externalFilter) return;
+    const prev = prevExternalFilterRef.current;
+    // Skip if identical filter values — avoids wiping data when clicking the same filter twice
+    if (
+      prev &&
+      prev.artist === externalFilter.artist &&
+      prev.album === externalFilter.album &&
+      prev.genre === externalFilter.genre &&
+      prev.charter === externalFilter.charter
+    ) return;
+    prevExternalFilterRef.current = externalFilter;
     setQuery("");
     setDebouncedQuery("");
     if (externalFilter.genre !== undefined) setGenre(externalFilter.genre);
@@ -430,7 +441,7 @@ export default function MusicTable({
             placeholder={t("table.searchPlaceholder")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="pl-10 h-10 text-sm w-full"
+            className={`pl-10 h-10 text-sm w-full ${query ? "active-filter" : ""}`}
           />
         </div>
 
@@ -438,7 +449,7 @@ export default function MusicTable({
         {(artist || albumFilter || charter) && (
           <div className="flex flex-wrap gap-1.5">
             {artist && (
-              <Badge variant="secondary" className="text-xs gap-1 pr-1">
+              <Badge variant="secondary" className="text-xs gap-1 pr-1 active-filter-badge">
                 {artist}
                 <button
                   onClick={() => { setArtist(""); handleFilterChange(); }}
@@ -450,7 +461,7 @@ export default function MusicTable({
               </Badge>
             )}
             {albumFilter && (
-              <Badge variant="secondary" className="text-xs gap-1 pr-1">
+              <Badge variant="secondary" className="text-xs gap-1 pr-1 active-filter-badge">
                 {albumFilter}
                 <button
                   onClick={() => { setAlbumFilter(""); handleFilterChange(); }}
@@ -462,7 +473,7 @@ export default function MusicTable({
               </Badge>
             )}
             {charter && (
-              <Badge variant="secondary" className="text-xs gap-1 pr-1">
+              <Badge variant="secondary" className="text-xs gap-1 pr-1 active-filter-badge">
                 {charter}
                 <button
                   onClick={() => { setCharter(""); handleFilterChange(); }}
@@ -487,7 +498,7 @@ export default function MusicTable({
                 handleFilterChange();
               }}
             >
-              <MultiSelectTrigger className="h-9 w-full text-sm">
+              <MultiSelectTrigger className={`h-9 w-full text-sm ${instruments.length > 0 ? "active-filter" : ""}`}>
                 <MultiSelectValue placeholder={t("table.allInstruments")} />
               </MultiSelectTrigger>
               <MultiSelectContent>
@@ -527,7 +538,7 @@ export default function MusicTable({
               <ComboboxInput
                 placeholder={t("table.allGenres") || "All genres"}
                 showClear={!!genre}
-                className="w-full sm:w-45 h-9 text-sm"
+                className={`w-full sm:w-45 h-9 text-sm ${genre ? "active-filter" : ""}`}
               />
               <ComboboxContent>
                 <ComboboxEmpty>{t("table.noGenresFound")}</ComboboxEmpty>
@@ -551,7 +562,7 @@ export default function MusicTable({
                 handleFilterChange();
               }}
             >
-              <SelectTrigger className="flex-1 sm:w-37.5 h-9">
+              <SelectTrigger className={`flex-1 sm:w-37.5 h-9 ${source ? "active-filter" : ""}`}>
                 <SelectValue placeholder={t("table.allSources")} />
               </SelectTrigger>
               <SelectContent>
