@@ -875,13 +875,13 @@ export default function ProviderPanel() {
           open={!!detailType}
           onOpenChange={(open) => !open && setDetailType(null)}
         >
-          <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
+          <DialogContent className="max-w-md flex flex-col">
             <DialogHeader>
               <DialogTitle className="capitalize">
                 {detailType && t(`provider.stats.${detailType}`)}
               </DialogTitle>
             </DialogHeader>
-            <div className="overflow-y-auto max-h-[60vh] pr-2">
+            <div className="overflow-y-auto max-h-[calc(100dvh-14rem)] pr-2">
               {detailType === "ignored" && detailData ? (
                 Object.entries(detailData).map(([reason, songs]) => (
                   <Collapsible key={reason} className="mb-2 last:mb-0">

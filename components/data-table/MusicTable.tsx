@@ -562,7 +562,7 @@ export default function MusicTable({
                 handleFilterChange();
               }}
             >
-              <SelectTrigger className={`flex-1 sm:w-37.5 h-9 ${source ? "active-filter" : ""}`}>
+              <SelectTrigger className={`w-full sm:w-37.5 h-9 ${source ? "active-filter" : ""}`}>
                 <SelectValue placeholder={t("table.allSources")} />
               </SelectTrigger>
               <SelectContent>

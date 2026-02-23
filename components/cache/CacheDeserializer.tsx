@@ -870,13 +870,13 @@ export default function CacheDeserializer() {
               open={!!detailType}
               onOpenChange={(open) => !open && setDetailType(null)}
             >
-              <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
+              <DialogContent className="max-w-md flex flex-col">
                 <DialogHeader>
                   <DialogTitle className="capitalize">
                     {detailType && t(`cacheDeserializer.stats.${detailType}`)}
                   </DialogTitle>
                 </DialogHeader>
-                <div className="overflow-y-auto max-h-[60vh] pr-2">
+                <div className="overflow-y-auto max-h-[calc(100dvh-14rem)] pr-2">
                   {detailType && importStats?.details[detailType]?.length ? (
                     <div className="space-y-1">
                       {importStats.details[detailType].map((song) => (
@@ -947,7 +947,7 @@ export default function CacheDeserializer() {
 
       {/* Path Help Dialog */}
       <Dialog open={showPathHelp} onOpenChange={setShowPathHelp}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {t("cacheDeserializer.songcacheDialog.title")}

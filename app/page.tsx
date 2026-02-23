@@ -102,7 +102,7 @@ export default function HomePage() {
               <DrawerHeader className="sr-only">
                 <DrawerTitle>{t("songDetail.title")}</DrawerTitle>
               </DrawerHeader>
-              <div className="p-4 overflow-y-auto max-h-[70vh]">
+              <div className="p-4 overflow-y-auto max-h-[calc(100dvh-6rem)]">
                 <SongDetail
                   song={selectedSong}
                   onClose={() => setSelectedSong(null)}

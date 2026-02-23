@@ -583,7 +583,7 @@ export function PlaylistImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-150 max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-175 overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{t("import.title")}</DialogTitle>
           <DialogDescription>
@@ -595,7 +595,7 @@ export function PlaylistImportDialog({
         </DialogHeader>
 
         <Stepper value={step} className="space-y-6">
-          <StepperNav className="mb-2 gap-5">
+          <StepperNav className="mb-2 gap-2 sm:gap-5">
             {[
               { title: t("import.step1Title") },
               { title: t("import.step2Title") },
@@ -622,7 +622,7 @@ export function PlaylistImportDialog({
             ))}
           </StepperNav>
 
-          <StepperPanel>
+          <StepperPanel className="overflow-y-auto flex-1 min-h-0">
             {/* Step 1: Select Provider */}
             <StepperContent value={1}>
               <div className="space-y-3">

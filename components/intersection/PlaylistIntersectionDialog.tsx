@@ -347,7 +347,7 @@ export function PlaylistIntersectionDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-150 max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-175 overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{t("intersection.title")}</DialogTitle>
           <DialogDescription>
@@ -360,7 +360,7 @@ export function PlaylistIntersectionDialog({
         </DialogHeader>
 
         <Stepper value={step} className="space-y-6">
-          <StepperNav className="mb-2 gap-5">
+          <StepperNav className="mb-2 gap-2 sm:gap-5">
             {[
               { title: t("intersection.step1Title") },
               { title: t("intersection.step2Title") },
@@ -634,39 +634,41 @@ export function PlaylistIntersectionDialog({
             <StepperContent value={4}>
               <div className="space-y-4">
                 {/* Installation selector */}
-                <div className="flex items-center gap-3">
-                  <Label className="text-sm shrink-0">
+                <div className="space-y-1.5">
+                  <Label className="text-sm">
                     {t("intersection.selectInstallation")}
                   </Label>
-                  {installationsLoading ? (
-                    <Skeleton className="h-9 flex-1" />
-                  ) : (
-                    <Select
-                      value={selectedInstallationId || "none"}
-                      onValueChange={(v) =>
-                        handleInstallationChange(v === "none" ? "" : v)
-                      }
-                    >
-                      <SelectTrigger className="flex-1">
-                        <SelectValue
-                          placeholder={t("intersection.noInstallation")}
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">
-                          {t("intersection.noInstallation")}
-                        </SelectItem>
-                        {installations.map((inst) => (
-                          <SelectItem key={inst.id} value={inst.id}>
-                            {inst.name}
+                  <div className="flex items-center gap-2">
+                    {installationsLoading ? (
+                      <Skeleton className="h-9 flex-1" />
+                    ) : (
+                      <Select
+                        value={selectedInstallationId || "none"}
+                        onValueChange={(v) =>
+                          handleInstallationChange(v === "none" ? "" : v)
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue
+                            placeholder={t("intersection.noInstallation")}
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">
+                            {t("intersection.noInstallation")}
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                  {isRefetchingWithInstallation && (
-                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
-                  )}
+                          {installations.map((inst) => (
+                            <SelectItem key={inst.id} value={inst.id}>
+                              {inst.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {isRefetchingWithInstallation && (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
+                    )}
+                  </div>
                 </div>
 
                 {/* Song list */}
@@ -736,7 +738,7 @@ export function PlaylistIntersectionDialog({
 
                 {/* Action bar */}
                 {results.length > 0 && (
-                  <div className="space-y-3 border-t pt-3">
+                  <div className="border-t pt-3 space-y-3">
                     {/* Save as playlist */}
                     {savedListId ? (
                       <div className="flex items-center gap-2">
@@ -800,21 +802,24 @@ export function PlaylistIntersectionDialog({
                           </Button>
                         </div>
                       </div>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowSaveForm(true)}
-                      >
-                        {t("intersection.saveAsPlaylist")}
-                      </Button>
-                    )}
+                    ) : null}
 
-                    {/* Download buttons */}
-                    <div className="flex flex-wrap gap-2">
+                    {/* Action buttons */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {!savedListId && !showSaveForm && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setShowSaveForm(true)}
+                        >
+                          {t("intersection.saveAsPlaylist")}
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
+                        className="w-full"
                         onClick={() => handleDownloadAll(results)}
                         disabled={isDownloading}
                       >
@@ -831,6 +836,7 @@ export function PlaylistIntersectionDialog({
                           <Button
                             variant="outline"
                             size="sm"
+                            className="w-full"
                             onClick={() => handleDownloadAll(uninstalledSongs)}
                             disabled={isDownloading}
                           >
