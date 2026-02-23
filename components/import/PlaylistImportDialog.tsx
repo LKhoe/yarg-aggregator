@@ -137,9 +137,6 @@ export function PlaylistImportDialog({
   // Step 2 state
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [playlistsLoading, setPlaylistsLoading] = useState(false);
-  const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(
-    null,
-  );
 
   // Step 3 state
   const [matchResults, setMatchResults] = useState<MatchResponse | null>(null);
@@ -219,12 +216,45 @@ export function PlaylistImportDialog({
     }
   }, [open, initialProvider, accounts]);
 
+  const fetchPlaylists = useCallback(
+    async (provider: string) => {
+      setPlaylistsLoading(true);
+      setPlaylists([]);
+      setShowTagInput(false);
+      setTagInputValue("");
+      try {
+        const url =
+          provider === "lastfm"
+            ? `/api/import/playlists?provider=${provider}&username=${encodeURIComponent(lastfmUsername)}`
+            : `/api/import/playlists?provider=${provider}`;
+        const res = await fetch(url);
+        if (res.status === 401) {
+          const data = await res.json();
+          if (data.error === "reauth_required") {
+            toast.error(t("import.reauthRequired"));
+            setStep(1);
+            return;
+          }
+        }
+        if (res.ok) {
+          const data = await res.json();
+          setPlaylists(data);
+        }
+      } catch {
+        toast.error(t("import.error"));
+      } finally {
+        setPlaylistsLoading(false);
+      }
+    },
+    [lastfmUsername, t],
+  );
+
   // Fetch playlists when step 2 is reached
   useEffect(() => {
     if (step === 2 && selectedProvider) {
       fetchPlaylists(selectedProvider);
     }
-  }, [step, selectedProvider]);
+  }, [step, selectedProvider, fetchPlaylists]);
 
   // Fetch user lists for the "add to existing" option
   useEffect(() => {
@@ -232,36 +262,6 @@ export function PlaylistImportDialog({
       fetchUserLists();
     }
   }, [step]);
-
-  const fetchPlaylists = async (provider: string) => {
-    setPlaylistsLoading(true);
-    setPlaylists([]);
-    setShowTagInput(false);
-    setTagInputValue("");
-    try {
-      const url =
-        provider === "lastfm"
-          ? `/api/import/playlists?provider=${provider}&username=${encodeURIComponent(lastfmUsername)}`
-          : `/api/import/playlists?provider=${provider}`;
-      const res = await fetch(url);
-      if (res.status === 401) {
-        const data = await res.json();
-        if (data.error === "reauth_required") {
-          toast.error(t("import.reauthRequired"));
-          setStep(1);
-          return;
-        }
-      }
-      if (res.ok) {
-        const data = await res.json();
-        setPlaylists(data);
-      }
-    } catch {
-      toast.error(t("import.error"));
-    } finally {
-      setPlaylistsLoading(false);
-    }
-  };
 
   const fetchUserLists = async () => {
     try {
@@ -325,7 +325,6 @@ export function PlaylistImportDialog({
       return;
     }
 
-    setSelectedPlaylist(playlist);
     setListName(playlist.name);
     setMatchLoading(true);
     setStep(3);
@@ -410,12 +409,6 @@ export function PlaylistImportDialog({
 
       const matchResponse = data as MatchResponse & { playlistName?: string };
       setMatchResults(matchResponse);
-      setSelectedPlaylist({
-        id: "url",
-        name: matchResponse.playlistName ?? url,
-        imageUrl: null,
-        trackCount: matchResponse.totalCount,
-      });
       setListName(matchResponse.playlistName ?? "");
 
       const matched = new Set<string>();
@@ -491,7 +484,6 @@ export function PlaylistImportDialog({
     setStep(1);
     setSelectedProvider(null);
     setPlaylists([]);
-    setSelectedPlaylist(null);
     setMatchResults(null);
     setSelectedSongIds(new Set());
     setListName("");
@@ -571,7 +563,6 @@ export function PlaylistImportDialog({
     } finally {
       setAppleMusicConnecting(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchAccounts, t]);
 
   const getProviderStatus = (acc: ProviderAccount) => {
@@ -845,7 +836,7 @@ export function PlaylistImportDialog({
                     <p>{t("import.noPlaylists")}</p>
                   </div>
                 ) : (
-                  <div className="max-h-[400px] overflow-y-auto space-y-2">
+                  <div className="max-h-100 overflow-y-auto space-y-2">
                     {playlists.map((playlist) => {
                       const isTagsItem =
                         selectedProvider === "lastfm" && playlist.id === "tags";

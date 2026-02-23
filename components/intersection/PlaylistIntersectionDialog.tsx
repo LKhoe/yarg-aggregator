@@ -93,14 +93,17 @@ export function PlaylistIntersectionDialog({
   // Step 1: My Lists
   const [myLists, setMyLists] = useState<MyList[]>([]);
   const [myListsLoading, setMyListsLoading] = useState(true);
-  const [selectedMyListIds, setSelectedMyListIds] = useState<Set<string>>(new Set());
+  const [selectedMyListIds, setSelectedMyListIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   // Step 2: Public Lists
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<PublicList[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [selectedPublicListIds, setSelectedPublicListIds] = useState<Set<string>>(new Set());
-  const [selectedPublicLists, setSelectedPublicLists] = useState<PublicList[]>([]);
+  const [selectedPublicListIds, setSelectedPublicListIds] = useState<
+    Set<string>
+  >(new Set());
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Step 3: Threshold
@@ -110,9 +113,11 @@ export function PlaylistIntersectionDialog({
   // Step 4: Results
   const [results, setResults] = useState<IntersectionSong[]>([]);
   const [installations, setInstallations] = useState<Installation[]>([]);
-  const [selectedInstallationId, setSelectedInstallationId] = useState<string>("");
+  const [selectedInstallationId, setSelectedInstallationId] =
+    useState<string>("");
   const [installationsLoading, setInstallationsLoading] = useState(false);
-  const [isRefetchingWithInstallation, setIsRefetchingWithInstallation] = useState(false);
+  const [isRefetchingWithInstallation, setIsRefetchingWithInstallation] =
+    useState(false);
 
   // Save as playlist state
   const [showSaveForm, setShowSaveForm] = useState(false);
@@ -149,33 +154,32 @@ export function PlaylistIntersectionDialog({
   }, [step]);
 
   // Search public lists with debounce
-  const handleSearchChange = useCallback(
-    (value: string) => {
-      setSearchQuery(value);
-      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
 
-      if (value.length < 2) {
-        setSearchResults([]);
-        return;
-      }
+    if (value.length < 2) {
+      setSearchResults([]);
+      return;
+    }
 
-      setIsSearching(true);
-      searchTimeoutRef.current = setTimeout(async () => {
-        try {
-          const res = await fetch(`/api/lists/search?q=${encodeURIComponent(value)}`);
-          if (res.ok) {
-            const data = await res.json();
-            setSearchResults(data);
-          }
-        } catch {
-          // silently fail
-        } finally {
-          setIsSearching(false);
+    setIsSearching(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/lists/search?q=${encodeURIComponent(value)}`,
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data);
         }
-      }, 300);
-    },
-    [],
-  );
+      } catch {
+        // silently fail
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  }, []);
 
   const toggleMyList = (id: string) => {
     setSelectedMyListIds((prev) => {
@@ -191,10 +195,8 @@ export function PlaylistIntersectionDialog({
       const next = new Set(prev);
       if (next.has(list.id)) {
         next.delete(list.id);
-        setSelectedPublicLists((lists) => lists.filter((l) => l.id !== list.id));
       } else {
         next.add(list.id);
-        setSelectedPublicLists((lists) => [...lists, list]);
       }
       return next;
     });
@@ -319,7 +321,6 @@ export function PlaylistIntersectionDialog({
     setSearchResults([]);
     setIsSearching(false);
     setSelectedPublicListIds(new Set());
-    setSelectedPublicLists([]);
     setMinCount(1);
     setIsCalculating(false);
     setResults([]);
@@ -402,20 +403,27 @@ export function PlaylistIntersectionDialog({
                     <p>{t("lists.noLists")}</p>
                   </div>
                 ) : (
-                  <div className="max-h-[400px] overflow-y-auto space-y-1 border rounded-lg p-2">
+                  <div className="max-h-100 overflow-y-auto space-y-1 border rounded-lg p-2">
                     {myLists.map((list) => (
                       <label
                         key={list.id}
                         className="flex items-center gap-3 py-2 px-2 rounded-md hover:bg-muted/50 cursor-pointer"
+                        htmlFor={list.id}
                       >
                         <Checkbox
+                          id={list.id}
                           checked={selectedMyListIds.has(list.id)}
                           onCheckedChange={() => toggleMyList(list.id)}
                         />
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{list.name}</div>
+                          <div className="text-sm font-medium truncate">
+                            {list.name}
+                          </div>
                           <div className="text-xs text-muted-foreground">
-                            {list.itemCount} {list.itemCount === 1 ? t("lists.song") : t("lists.songs")}
+                            {list.itemCount}{" "}
+                            {list.itemCount === 1
+                              ? t("lists.song")
+                              : t("lists.songs")}
                           </div>
                         </div>
                       </label>
@@ -455,14 +463,16 @@ export function PlaylistIntersectionDialog({
                 {isSearching ? (
                   <div className="flex items-center justify-center py-6 text-muted-foreground gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm">{t("intersection.searching")}</span>
+                    <span className="text-sm">
+                      {t("intersection.searching")}
+                    </span>
                   </div>
                 ) : searchQuery.length >= 2 && searchResults.length === 0 ? (
                   <div className="text-center py-6 text-sm text-muted-foreground">
                     {t("intersection.noResults")}
                   </div>
                 ) : searchResults.length > 0 ? (
-                  <div className="max-h-[250px] overflow-y-auto space-y-1 border rounded-lg p-2">
+                  <div className="max-h-62.5 overflow-y-auto space-y-1 border rounded-lg p-2">
                     {searchResults.map((list) => (
                       <label
                         key={list.id}
@@ -473,10 +483,14 @@ export function PlaylistIntersectionDialog({
                           onCheckedChange={() => togglePublicList(list)}
                         />
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{list.name}</div>
+                          <div className="text-sm font-medium truncate">
+                            {list.name}
+                          </div>
                           <div className="text-xs text-muted-foreground">
-                            {list.ownerDisplayName} &middot;{" "}
-                            {list.itemCount} {list.itemCount === 1 ? t("lists.song") : t("lists.songs")}
+                            {list.ownerDisplayName} &middot; {list.itemCount}{" "}
+                            {list.itemCount === 1
+                              ? t("lists.song")
+                              : t("lists.songs")}
                           </div>
                         </div>
                         {selectedPublicListIds.has(list.id) && (
@@ -490,12 +504,18 @@ export function PlaylistIntersectionDialog({
                 {/* Selected public lists summary */}
                 {selectedPublicListIds.size > 0 && (
                   <div className="text-xs text-muted-foreground">
-                    {t("intersection.publicListsSummary", { count: selectedPublicListIds.size })}
+                    {t("intersection.publicListsSummary", {
+                      count: selectedPublicListIds.size,
+                    })}
                   </div>
                 )}
 
                 <div className="flex justify-between pt-2">
-                  <Button variant="outline" size="sm" onClick={() => setStep(1)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setStep(1)}
+                  >
                     <ArrowLeft className="h-4 w-4 mr-1" />
                     {t("import.back")}
                   </Button>
@@ -513,15 +533,29 @@ export function PlaylistIntersectionDialog({
                 {/* Summary */}
                 <div className="rounded-lg border bg-muted/30 p-4 space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">{t("intersection.myListsSummary", { count: selectedMyListIds.size })}</span>
+                    <span className="text-muted-foreground">
+                      {t("intersection.myListsSummary", {
+                        count: selectedMyListIds.size,
+                      })}
+                    </span>
                     <Badge variant="secondary">{selectedMyListIds.size}</Badge>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">{t("intersection.publicListsSummary", { count: selectedPublicListIds.size })}</span>
-                    <Badge variant="secondary">{selectedPublicListIds.size}</Badge>
+                    <span className="text-muted-foreground">
+                      {t("intersection.publicListsSummary", {
+                        count: selectedPublicListIds.size,
+                      })}
+                    </span>
+                    <Badge variant="secondary">
+                      {selectedPublicListIds.size}
+                    </Badge>
                   </div>
                   <div className="flex justify-between font-medium pt-1 border-t">
-                    <span>{t("intersection.totalSelected", { total: totalSelected })}</span>
+                    <span>
+                      {t("intersection.totalSelected", {
+                        total: totalSelected,
+                      })}
+                    </span>
                     <Badge>{totalSelected}</Badge>
                   </div>
                 </div>
@@ -529,7 +563,10 @@ export function PlaylistIntersectionDialog({
                 {/* Slider */}
                 <div className="space-y-3">
                   <Label className="text-sm">
-                    {t("intersection.minThreshold", { n: minCount, total: totalSelected })}
+                    {t("intersection.minThreshold", {
+                      n: minCount,
+                      total: totalSelected,
+                    })}
                   </Label>
                   <div className="flex items-center gap-3">
                     <Button
@@ -553,21 +590,33 @@ export function PlaylistIntersectionDialog({
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 shrink-0"
-                      onClick={() => setMinCount((v) => Math.min(totalSelected, v + 1))}
+                      onClick={() =>
+                        setMinCount((v) => Math.min(totalSelected, v + 1))
+                      }
                       disabled={minCount >= totalSelected}
                     >
                       +
                     </Button>
-                    <span className="text-sm font-bold w-6 text-center">{minCount}</span>
+                    <span className="text-sm font-bold w-6 text-center">
+                      {minCount}
+                    </span>
                   </div>
                 </div>
 
                 <div className="flex justify-between pt-2">
-                  <Button variant="outline" size="sm" onClick={() => setStep(2)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setStep(2)}
+                  >
                     <ArrowLeft className="h-4 w-4 mr-1" />
                     {t("import.back")}
                   </Button>
-                  <Button size="sm" onClick={handleCalculate} disabled={isCalculating}>
+                  <Button
+                    size="sm"
+                    onClick={handleCalculate}
+                    disabled={isCalculating}
+                  >
                     {isCalculating ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-1 animate-spin" />
@@ -586,19 +635,27 @@ export function PlaylistIntersectionDialog({
               <div className="space-y-4">
                 {/* Installation selector */}
                 <div className="flex items-center gap-3">
-                  <Label className="text-sm shrink-0">{t("intersection.selectInstallation")}</Label>
+                  <Label className="text-sm shrink-0">
+                    {t("intersection.selectInstallation")}
+                  </Label>
                   {installationsLoading ? (
                     <Skeleton className="h-9 flex-1" />
                   ) : (
                     <Select
                       value={selectedInstallationId || "none"}
-                      onValueChange={(v) => handleInstallationChange(v === "none" ? "" : v)}
+                      onValueChange={(v) =>
+                        handleInstallationChange(v === "none" ? "" : v)
+                      }
                     >
                       <SelectTrigger className="flex-1">
-                        <SelectValue placeholder={t("intersection.noInstallation")} />
+                        <SelectValue
+                          placeholder={t("intersection.noInstallation")}
+                        />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">{t("intersection.noInstallation")}</SelectItem>
+                        <SelectItem value="none">
+                          {t("intersection.noInstallation")}
+                        </SelectItem>
                         {installations.map((inst) => (
                           <SelectItem key={inst.id} value={inst.id}>
                             {inst.name}
@@ -619,7 +676,7 @@ export function PlaylistIntersectionDialog({
                     <p>{t("intersection.noSongsFound")}</p>
                   </div>
                 ) : (
-                  <div className="max-h-[300px] overflow-y-auto space-y-1 border rounded-lg p-2">
+                  <div className="max-h-75 overflow-y-auto space-y-1 border rounded-lg p-2">
                     {results.map((song) => (
                       <div
                         key={song.songId}
@@ -634,7 +691,8 @@ export function PlaylistIntersectionDialog({
                               width={36}
                               height={36}
                               onLoad={(e) => {
-                                (e.target as HTMLImageElement).style.opacity = "1";
+                                (e.target as HTMLImageElement).style.opacity =
+                                  "1";
                               }}
                             />
                           </div>
@@ -644,8 +702,12 @@ export function PlaylistIntersectionDialog({
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{song.title}</div>
-                          <div className="text-xs text-muted-foreground truncate">{song.artist}</div>
+                          <div className="text-sm font-medium truncate">
+                            {song.title}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {song.artist}
+                          </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <Badge variant="outline" className="text-xs">
@@ -679,7 +741,9 @@ export function PlaylistIntersectionDialog({
                     {savedListId ? (
                       <div className="flex items-center gap-2">
                         <Check className="h-4 w-4 text-green-500" />
-                        <span className="text-sm text-green-600">{t("intersection.saved")}</span>
+                        <span className="text-sm text-green-600">
+                          {t("intersection.saved")}
+                        </span>
                         <Button asChild variant="outline" size="sm">
                           <Link href={`/lists/${savedListId}`}>
                             <ExternalLink className="h-4 w-4 mr-1" />
@@ -702,9 +766,14 @@ export function PlaylistIntersectionDialog({
                           />
                         </div>
                         <div className="flex items-center gap-2">
-                          <Switch checked={saveIsPublic} onCheckedChange={setSaveIsPublic} />
+                          <Switch
+                            checked={saveIsPublic}
+                            onCheckedChange={setSaveIsPublic}
+                          />
                           <Label className="text-sm">
-                            {saveIsPublic ? t("import.publicList") : t("import.privateList")}
+                            {saveIsPublic
+                              ? t("import.publicList")
+                              : t("import.privateList")}
                           </Label>
                         </div>
                         <div className="flex gap-2">
@@ -756,23 +825,29 @@ export function PlaylistIntersectionDialog({
                         )}
                         {t("intersection.downloadAll")}
                       </Button>
-                      {hasInstallation && hasInstalledSongs && uninstalledSongs.length > 0 && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDownloadAll(uninstalledSongs)}
-                          disabled={isDownloading}
-                        >
-                          <Download className="h-4 w-4 mr-1" />
-                          {t("intersection.downloadUninstalled")}
-                        </Button>
-                      )}
+                      {hasInstallation &&
+                        hasInstalledSongs &&
+                        uninstalledSongs.length > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownloadAll(uninstalledSongs)}
+                            disabled={isDownloading}
+                          >
+                            <Download className="h-4 w-4 mr-1" />
+                            {t("intersection.downloadUninstalled")}
+                          </Button>
+                        )}
                     </div>
                   </div>
                 )}
 
                 <div className="flex justify-start pt-2">
-                  <Button variant="outline" size="sm" onClick={() => setStep(3)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setStep(3)}
+                  >
                     <ArrowLeft className="h-4 w-4 mr-1" />
                     {t("import.back")}
                   </Button>

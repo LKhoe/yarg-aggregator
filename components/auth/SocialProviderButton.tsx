@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { useTheme } from "next-themes";
 
 interface Logo {
   src: string;
@@ -25,9 +24,6 @@ export function SocialProviderButton({
   isLoading,
   invertOnDark,
 }: SocialProviderButtonProps) {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
-
   return (
     <button
       onClick={onClick}

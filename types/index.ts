@@ -1,27 +1,4 @@
 // Database Types
-export interface IMusic {
-  _id?: string;
-  name: string;
-  artist: string;
-  album: string;
-  coverUrl: string;
-  downloadUrl: string;
-  source: "enchor" | "rhythmverse";
-  sourceUpdatedAt?: Date;
-  instruments: {
-    drums?: number;
-    bass?: number;
-    guitar?: number;
-    keys?: number;
-    vocals?: number;
-  };
-  genre?: string;
-  year?: number;
-  charter?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 export interface IProvider {
   _id?: string;
   name: "enchor" | "rhythmverse";
@@ -92,17 +69,4 @@ export interface PlatformLink {
   url: string;
   previewUrl: string | null;
   videoId: string | null;
-}
-
-// Provider Types
-export interface ProviderJobStatus {
-  id: string;
-  source: "enchor" | "rhythmverse" | "all";
-  status: "pending" | "running" | "completed" | "failed";
-  progress: number;
-  totalItems: number;
-  processedItems: number;
-  errors: string[];
-  startedAt?: Date;
-  completedAt?: Date;
 }

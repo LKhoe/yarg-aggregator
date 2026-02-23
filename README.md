@@ -5,6 +5,8 @@ The **YARG Content Aggregator** is a modern, high-performance web platform desig
 > [!NOTE]
 > This is a community-made tool and is not affiliated with the YARG project.
 
+![Screenshot](screenshot.png)
+
 ## Features
 
 - **Unified Search**: Browse and filter music charts from multiple sources in one place.

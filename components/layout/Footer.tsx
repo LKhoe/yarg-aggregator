@@ -21,6 +21,10 @@ export default function Footer() {
           <Link href="/terms" className="hover:opacity-100 hover:underline transition-opacity">
             {t("footer.termsOfService")}
           </Link>
+          <span aria-hidden="true">·</span>
+          <a href="https://github.com/LKhoe/yarg-aggregator" target="_blank" rel="noopener noreferrer" className="hover:opacity-100 hover:underline transition-opacity">
+            GitHub
+          </a>
         </div>
       </div>
     </footer>

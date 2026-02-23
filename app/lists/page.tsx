@@ -95,7 +95,7 @@ function ListsContent() {
     fetchLists();
   }, [fetchLists]);
 
-  const handleCreateList = async (e: React.FormEvent) => {
+  const handleCreateList = async (e: React.SubmitEvent) => {
     e.preventDefault();
     setIsCreating(true);
 
