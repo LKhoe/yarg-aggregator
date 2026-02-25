@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, memo, useRef } from "react";
 import { useTranslations } from "@/hooks/use-translations";
 import {
   Table,
@@ -44,7 +44,7 @@ import { useGenres } from "@/hooks/use-genres";
 import type { ProviderMusic, PaginatedResponse } from "@/types";
 import { DifficultyMedal } from "@/components/ui/difficulty-medal";
 import { InstrumentIcon } from "@/components/ui/instrument-icon";
-import Image from "next/image";
+import { AlbumImage } from "@/components/ui/album-image";
 import {
   MultiSelect,
   MultiSelectContent,
@@ -68,10 +68,38 @@ import { SongActions } from "@/components/data-table/SongActions";
 interface MusicTableProps {
   onTotalChange: (total: number) => void;
   onSongSelect?: (song: ProviderMusic) => void;
-  externalFilter?: { artist?: string; genre?: string; album?: string; charter?: string } | null;
+  externalFilter?: {
+    artist?: string;
+    genre?: string;
+    album?: string;
+    charter?: string;
+  } | null;
 }
 
 const INSTRUMENTS = ["guitar", "bass", "drums", "vocals", "keys"] as const;
+const LIMIT = 20;
+
+// Hoist IntersectionObserver options to avoid object re-creation every render
+const INTERSECTION_OBSERVER_OPTIONS = { rootMargin: "1000px", threshold: 0.1 };
+
+// Extracted memoized sort icon — avoids unmount/remount when sortBy/sortOrder change
+const SortIcon = memo(function SortIcon({
+  column,
+  sortBy,
+  sortOrder,
+}: {
+  column: string;
+  sortBy: string;
+  sortOrder: "asc" | "desc";
+}) {
+  if (sortBy !== column)
+    return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />;
+  return sortOrder === "asc" ? (
+    <ArrowUp className="ml-2 h-4 w-4" />
+  ) : (
+    <ArrowDown className="ml-2 h-4 w-4" />
+  );
+});
 
 // Hoist static JSX to prevent recreation on every render
 const LoadingSkeleton = () =>
@@ -116,7 +144,6 @@ export default function MusicTable({
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [total, setTotal] = useState(0);
-  const [limit] = useState(20);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [sortBy, setSortBy] = useState<string>("createdAt");
@@ -152,7 +179,9 @@ export default function MusicTable({
 
   // Ref to read current sort without adding to effect deps
   const sortRef = useRef({ sortBy, sortOrder });
-  useEffect(() => { sortRef.current = { sortBy, sortOrder }; }, [sortBy, sortOrder]);
+  useEffect(() => {
+    sortRef.current = { sortBy, sortOrder };
+  }, [sortBy, sortOrder]);
 
   // Simple debounce — only updates debouncedQuery
   useEffect(() => {
@@ -202,7 +231,7 @@ export default function MusicTable({
 
       try {
         const params = new URLSearchParams({
-          limit: limit.toString(),
+          limit: LIMIT.toString(),
           sortBy,
           sortOrder,
         });
@@ -259,7 +288,6 @@ export default function MusicTable({
       }
     },
     [
-      limit,
       sortBy,
       sortOrder,
       debouncedQuery,
@@ -273,19 +301,6 @@ export default function MusicTable({
       charter,
     ],
   );
-
-  // Memoize the sort icon to prevent unnecessary re-renders
-  const SortIcon = useMemo(() => {
-    return function sortIcon({ column }: { column: string }) {
-      if (sortBy !== column)
-        return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />;
-      return sortOrder === "asc" ? (
-        <ArrowUp className="ml-2 h-4 w-4" />
-      ) : (
-        <ArrowDown className="ml-2 h-4 w-4" />
-      );
-    };
-  }, [sortBy, sortOrder]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -388,14 +403,17 @@ export default function MusicTable({
       prev.album === externalFilter.album &&
       prev.genre === externalFilter.genre &&
       prev.charter === externalFilter.charter
-    ) return;
+    )
+      return;
     prevExternalFilterRef.current = externalFilter;
     setQuery("");
     setDebouncedQuery("");
     if (externalFilter.genre !== undefined) setGenre(externalFilter.genre);
     if (externalFilter.artist !== undefined) setArtist(externalFilter.artist);
-    if (externalFilter.album !== undefined) setAlbumFilter(externalFilter.album);
-    if (externalFilter.charter !== undefined) setCharter(externalFilter.charter);
+    if (externalFilter.album !== undefined)
+      setAlbumFilter(externalFilter.album);
+    if (externalFilter.charter !== undefined)
+      setCharter(externalFilter.charter);
     handleFilterChange();
   }, [externalFilter, handleFilterChange]);
 
@@ -404,18 +422,12 @@ export default function MusicTable({
     // Only set up observer if we have data and more to load
     if (!data.length || !hasMore || loading || loadingMore) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const [entry] = entries;
-        if (entry.isIntersecting && hasMore && !loadingMore && !loading) {
-          loadMore();
-        }
-      },
-      {
-        rootMargin: "1000px",
-        threshold: 0.1,
-      },
-    );
+    const observer = new IntersectionObserver((entries) => {
+      const [entry] = entries;
+      if (entry.isIntersecting && hasMore && !loadingMore && !loading) {
+        loadMore();
+      }
+    }, INTERSECTION_OBSERVER_OPTIONS);
 
     const loadMoreTrigger = document.getElementById("load-more-trigger");
     if (loadMoreTrigger) {
@@ -449,10 +461,16 @@ export default function MusicTable({
         {(artist || albumFilter || charter) && (
           <div className="flex flex-wrap gap-1.5">
             {artist && (
-              <Badge variant="secondary" className="text-xs gap-1 pr-1 active-filter-badge">
+              <Badge
+                variant="secondary"
+                className="text-xs gap-1 pr-1 active-filter-badge"
+              >
                 {artist}
                 <button
-                  onClick={() => { setArtist(""); handleFilterChange(); }}
+                  onClick={() => {
+                    setArtist("");
+                    handleFilterChange();
+                  }}
                   className="ml-1 hover:opacity-70"
                   aria-label="Clear artist filter"
                 >
@@ -461,10 +479,16 @@ export default function MusicTable({
               </Badge>
             )}
             {albumFilter && (
-              <Badge variant="secondary" className="text-xs gap-1 pr-1 active-filter-badge">
+              <Badge
+                variant="secondary"
+                className="text-xs gap-1 pr-1 active-filter-badge"
+              >
                 {albumFilter}
                 <button
-                  onClick={() => { setAlbumFilter(""); handleFilterChange(); }}
+                  onClick={() => {
+                    setAlbumFilter("");
+                    handleFilterChange();
+                  }}
                   className="ml-1 hover:opacity-70"
                   aria-label="Clear album filter"
                 >
@@ -473,10 +497,16 @@ export default function MusicTable({
               </Badge>
             )}
             {charter && (
-              <Badge variant="secondary" className="text-xs gap-1 pr-1 active-filter-badge">
+              <Badge
+                variant="secondary"
+                className="text-xs gap-1 pr-1 active-filter-badge"
+              >
                 {charter}
                 <button
-                  onClick={() => { setCharter(""); handleFilterChange(); }}
+                  onClick={() => {
+                    setCharter("");
+                    handleFilterChange();
+                  }}
                   className="ml-1 hover:opacity-70"
                   aria-label="Clear charter filter"
                 >
@@ -498,7 +528,9 @@ export default function MusicTable({
                 handleFilterChange();
               }}
             >
-              <MultiSelectTrigger className={`h-9 w-full text-sm ${instruments.length > 0 ? "active-filter" : ""}`}>
+              <MultiSelectTrigger
+                className={`h-9 w-full text-sm ${instruments.length > 0 ? "active-filter" : ""}`}
+              >
                 <MultiSelectValue placeholder={t("table.allInstruments")} />
               </MultiSelectTrigger>
               <MultiSelectContent>
@@ -562,7 +594,9 @@ export default function MusicTable({
                 handleFilterChange();
               }}
             >
-              <SelectTrigger className={`w-full sm:w-37.5 h-9 ${source ? "active-filter" : ""}`}>
+              <SelectTrigger
+                className={`w-full sm:w-37.5 h-9 ${source ? "active-filter" : ""}`}
+              >
                 <SelectValue placeholder={t("table.allSources")} />
               </SelectTrigger>
               <SelectContent>
@@ -621,7 +655,7 @@ export default function MusicTable({
                   onClick={() => handleSort("name")}
                   className="p-0 hover:bg-transparent text-xs sm:text-sm"
                 >
-                  {t("table.song")} <SortIcon column="name" />
+                  {t("table.song")} <SortIcon column="name" sortBy={sortBy} sortOrder={sortOrder} />
                 </Button>
               </TableHead>
               <TableHead className="hidden sm:table-cell min-w-20">
@@ -630,7 +664,7 @@ export default function MusicTable({
                   onClick={() => handleSort("artist")}
                   className="p-0 hover:bg-transparent text-xs sm:text-sm"
                 >
-                  {t("table.artist")} <SortIcon column="artist" />
+                  {t("table.artist")} <SortIcon column="artist" sortBy={sortBy} sortOrder={sortOrder} />
                 </Button>
               </TableHead>
               <TableHead className="hidden md:table-cell min-w-20">
@@ -639,7 +673,7 @@ export default function MusicTable({
                   onClick={() => handleSort("album")}
                   className="p-0 hover:bg-transparent text-xs sm:text-sm"
                 >
-                  {t("table.album")} <SortIcon column="album" />
+                  {t("table.album")} <SortIcon column="album" sortBy={sortBy} sortOrder={sortOrder} />
                 </Button>
               </TableHead>
               <TableHead className="hidden lg:table-cell min-w-25">
@@ -678,66 +712,12 @@ export default function MusicTable({
                   <TableCell className="hidden sm:table-cell">
                     <div className="relative h-8 w-8 sm:h-12 sm:w-12 rounded">
                       {music.coverUrl ? (
-                        <>
-                          <Image
-                            src={music.coverUrl}
-                            alt={music.name}
-                            className="h-8 w-8 sm:h-12 sm:w-12 rounded object-cover bg-muted opacity-0 transition-opacity duration-300"
-                            width={48}
-                            height={48}
-                            sizes="(max-width: 640px) 32px, 48px"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              const parent = target.parentElement;
-                              if (parent) {
-                                const skeleton =
-                                  parent.querySelector(".loading-skeleton");
-                                const fallback =
-                                  parent.querySelector(".error-fallback");
-                                if (skeleton) {
-                                  (skeleton as HTMLElement).style.display =
-                                    "none";
-                                }
-                                if (fallback) {
-                                  (fallback as HTMLElement).style.display =
-                                    "flex";
-                                }
-                              }
-                            }}
-                            onLoad={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              const parent = target.parentElement;
-                              if (parent) {
-                                const skeleton =
-                                  parent.querySelector(".loading-skeleton");
-                                const fallback =
-                                  parent.querySelector(".error-fallback");
-                                if (skeleton) {
-                                  (skeleton as HTMLElement).style.display =
-                                    "none";
-                                }
-                                if (fallback) {
-                                  (fallback as HTMLElement).style.display =
-                                    "none";
-                                }
-                              }
-                              target.style.opacity = "1";
-                            }}
-                          />
-                          {/* Loading skeleton - shown while image is loading */}
-                          <div className="loading-skeleton absolute inset-0 h-8 w-8 sm:h-12 sm:w-12 rounded">
-                            <Skeleton className="h-full w-full rounded" />
-                          </div>
-                          {/* Error fallback - shown only on error */}
-                          <div
-                            className="error-fallback absolute inset-0 h-8 w-8 sm:h-12 sm:w-12 rounded bg-muted flex items-center justify-center"
-                            style={{ display: "none" }}
-                          >
-                            <div className="h-4 w-4 sm:h-6 sm:w-6 rounded bg-muted flex items-center justify-center text-muted-foreground font-bold text-xs sm:text-sm">
-                              <Music className="h-4 w-4 sm:h-6 sm:w-6 text-muted-foreground" />
-                            </div>
-                          </div>
-                        </>
+                        <AlbumImage
+                          src={music.coverUrl}
+                          alt={music.name}
+                          size={48}
+                          responsiveSize={48}
+                        />
                       ) : (
                         <div className="h-8 w-8 sm:h-12 sm:w-12 rounded bg-muted flex items-center justify-center">
                           <Music className="h-4 w-4 sm:h-6 sm:w-6 text-muted-foreground" />
@@ -748,68 +728,13 @@ export default function MusicTable({
                   <TableCell className="font-medium">
                     <div className="flex items-start gap-2 sm:gap-3">
                       {/* Album image - shown on all screen sizes in this cell for mobile layout */}
-                      <div className="relative h-8 w-8 sm:h-12 sm:w-12 rounded shrink-0 sm:hidden">
+                      <div className="relative h-8 w-8 rounded shrink-0 sm:hidden">
                         {music.coverUrl ? (
-                          <>
-                            <Image
-                              src={music.coverUrl}
-                              alt={music.name}
-                              className="h-8 w-8 rounded object-cover bg-muted opacity-0 transition-opacity duration-300"
-                              width={32}
-                              height={32}
-                              sizes="32px"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                const parent = target.parentElement;
-                                if (parent) {
-                                  const skeleton =
-                                    parent.querySelector(".loading-skeleton");
-                                  const fallback =
-                                    parent.querySelector(".error-fallback");
-                                  if (skeleton) {
-                                    (skeleton as HTMLElement).style.display =
-                                      "none";
-                                  }
-                                  if (fallback) {
-                                    (fallback as HTMLElement).style.display =
-                                      "flex";
-                                  }
-                                }
-                              }}
-                              onLoad={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                const parent = target.parentElement;
-                                if (parent) {
-                                  const skeleton =
-                                    parent.querySelector(".loading-skeleton");
-                                  const fallback =
-                                    parent.querySelector(".error-fallback");
-                                  if (skeleton) {
-                                    (skeleton as HTMLElement).style.display =
-                                      "none";
-                                  }
-                                  if (fallback) {
-                                    (fallback as HTMLElement).style.display =
-                                      "none";
-                                  }
-                                }
-                                target.style.opacity = "1";
-                              }}
-                            />
-                            {/* Loading skeleton - shown while image is loading */}
-                            <div className="loading-skeleton absolute inset-0 h-8 w-8 rounded">
-                              <Skeleton className="h-full w-full rounded" />
-                            </div>
-                            {/* Error fallback - shown only on error */}
-                            <div
-                              className="error-fallback absolute inset-0 h-8 w-8 rounded bg-muted flex items-center justify-center"
-                              style={{ display: "none" }}
-                            >
-                              <div className="h-4 w-4 rounded bg-muted-foreground/20 flex items-center justify-center text-muted-foreground font-bold text-xs">
-                                ?
-                              </div>
-                            </div>
-                          </>
+                          <AlbumImage
+                            src={music.coverUrl}
+                            alt={music.name}
+                            size={32}
+                          />
                         ) : (
                           <div className="h-8 w-8 rounded bg-muted flex items-center justify-center">
                             <Music className="h-4 w-4 text-muted-foreground" />
@@ -848,7 +773,10 @@ export default function MusicTable({
                   <TableCell className="hidden lg:table-cell">
                     <div className="flex gap-1 sm:gap-2">
                       {INSTRUMENTS.map((inst: string) => {
-                        const diff = music.instruments[inst as keyof typeof music.instruments];
+                        const diff =
+                          music.instruments[
+                            inst as keyof typeof music.instruments
+                          ];
                         if (diff === null) return null;
                         return (
                           <div

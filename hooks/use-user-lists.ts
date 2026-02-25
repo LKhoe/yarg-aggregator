@@ -14,18 +14,13 @@ interface UserList {
 export function useUserLists(isAuthenticated: boolean) {
   const [lists, setLists] = useState<UserList[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [prevAuth, setPrevAuth] = useState(isAuthenticated);
 
-  if (prevAuth !== isAuthenticated) {
-    setPrevAuth(isAuthenticated);
+  useEffect(() => {
     if (!isAuthenticated) {
       setLists([]);
       setLoaded(false);
+      return;
     }
-  }
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
 
     let cancelled = false;
 

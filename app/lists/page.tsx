@@ -4,8 +4,22 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useTranslations } from "@/hooks/use-translations";
-import { PlaylistImportDialog } from "@/components/import/PlaylistImportDialog";
-import { PlaylistIntersectionDialog } from "@/components/intersection/PlaylistIntersectionDialog";
+import dynamic from "next/dynamic";
+
+const PlaylistImportDialog = dynamic(
+  () =>
+    import("@/components/import/PlaylistImportDialog").then(
+      (m) => ({ default: m.PlaylistImportDialog }),
+    ),
+  { ssr: false },
+);
+const PlaylistIntersectionDialog = dynamic(
+  () =>
+    import("@/components/intersection/PlaylistIntersectionDialog").then(
+      (m) => ({ default: m.PlaylistIntersectionDialog }),
+    ),
+  { ssr: false },
+);
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

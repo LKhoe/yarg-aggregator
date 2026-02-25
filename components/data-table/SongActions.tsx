@@ -38,7 +38,8 @@ export function SongActions({
 }: SongActionsProps) {
   const { t } = useTranslations();
 
-  const handleToggleFavorite = async () => {
+  const handleToggleFavorite = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       const result = await onToggleFavorite(songId);
       toast.success(
@@ -67,7 +68,7 @@ export function SongActions({
           <Button
             variant="ghost"
             size="icon"
-            onClick={handleToggleFavorite}
+            onClick={(e) => handleToggleFavorite(e)}
             className="h-8 w-8 sm:h-10 sm:w-10"
           >
             <Heart
@@ -93,6 +94,7 @@ export function SongActions({
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 sm:h-10 sm:w-10"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <ListPlus className="h-3 w-3 sm:h-4 sm:w-4 text-foreground" />
                 </Button>

@@ -1,4 +1,5 @@
 const SPOTIFY_API = "https://api.spotify.com/v1";
+const FETCH_TIMEOUT_MS = 15_000;
 
 export interface SpotifyPublicTrackInfo {
   title: string;
@@ -40,6 +41,7 @@ export async function getClientCredentialsToken(
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: "grant_type=client_credentials",
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!response.ok) {
     throw new Error(`Spotify token error: ${response.status}`);
@@ -68,6 +70,7 @@ export async function getPublicPlaylistTracks(
   // Fetch playlist metadata for the name
   const metaResponse = await fetch(`${SPOTIFY_API}/playlists/${playlistId}?fields=name`, {
     headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!metaResponse.ok) {
     throw new Error(`Spotify API error: ${metaResponse.status}`);
@@ -83,6 +86,7 @@ export async function getPublicPlaylistTracks(
   while (nextUrl) {
     const response = await fetch(nextUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!response.ok) {
       throw new Error(`Spotify API error: ${response.status}`);

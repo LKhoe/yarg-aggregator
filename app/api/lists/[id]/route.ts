@@ -34,12 +34,22 @@ export async function GET(
           album: item.song.album?.name ?? null,
           albumImageUrl: item.song.albumImageUrl,
           downloadUrls: item.song.downloadUrls,
+          instruments: {
+            drums: item.song.diffDrums ?? null,
+            bass: item.song.diffBass ?? null,
+            guitar: item.song.diffGuitar ?? null,
+            keys: item.song.diffKeys ?? null,
+            vocals: item.song.diffVocals ?? null,
+          },
         },
       })),
     });
   } catch (error) {
     console.error("Error fetching list:", error);
-    return NextResponse.json({ error: "Failed to fetch list" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch list" },
+      { status: 500 },
+    );
   }
 }
 
@@ -58,7 +68,10 @@ export async function PATCH(
     const body = await request.json();
     const { name, isPublic } = body;
 
-    if (name !== undefined && (typeof name !== "string" || name.length < 1 || name.length > 50)) {
+    if (
+      name !== undefined &&
+      (typeof name !== "string" || name.length < 1 || name.length > 50)
+    ) {
       return NextResponse.json(
         { error: "Name must be between 1 and 50 characters" },
         { status: 400 },
@@ -85,7 +98,10 @@ export async function PATCH(
     });
   } catch (error) {
     console.error("Error updating list:", error);
-    return NextResponse.json({ error: "Failed to update list" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to update list" },
+      { status: 500 },
+    );
   }
 }
 
@@ -114,6 +130,9 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting list:", error);
-    return NextResponse.json({ error: "Failed to delete list" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to delete list" },
+      { status: 500 },
+    );
   }
 }

@@ -21,6 +21,14 @@ export const initProviderWorker = () => {
     "provider-fetch",
     async (job: Job<FetchJobData>) => {
       const { source, latestSourceUpdatedAt } = job.data;
+
+      // Validate job data
+      if (!source || !["enchor", "rhythmverse"].includes(source)) {
+        throw new Error(`Invalid source in job data: ${source}`);
+      }
+      if (latestSourceUpdatedAt !== null && typeof latestSourceUpdatedAt !== "string") {
+        throw new Error("Invalid latestSourceUpdatedAt in job data");
+      }
       const latestDate = latestSourceUpdatedAt
         ? new Date(latestSourceUpdatedAt)
         : undefined;

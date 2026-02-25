@@ -3,18 +3,18 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "@/hooks/use-translations";
-import {
-  Play,
-  Pause,
-  Volume2,
-  VolumeX,
-  ExternalLink,
-} from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, ExternalLink } from "lucide-react";
 
 interface AudioPreviewProps {
   previewUrl: string;
   platformUrl: string;
   platformName: string;
+}
+
+function formatTime(s: number): string {
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2, "0")}`;
 }
 
 export default function AudioPreview({
@@ -33,13 +33,23 @@ export default function AudioPreview({
     const audio = new Audio(previewUrl);
     audioRef.current = audio;
 
-    audio.addEventListener("loadedmetadata", () => setDuration(audio.duration));
-    audio.addEventListener("timeupdate", () => setCurrentTime(audio.currentTime));
-    audio.addEventListener("ended", () => setPlaying(false));
+    const onMetadata = () => setDuration(audio.duration);
+    const onTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const onEnded = () => setPlaying(false);
 
-    audio.play().then(() => setPlaying(true)).catch(() => {});
+    audio.addEventListener("loadedmetadata", onMetadata);
+    audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("ended", onEnded);
+
+    audio
+      .play()
+      .then(() => setPlaying(true))
+      .catch(() => {});
 
     return () => {
+      audio.removeEventListener("loadedmetadata", onMetadata);
+      audio.removeEventListener("timeupdate", onTimeUpdate);
+      audio.removeEventListener("ended", onEnded);
       audio.pause();
       audio.src = "";
       audioRef.current = null;
@@ -53,7 +63,10 @@ export default function AudioPreview({
       audio.pause();
       setPlaying(false);
     } else {
-      audio.play().then(() => setPlaying(true)).catch(() => {});
+      audio
+        .play()
+        .then(() => setPlaying(true))
+        .catch(() => {});
     }
   }, [playing]);
 
@@ -74,12 +87,6 @@ export default function AudioPreview({
     },
     [duration],
   );
-
-  const formatTime = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
-    return `${m}:${sec.toString().padStart(2, "0")}`;
-  };
 
   const progress = duration ? (currentTime / duration) * 100 : 0;
 
@@ -103,7 +110,7 @@ export default function AudioPreview({
           className="flex-1 h-1.5 bg-muted rounded-full cursor-pointer relative"
           onClick={seek}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
+            if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
               // For progress bar, we could implement arrow key navigation here
               // but for now, just make it keyboard accessible
@@ -117,8 +124,14 @@ export default function AudioPreview({
           aria-valuenow={progress}
         >
           <div
-            className="absolute inset-y-0 left-0 bg-primary rounded-full"
-            style={{ width: `${progress}%` }}
+            className="absolute inset-y-0 left-0 rounded-full"
+            style={{
+              width: `${progress}%`,
+              background:
+                "linear-gradient(to right, var(--color-primary), var(--color-chart-2))",
+              boxShadow:
+                "0 0 4px 1px oklch(from var(--color-primary) l c h / 60%), 0 0 12px 2px oklch(from var(--color-chart-2) l c h / 30%)",
+            }}
           />
         </div>
 
@@ -140,12 +153,7 @@ export default function AudioPreview({
         </Button>
       </div>
 
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full text-xs"
-        asChild
-      >
+      <Button variant="outline" size="sm" className="w-full text-xs" asChild>
         <a href={platformUrl} target="_blank" rel="noopener noreferrer">
           <ExternalLink className="h-3 w-3 mr-1" />
           {t("songDetail.openIn", { platform: platformName })}

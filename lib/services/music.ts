@@ -183,7 +183,16 @@ export class MusicService {
     // Parse cursor to get the last seen values
     let cursorCondition = undefined;
     if (cursor) {
-      const cursorData = JSON.parse(atob(cursor));
+      let cursorData: { lastValue?: unknown; lastId?: string; lastScore?: number; total?: number };
+      try {
+        cursorData = JSON.parse(atob(cursor));
+      } catch {
+        // Return empty result for malformed cursors
+        return { data: [], total: 0, page: 1, limit, totalPages: 0, nextCursor: null, hasMore: false };
+      }
+      if (!cursorData || typeof cursorData.lastId !== "string") {
+        return { data: [], total: 0, page: 1, limit, totalPages: 0, nextCursor: null, hasMore: false };
+      }
       const { lastValue, lastId } = cursorData;
 
       if (useRelevanceSort) {
@@ -300,8 +309,13 @@ export class MusicService {
     // Get total count: only query if no cursor, otherwise use count from cursor
     let count: number;
     if (cursor) {
-      const cursorData = JSON.parse(atob(cursor));
-      count = cursorData.total;
+      let cursorData: { total?: number };
+      try {
+        cursorData = JSON.parse(atob(cursor));
+      } catch {
+        cursorData = {};
+      }
+      count = typeof cursorData.total === "number" ? cursorData.total : 0;
     } else {
       const countBaseQuery = db
         .select({ count: sql<number>`count(DISTINCT ${song.id})` })

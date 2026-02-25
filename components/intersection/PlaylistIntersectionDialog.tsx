@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useTranslations } from "@/hooks/use-translations";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -46,7 +46,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
+import { AlbumImage } from "@/components/ui/album-image";
 
 interface MyList {
   id: string;
@@ -341,9 +341,15 @@ export function PlaylistIntersectionDialog({
     onOpenChange(newOpen);
   };
 
-  const uninstalledSongs = results.filter((s) => !s.installed);
+  const uninstalledSongs = useMemo(
+    () => results.filter((s) => !s.installed),
+    [results],
+  );
   const hasInstallation = !!selectedInstallationId;
-  const hasInstalledSongs = results.some((s) => s.installed);
+  const hasInstalledSongs = useMemo(
+    () => results.some((s) => s.installed),
+    [results],
+  );
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -685,19 +691,7 @@ export function PlaylistIntersectionDialog({
                         className="flex items-center gap-3 py-2 px-2 rounded-md"
                       >
                         {song.albumImageUrl ? (
-                          <div className="relative h-9 w-9 rounded shrink-0">
-                            <Image
-                              src={song.albumImageUrl}
-                              alt=""
-                              className="h-9 w-9 rounded object-cover bg-muted opacity-0 transition-opacity duration-300"
-                              width={36}
-                              height={36}
-                              onLoad={(e) => {
-                                (e.target as HTMLImageElement).style.opacity =
-                                  "1";
-                              }}
-                            />
-                          </div>
+                          <AlbumImage src={song.albumImageUrl} alt="" size={36} />
                         ) : (
                           <div className="h-9 w-9 rounded bg-muted flex items-center justify-center shrink-0">
                             <Music className="h-4 w-4 text-muted-foreground" />

@@ -63,6 +63,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { AlbumImage } from "@/components/ui/album-image";
 
 interface ProviderAccount {
   provider: string;
@@ -256,14 +257,7 @@ export function PlaylistImportDialog({
     }
   }, [step, selectedProvider, fetchPlaylists]);
 
-  // Fetch user lists for the "add to existing" option
-  useEffect(() => {
-    if (step === 3) {
-      fetchUserLists();
-    }
-  }, [step]);
-
-  const fetchUserLists = async () => {
+  const fetchUserLists = useCallback(async () => {
     try {
       const res = await fetch("/api/lists");
       if (res.ok) {
@@ -273,7 +267,14 @@ export function PlaylistImportDialog({
     } catch {
       // Non-critical, silently fail
     }
-  };
+  }, []);
+
+  // Fetch user lists for the "add to existing" option
+  useEffect(() => {
+    if (step === 3) {
+      fetchUserLists();
+    }
+  }, [step, fetchUserLists]);
 
   const handleProviderSelect = (provider: string) => {
     const acc = accounts.find((a) => a.provider === provider);
@@ -855,65 +856,7 @@ export function PlaylistImportDialog({
                                 )}
                               </div>
                             ) : playlist.imageUrl ? (
-                              <div className="relative h-12 w-12 rounded shrink-0">
-                                <Image
-                                  src={playlist.imageUrl}
-                                  alt={playlist.name}
-                                  className="h-12 w-12 rounded object-cover bg-muted opacity-0 transition-opacity duration-300"
-                                  width={48}
-                                  height={48}
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    const parent = target.parentElement;
-                                    if (parent) {
-                                      const skeleton =
-                                        parent.querySelector(
-                                          ".loading-skeleton",
-                                        );
-                                      const fallback =
-                                        parent.querySelector(".error-fallback");
-                                      if (skeleton)
-                                        (
-                                          skeleton as HTMLElement
-                                        ).style.display = "none";
-                                      if (fallback)
-                                        (
-                                          fallback as HTMLElement
-                                        ).style.display = "flex";
-                                    }
-                                  }}
-                                  onLoad={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    const parent = target.parentElement;
-                                    if (parent) {
-                                      const skeleton =
-                                        parent.querySelector(
-                                          ".loading-skeleton",
-                                        );
-                                      const fallback =
-                                        parent.querySelector(".error-fallback");
-                                      if (skeleton)
-                                        (
-                                          skeleton as HTMLElement
-                                        ).style.display = "none";
-                                      if (fallback)
-                                        (
-                                          fallback as HTMLElement
-                                        ).style.display = "none";
-                                    }
-                                    target.style.opacity = "1";
-                                  }}
-                                />
-                                <div className="loading-skeleton absolute inset-0 h-12 w-12 rounded">
-                                  <Skeleton className="h-full w-full rounded" />
-                                </div>
-                                <div
-                                  className="error-fallback absolute inset-0 h-12 w-12 rounded bg-muted flex items-center justify-center"
-                                  style={{ display: "none" }}
-                                >
-                                  <Music className="h-6 w-6 text-muted-foreground" />
-                                </div>
-                              </div>
+                              <AlbumImage src={playlist.imageUrl} alt={playlist.name} size={48} />
                             ) : (
                               <div className="h-12 w-12 rounded bg-muted flex items-center justify-center">
                                 <Music className="h-6 w-6 text-muted-foreground" />
@@ -1029,71 +972,7 @@ export function PlaylistImportDialog({
                                   }
                                 />
                                 {r.match!.albumImageUrl && (
-                                  <div className="relative h-8 w-8 rounded shrink-0">
-                                    <Image
-                                      src={r.match!.albumImageUrl}
-                                      alt=""
-                                      className="h-8 w-8 rounded object-cover bg-muted opacity-0 transition-opacity duration-300"
-                                      width={32}
-                                      height={32}
-                                      onError={(e) => {
-                                        const target =
-                                          e.target as HTMLImageElement;
-                                        const parent = target.parentElement;
-                                        if (parent) {
-                                          const skeleton =
-                                            parent.querySelector(
-                                              ".loading-skeleton",
-                                            );
-                                          const fallback =
-                                            parent.querySelector(
-                                              ".error-fallback",
-                                            );
-                                          if (skeleton)
-                                            (
-                                              skeleton as HTMLElement
-                                            ).style.display = "none";
-                                          if (fallback)
-                                            (
-                                              fallback as HTMLElement
-                                            ).style.display = "flex";
-                                        }
-                                      }}
-                                      onLoad={(e) => {
-                                        const target =
-                                          e.target as HTMLImageElement;
-                                        const parent = target.parentElement;
-                                        if (parent) {
-                                          const skeleton =
-                                            parent.querySelector(
-                                              ".loading-skeleton",
-                                            );
-                                          const fallback =
-                                            parent.querySelector(
-                                              ".error-fallback",
-                                            );
-                                          if (skeleton)
-                                            (
-                                              skeleton as HTMLElement
-                                            ).style.display = "none";
-                                          if (fallback)
-                                            (
-                                              fallback as HTMLElement
-                                            ).style.display = "none";
-                                        }
-                                        target.style.opacity = "1";
-                                      }}
-                                    />
-                                    <div className="loading-skeleton absolute inset-0 h-8 w-8 rounded">
-                                      <Skeleton className="h-full w-full rounded" />
-                                    </div>
-                                    <div
-                                      className="error-fallback absolute inset-0 h-8 w-8 rounded bg-muted flex items-center justify-center"
-                                      style={{ display: "none" }}
-                                    >
-                                      <Music className="h-4 w-4 text-muted-foreground" />
-                                    </div>
-                                  </div>
+                                  <AlbumImage src={r.match!.albumImageUrl} alt="" size={32} />
                                 )}
                                 <div className="flex-1 min-w-0">
                                   <div className="text-sm truncate">

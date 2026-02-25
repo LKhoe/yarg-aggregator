@@ -36,11 +36,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid source" }, { status: 400 });
     }
 
+    // File size limit: 100MB
+    const MAX_FILE_SIZE = 100 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: "File too large. Maximum size is 100MB." },
+        { status: 400 },
+      );
+    }
+
     // Convert File to Buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Initialiaze zip
+    // Initialize zip
     let zip: AdmZip;
     try {
       zip = new AdmZip(buffer);
@@ -50,7 +59,19 @@ export async function POST(request: NextRequest) {
 
     const allSongs: ProviderMusic[] = [];
 
-    for (const entry of zip.getEntries()) {
+    // Zip bomb protection
+    const MAX_ENTRIES = 500;
+    const MAX_DECOMPRESSED_SIZE = 500 * 1024 * 1024; // 500MB total decompressed
+    const entries = zip.getEntries();
+    if (entries.length > MAX_ENTRIES) {
+      return NextResponse.json(
+        { error: `Too many entries in zip (max ${MAX_ENTRIES})` },
+        { status: 400 },
+      );
+    }
+
+    let totalDecompressedSize = 0;
+    for (const entry of entries) {
       if (
         entry.isDirectory ||
         !entry.name.endsWith(".json") ||
@@ -58,6 +79,15 @@ export async function POST(request: NextRequest) {
         entry.name.includes("__MACOSX")
       )
         continue;
+
+      totalDecompressedSize += entry.header.size;
+      if (totalDecompressedSize > MAX_DECOMPRESSED_SIZE) {
+        return NextResponse.json(
+          { error: "Decompressed content too large" },
+          { status: 400 },
+        );
+      }
+
       try {
         const fileContent = entry.getData().toString("utf8");
         const json = JSON.parse(fileContent);

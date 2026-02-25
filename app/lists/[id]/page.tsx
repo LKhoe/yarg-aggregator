@@ -2,17 +2,13 @@
 
 import { useState, useEffect, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useTranslations } from "@/hooks/use-translations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +27,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -48,7 +50,13 @@ import {
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import Link from "next/link";
-import Image from "next/image";
+import { AlbumImage } from "@/components/ui/album-image";
+import type { ProviderMusic } from "@/types";
+import { useMediaQuery } from "@/hooks/use-media-query";
+
+const SongDetail = dynamic(() => import("@/components/song/SongDetail"), {
+  ssr: false,
+});
 
 interface ListItem {
   id: string;
@@ -60,6 +68,13 @@ interface ListItem {
     album: string | null;
     albumImageUrl: string | null;
     downloadUrls: { url: string; source: string }[];
+    instruments: {
+      drums: number | null;
+      bass: number | null;
+      guitar: number | null;
+      keys: number | null;
+      vocals: number | null;
+    };
   };
 }
 
@@ -79,10 +94,31 @@ interface Installation {
   name: string;
 }
 
+function toProviderMusic(
+  song: ListItem["song"],
+  installed: boolean,
+): ProviderMusic {
+  return {
+    id: song.id,
+    name: song.title,
+    artist: song.artist,
+    album: song.album,
+    coverUrl: song.albumImageUrl ?? "",
+    downloadUrls: song.downloadUrls,
+    instruments: song.instruments,
+    genre: null,
+    year: null,
+    charter: null,
+    sourceUpdatedAt: null,
+    installed,
+  };
+}
+
 function ListDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { t } = useTranslations();
   const router = useRouter();
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
   const [list, setList] = useState<SongList | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -90,11 +126,14 @@ function ListDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const [editName, setEditName] = useState("");
   const [editPublic, setEditPublic] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [selectedSong, setSelectedSong] = useState<ProviderMusic | null>(null);
 
   // Installation state
   const [installations, setInstallations] = useState<Installation[]>([]);
   const [selectedInstallationId, setSelectedInstallationId] = useState("");
-  const [installedSongIds, setInstalledSongIds] = useState<Set<string>>(new Set());
+  const [installedSongIds, setInstalledSongIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [checkingInstalled, setCheckingInstalled] = useState(false);
 
   const fetchList = useCallback(async () => {
@@ -281,291 +320,320 @@ function ListDetailContent({ params }: { params: Promise<{ id: string }> }) {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/lists">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div className="flex items-center gap-2">
-          {list.isFavorites && (
-            <Heart className="h-5 w-5 text-red-500 fill-red-500" />
-          )}
-          <h1 className="text-2xl font-bold">{list.name}</h1>
-        </div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("lists.listSettings")}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="listName">{t("lists.listName")}</Label>
-            <Input
-              id="listName"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              disabled={list.isFavorites || isSaving}
-              minLength={1}
-              maxLength={50}
-            />
-            {list.isFavorites && (
-              <p className="text-xs text-muted-foreground">
-                {t("lists.favoritesCannotRename")}
-              </p>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>{t("lists.visibility")}</Label>
-              <p className="text-sm text-muted-foreground">
-                {editPublic
-                  ? t("lists.publicDescription")
-                  : t("lists.privateDescription")}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {editPublic ? (
-                <Globe className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <Lock className="h-4 w-4 text-muted-foreground" />
-              )}
-              <Switch
-                checked={editPublic}
-                onCheckedChange={setEditPublic}
-                disabled={isSaving}
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-between pt-4">
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving ? t("lists.saving") : t("lists.save")}
+    <div
+      className={`mx-auto transition-all ${selectedSong ? "max-w-6xl" : "max-w-4xl"}`}
+    >
+      <div
+        className={`${selectedSong ? "grid gap-6 lg:grid-cols-[1fr_320px] items-start" : "space-y-6"}`}
+      >
+        <div className="space-y-6">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" asChild>
+              <Link href="/lists">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
             </Button>
-
-            {!list.isFavorites && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    {t("lists.delete")}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      {t("lists.deleteConfirm")}
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {t("lists.deleteWarning")}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>{t("lists.cancel")}</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleDelete}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      disabled={isDeleting}
-                    >
-                      {isDeleting
-                        ? t("lists.deleting")
-                        : t("lists.confirmDelete")}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
+            <div className="flex items-center gap-2">
+              {list.isFavorites && (
+                <Heart className="h-5 w-5 text-red-500 fill-red-500" />
+              )}
+              <h1 className="text-2xl font-bold">{list.name}</h1>
+            </div>
           </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle>
-              {t("lists.songs")} ({list.items.length})
-            </CardTitle>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Installation selector */}
-              <div className="flex items-center gap-2">
-                <Select
-                  value={selectedInstallationId || "none"}
-                  onValueChange={handleInstallationChange}
-                >
-                  <SelectTrigger className="w-48 h-8 text-sm">
-                    <SelectValue placeholder={t("lists.selectInstallation")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">
-                      {t("lists.selectInstallation")}
-                    </SelectItem>
-                    {installations.map((inst) => (
-                      <SelectItem key={inst.id} value={inst.id}>
-                        {inst.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {checkingInstalled && (
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("lists.listSettings")}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="listName">{t("lists.listName")}</Label>
+                <Input
+                  id="listName"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  disabled={list.isFavorites || isSaving}
+                  minLength={1}
+                  maxLength={50}
+                />
+                {list.isFavorites && (
+                  <p className="text-xs text-muted-foreground">
+                    {t("lists.favoritesCannotRename")}
+                  </p>
                 )}
               </div>
 
-              {/* Download uninstalled only (shown when installation selected and some songs are installed) */}
-              {hasInstallation && hasInstalledWithDownload && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={isDownloading || uninstalledDownloadableItems.length === 0}
-                  onClick={() => openDownloads(uninstalledDownloadableItems)}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  {t("lists.downloadUninstalled")}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>{t("lists.visibility")}</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {editPublic
+                      ? t("lists.publicDescription")
+                      : t("lists.privateDescription")}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {editPublic ? (
+                    <Globe className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Lock className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <Switch
+                    checked={editPublic}
+                    onCheckedChange={setEditPublic}
+                    disabled={isSaving}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-between pt-4">
+                <Button onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? t("lists.saving") : t("lists.save")}
                 </Button>
-              )}
 
-              {/* Download All */}
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    size="sm"
-                    disabled={downloadableItems.length === 0 || isDownloading}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    {isDownloading ? t("lists.downloading") : t("lists.downloadAll")}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      {t("lists.downloadAllConfirm")}
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {t("lists.downloadAllDescription").replace(
-                        "{count}",
-                        String(downloadableItems.length),
-                      )}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>{t("lists.cancel")}</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => openDownloads(downloadableItems)}
+                {!list.isFavorites && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        {t("lists.delete")}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          {t("lists.deleteConfirm")}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {t("lists.deleteWarning")}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>
+                          {t("lists.cancel")}
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleDelete}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          disabled={isDeleting}
+                        >
+                          {isDeleting
+                            ? t("lists.deleting")
+                            : t("lists.confirmDelete")}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle>
+                  {t("lists.songs")} ({list.items.length})
+                </CardTitle>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Installation selector */}
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={selectedInstallationId || "none"}
+                      onValueChange={handleInstallationChange}
                     >
-                      {t("lists.confirm")}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {list.items.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">
-              {t("lists.noSongs")}
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {list.items.map((item) => {
-                const hasDownload = item.song.downloadUrls.length > 0;
-                const isInstalled = installedSongIds.has(item.song.id);
+                      <SelectTrigger className="w-48 h-8 text-sm">
+                        <SelectValue
+                          placeholder={t("lists.selectInstallation")}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">
+                          {t("lists.selectInstallation")}
+                        </SelectItem>
+                        {installations.map((inst) => (
+                          <SelectItem key={inst.id} value={inst.id}>
+                            {inst.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {checkingInstalled && (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
 
-                return (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="relative h-10 w-10 shrink-0">
-                        {item.song.albumImageUrl ? (
-                          <>
-                            <Image
+                  {/* Download uninstalled only (shown when installation selected and some songs are installed) */}
+                  {hasInstallation && hasInstalledWithDownload && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={
+                        isDownloading ||
+                        uninstalledDownloadableItems.length === 0
+                      }
+                      onClick={() =>
+                        openDownloads(uninstalledDownloadableItems)
+                      }
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      {t("lists.downloadUninstalled")}
+                    </Button>
+                  )}
+
+                  {/* Download All */}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        size="sm"
+                        disabled={
+                          downloadableItems.length === 0 || isDownloading
+                        }
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        {isDownloading
+                          ? t("lists.downloading")
+                          : t("lists.downloadAll")}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          {t("lists.downloadAllConfirm")}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {t("lists.downloadAllDescription").replace(
+                            "{count}",
+                            String(downloadableItems.length),
+                          )}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>
+                          {t("lists.cancel")}
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => openDownloads(downloadableItems)}
+                        >
+                          {t("lists.confirm")}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {list.items.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  {t("lists.noSongs")}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {list.items.map((item) => {
+                    const hasDownload = item.song.downloadUrls.length > 0;
+                    const isInstalled = installedSongIds.has(item.song.id);
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() =>
+                          setSelectedSong(
+                            toProviderMusic(item.song, isInstalled),
+                          )
+                        }
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {item.song.albumImageUrl ? (
+                            <AlbumImage
                               src={item.song.albumImageUrl}
                               alt={item.song.title}
-                              className="h-10 w-10 rounded object-cover bg-muted opacity-0 transition-opacity duration-300"
-                              width={40}
-                              height={40}
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                const parent = target.parentElement;
-                                if (parent) {
-                                  const skeleton = parent.querySelector(".loading-skeleton");
-                                  const fallback = parent.querySelector(".error-fallback");
-                                  if (skeleton) (skeleton as HTMLElement).style.display = "none";
-                                  if (fallback) (fallback as HTMLElement).style.display = "flex";
-                                }
-                              }}
-                              onLoad={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                const parent = target.parentElement;
-                                if (parent) {
-                                  const skeleton = parent.querySelector(".loading-skeleton");
-                                  const fallback = parent.querySelector(".error-fallback");
-                                  if (skeleton) (skeleton as HTMLElement).style.display = "none";
-                                  if (fallback) (fallback as HTMLElement).style.display = "none";
-                                }
-                                target.style.opacity = "1";
-                              }}
+                              size={40}
                             />
-                            <div className="loading-skeleton absolute inset-0 h-10 w-10 rounded">
-                              <Skeleton className="h-full w-full rounded" />
-                            </div>
-                            <div
-                              className="error-fallback absolute inset-0 h-10 w-10 rounded bg-muted flex items-center justify-center"
-                              style={{ display: "none" }}
-                            >
+                          ) : (
+                            <div className="h-10 w-10 rounded bg-muted flex items-center justify-center shrink-0">
                               <Music className="h-5 w-5 text-muted-foreground" />
                             </div>
-                          </>
-                        ) : (
-                          <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
-                            <Music className="h-5 w-5 text-muted-foreground" />
+                          )}
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">
+                              {item.song.title}
+                            </p>
+                            <p className="text-sm text-muted-foreground truncate">
+                              {item.song.artist}
+                            </p>
                           </div>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-medium truncate">{item.song.title}</p>
-                        <p className="text-sm text-muted-foreground truncate">
-                          {item.song.artist}
-                        </p>
-                      </div>
-                    </div>
+                        </div>
 
-                    <div className="flex items-center gap-2 shrink-0 ml-2">
-                      {hasInstallation && isInstalled && (
-                        <span title={t("lists.installed")}>
-                          <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        </span>
-                      )}
-                      {!hasDownload && (
-                        <Badge
-                          variant="outline"
-                          className="text-xs text-muted-foreground gap-1"
-                        >
-                          <AlertCircle className="h-3 w-3" />
-                          {t("lists.noDownloadLink")}
-                        </Badge>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveSong(item.song.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                          {hasInstallation && isInstalled && (
+                            <span title={t("lists.installed")}>
+                              <CheckCircle2 className="h-4 w-4 text-green-500" />
+                            </span>
+                          )}
+                          {!hasDownload && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs text-muted-foreground gap-1"
+                            >
+                              <AlertCircle className="h-3 w-3" />
+                              {t("lists.noDownloadLink")}
+                            </Badge>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveSong(item.song.id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+        {/* end inner space-y-6 */}
+
+        {/* Desktop side panel */}
+        {selectedSong && (
+          <aside className="hidden lg:block sticky top-20 self-start max-h-[calc(100vh-5rem)] overflow-hidden">
+            <SongDetail
+              song={selectedSong}
+              onClose={() => setSelectedSong(null)}
+            />
+          </aside>
+        )}
+      </div>
+      {/* end grid */}
+
+      {/* Mobile drawer */}
+      <Drawer
+        open={!!selectedSong && !isDesktop}
+        onOpenChange={(open) => !open && setSelectedSong(null)}
+      >
+        <DrawerContent className="max-h-[90dvh]">
+          <DrawerHeader>
+            <DrawerTitle className="sr-only">{selectedSong?.name}</DrawerTitle>
+          </DrawerHeader>
+          <div className="overflow-y-auto px-4 pb-6">
+            {selectedSong && (
+              <SongDetail
+                song={selectedSong}
+                onClose={() => setSelectedSong(null)}
+              />
+            )}
+          </div>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }

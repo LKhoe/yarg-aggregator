@@ -19,11 +19,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json([]);
     }
 
+    // Validate all IDs are strings
+    if (!musicIds.every((id: unknown) => typeof id === "string")) {
+      return NextResponse.json(
+        { error: "All musicIds must be strings" },
+        { status: 400 },
+      );
+    }
+
+    // Validate UUID format
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const validIds = musicIds.filter((id: string) => UUID_REGEX.test(id));
+
     // Limit the number of IDs to prevent excessive database queries
-    const limitedIds = musicIds.slice(0, 100);
-    if (musicIds.length > 100) {
+    const limitedIds = validIds.slice(0, 100);
+    if (validIds.length > 100) {
       console.warn(
-        `Batch request limited to 100 items (requested ${musicIds.length})`,
+        `Batch request limited to 100 items (requested ${validIds.length})`,
       );
     }
 
@@ -50,17 +62,39 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
 
     const instrumentsParam = searchParams.get("instruments");
+
+    // Validate sortBy against whitelist
+    const validSortBy = ["name", "artist", "album", "createdAt", "relevance"] as const;
+    const rawSortBy = searchParams.get("sortBy") || "createdAt";
+    const sortBy = validSortBy.includes(rawSortBy as (typeof validSortBy)[number])
+      ? (rawSortBy as SearchParams["sortBy"])
+      : "createdAt";
+
+    // Validate sortOrder
+    const rawSortOrder = searchParams.get("sortOrder") || "desc";
+    const sortOrder = rawSortOrder === "asc" ? "asc" : "desc";
+
+    // Validate source
+    const validSources = ["", "enchor", "rhythmverse"] as const;
+    const rawSource = searchParams.get("source") || "";
+    const source = validSources.includes(rawSource as (typeof validSources)[number])
+      ? (rawSource as SearchParams["source"])
+      : "";
+
+    // Validate instruments against known values
+    const validInstruments = ["guitar", "bass", "drums", "keys", "vocals"];
+    const instruments = instrumentsParam
+      ? instrumentsParam.split(",").filter((i) => validInstruments.includes(i))
+      : [];
+
     const params: SearchParams = {
       query: searchParams.get("query") || "",
-      limit: Math.min(parseInt(searchParams.get("limit") || "20", 10), 100),
-      sortBy: (searchParams.get("sortBy") as SearchParams["sortBy"]) || "createdAt",
-      sortOrder:
-        (searchParams.get("sortOrder") as SearchParams["sortOrder"]) || "desc",
+      limit: Math.min(Math.max(parseInt(searchParams.get("limit") || "20", 10), 1), 100),
+      sortBy,
+      sortOrder,
       genre: searchParams.get("genre") || "",
-      instruments: instrumentsParam
-        ? instrumentsParam.split(",").filter(Boolean)
-        : [],
-      source: (searchParams.get("source") as SearchParams["source"]) || "",
+      instruments,
+      source,
       cursor: searchParams.get("cursor"),
       installationId: searchParams.get("installationId") || null,
       installed: searchParams.get("installed") === "true",

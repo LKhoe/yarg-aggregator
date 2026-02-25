@@ -1,4 +1,5 @@
 const YOUTUBE_API = "https://www.googleapis.com/youtube/v3";
+const FETCH_TIMEOUT_MS = 15_000;
 
 export interface YouTubePublicTrackInfo {
   title: string;
@@ -58,7 +59,9 @@ export async function getPublicPlaylistTracks(
     id: playlistId,
     key: apiKey,
   });
-  const metaResponse = await fetch(`${YOUTUBE_API}/playlists?${metaParams}`);
+  const metaResponse = await fetch(`${YOUTUBE_API}/playlists?${metaParams}`, {
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
   if (!metaResponse.ok) {
     throw new Error(`YouTube API error: ${metaResponse.status}`);
   }
@@ -78,7 +81,9 @@ export async function getPublicPlaylistTracks(
       ...(pageToken ? { pageToken } : {}),
     });
 
-    const response = await fetch(`${YOUTUBE_API}/playlistItems?${params}`);
+    const response = await fetch(`${YOUTUBE_API}/playlistItems?${params}`, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
     if (!response.ok) {
       throw new Error(`YouTube API error: ${response.status}`);
     }

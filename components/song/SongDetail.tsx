@@ -28,8 +28,7 @@ import {
   CollapsibleTrigger,
   CollapsibleContent,
 } from "@/components/ui/collapsible";
-import Image from "next/image";
-import { Skeleton } from "@/components/ui/skeleton";
+import { AlbumImage } from "@/components/ui/album-image";
 import PlatformLinks from "./PlatformLinks";
 import SongLyrics from "./SongLyrics";
 
@@ -38,18 +37,29 @@ const INSTRUMENTS = ["guitar", "bass", "drums", "vocals", "keys"] as const;
 interface SongDetailProps {
   song: ProviderMusic | null;
   onClose: () => void;
-  onApplyFilters?: (filters: { artist?: string; genre?: string; album?: string; charter?: string }) => void;
+  onApplyFilters?: (filters: {
+    artist?: string;
+    genre?: string;
+    album?: string;
+    charter?: string;
+  }) => void;
 }
 
-export default function SongDetail({ song, onClose, onApplyFilters }: SongDetailProps) {
+export default function SongDetail({
+  song,
+  onClose,
+  onApplyFilters,
+}: SongDetailProps) {
   const { t } = useTranslations();
 
   if (!song) return null;
 
   return (
-    <Card>
+    <Card className="gradient-border">
       <CardHeader>
-        <CardTitle className="text-sm font-semibold">{t("songDetail.title")}</CardTitle>
+        <CardTitle className="text-sm font-semibold">
+          {t("songDetail.title")}
+        </CardTitle>
         <CardAction>
           <Button variant="ghost" size="icon-sm" onClick={onClose}>
             <X className="h-4 w-4" />
@@ -59,63 +69,18 @@ export default function SongDetail({ song, onClose, onApplyFilters }: SongDetail
       <CardContent className="space-y-4">
         {/* Cover + Title */}
         <div className="flex gap-3">
-          <div className="relative h-20 w-20 rounded-lg overflow-hidden shrink-0">
-            {song.coverUrl ? (
-              <>
-                <Image
-                  src={song.coverUrl}
-                  alt={song.name}
-                  className="h-full w-full object-cover bg-muted opacity-0 transition-opacity duration-300"
-                  fill
-                  sizes="80px"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    const parent = target.parentElement;
-                    if (parent) {
-                      const skeleton = parent.querySelector(".loading-skeleton");
-                      const fallback = parent.querySelector(".error-fallback");
-                      if (skeleton) {
-                        (skeleton as HTMLElement).style.display = "none";
-                      }
-                      if (fallback) {
-                        (fallback as HTMLElement).style.display = "flex";
-                      }
-                    }
-                  }}
-                  onLoad={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    const parent = target.parentElement;
-                    if (parent) {
-                      const skeleton = parent.querySelector(".loading-skeleton");
-                      const fallback = parent.querySelector(".error-fallback");
-                      if (skeleton) {
-                        (skeleton as HTMLElement).style.display = "none";
-                      }
-                      if (fallback) {
-                        (fallback as HTMLElement).style.display = "none";
-                      }
-                    }
-                    target.style.opacity = "1";
-                  }}
-                />
-                {/* Loading skeleton - shown while image is loading */}
-                <div className="loading-skeleton absolute inset-0">
-                  <Skeleton className="h-full w-full rounded-lg" />
-                </div>
-                {/* Error fallback - shown only on error */}
-                <div
-                  className="error-fallback absolute inset-0 bg-muted flex items-center justify-center rounded-lg"
-                  style={{ display: "none" }}
-                >
-                  <Music className="h-8 w-8 text-muted-foreground" />
-                </div>
-              </>
-            ) : (
-              <div className="h-full w-full bg-muted flex items-center justify-center">
-                <Music className="h-8 w-8 text-muted-foreground" />
-              </div>
-            )}
-          </div>
+          {song.coverUrl ? (
+            <AlbumImage
+              src={song.coverUrl}
+              alt={song.name}
+              size={80}
+              className="rounded-lg"
+            />
+          ) : (
+            <div className="h-20 w-20 rounded-lg bg-muted flex items-center justify-center shrink-0">
+              <Music className="h-8 w-8 text-muted-foreground" />
+            </div>
+          )}
           <div className="min-w-0 flex-1 space-y-1">
             <h3
               className={`font-semibold text-sm leading-tight truncate ${song.installed ? "text-green-600 dark:text-green-400" : ""}`}
@@ -134,7 +99,9 @@ export default function SongDetail({ song, onClose, onApplyFilters }: SongDetail
             {song.album && (
               <button
                 className="block text-xs text-muted-foreground truncate cursor-pointer hover:underline text-left"
-                onClick={() => onApplyFilters?.({ album: song.album ?? undefined })}
+                onClick={() =>
+                  onApplyFilters?.({ album: song.album ?? undefined })
+                }
               >
                 {song.album}
               </button>
@@ -148,7 +115,9 @@ export default function SongDetail({ song, onClose, onApplyFilters }: SongDetail
             <Badge
               variant="secondary"
               className="text-xs cursor-pointer hover:opacity-80"
-              onClick={() => onApplyFilters?.({ genre: song.genre ?? undefined })}
+              onClick={() =>
+                onApplyFilters?.({ genre: song.genre ?? undefined })
+              }
             >
               {song.genre}
             </Badge>
@@ -163,7 +132,9 @@ export default function SongDetail({ song, onClose, onApplyFilters }: SongDetail
             <Badge
               variant="outline"
               className="text-xs cursor-pointer hover:opacity-80"
-              onClick={() => onApplyFilters?.({ charter: song.charter ?? undefined })}
+              onClick={() =>
+                onApplyFilters?.({ charter: song.charter ?? undefined })
+              }
             >
               <User className="h-3 w-3 mr-1" />
               {song.charter}
@@ -199,10 +170,7 @@ export default function SongDetail({ song, onClose, onApplyFilters }: SongDetail
               const diff = song.instruments[inst];
               if (diff === null) return null;
               return (
-                <div
-                  key={inst}
-                  className="flex items-center gap-1.5 text-xs"
-                >
+                <div key={inst} className="flex items-center gap-1.5 text-xs">
                   <DifficultyMedal
                     level={diff}
                     size="sm"
@@ -210,11 +178,9 @@ export default function SongDetail({ song, onClose, onApplyFilters }: SongDetail
                   />
                   <div className="flex flex-col">
                     <span className="capitalize font-medium">
-                      {t(`table.instrumentsObj.${inst}` as any)}
+                      {t(`table.instrumentsObj.${inst}`)}
                     </span>
-                    <span className="text-muted-foreground">
-                      {diff}/7
-                    </span>
+                    <span className="text-muted-foreground">{diff}/7</span>
                   </div>
                 </div>
               );
@@ -239,11 +205,7 @@ export default function SongDetail({ song, onClose, onApplyFilters }: SongDetail
                     className="w-full justify-start text-xs"
                     asChild
                   >
-                    <a
-                      href={dl.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
+                    <a href={dl.url} target="_blank" rel="noopener noreferrer">
                       <Download className="h-3.5 w-3.5 mr-2" />
                       {dl.source}
                     </a>
@@ -255,10 +217,18 @@ export default function SongDetail({ song, onClose, onApplyFilters }: SongDetail
         )}
 
         {/* Platform Links */}
-        <PlatformLinks key={`platform-${song.name}-${song.artist}`} songName={song.name} artistName={song.artist} />
+        <PlatformLinks
+          key={`platform-${song.name}-${song.artist}`}
+          songName={song.name}
+          artistName={song.artist}
+        />
 
         {/* Lyrics */}
-        <SongLyrics key={`lyrics-${song.name}-${song.artist}`} songName={song.name} artistName={song.artist} />
+        <SongLyrics
+          key={`lyrics-${song.name}-${song.artist}`}
+          songName={song.name}
+          artistName={song.artist}
+        />
       </CardContent>
     </Card>
   );

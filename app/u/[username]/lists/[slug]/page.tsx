@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Music, ArrowLeft, User, Download, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
+import { AlbumImage } from "@/components/ui/album-image";
 
 interface PublicList {
   id: string;
@@ -224,69 +224,13 @@ export default function PublicListPage() {
                   className="flex items-center justify-between p-3 border rounded-lg"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="relative h-10 w-10 shrink-0">
-                      {song.albumImageUrl ? (
-                        <>
-                          <Image
-                            src={song.albumImageUrl}
-                            alt={song.name}
-                            className="h-10 w-10 rounded object-cover bg-muted opacity-0 transition-opacity duration-300"
-                            width={40}
-                            height={40}
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              const parent = target.parentElement;
-                              if (parent) {
-                                const skeleton =
-                                  parent.querySelector(".loading-skeleton");
-                                const fallback =
-                                  parent.querySelector(".error-fallback");
-                                if (skeleton) {
-                                  (skeleton as HTMLElement).style.display =
-                                    "none";
-                                }
-                                if (fallback) {
-                                  (fallback as HTMLElement).style.display =
-                                    "flex";
-                                }
-                              }
-                            }}
-                            onLoad={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              const parent = target.parentElement;
-                              if (parent) {
-                                const skeleton =
-                                  parent.querySelector(".loading-skeleton");
-                                const fallback =
-                                  parent.querySelector(".error-fallback");
-                                if (skeleton) {
-                                  (skeleton as HTMLElement).style.display =
-                                    "none";
-                                }
-                                if (fallback) {
-                                  (fallback as HTMLElement).style.display =
-                                    "none";
-                                }
-                              }
-                              target.style.opacity = "1";
-                            }}
-                          />
-                          <div className="loading-skeleton absolute inset-0 h-10 w-10 rounded">
-                            <Skeleton className="h-full w-full rounded" />
-                          </div>
-                          <div
-                            className="error-fallback absolute inset-0 h-10 w-10 rounded bg-muted flex items-center justify-center"
-                            style={{ display: "none" }}
-                          >
-                            <Music className="h-5 w-5 text-muted-foreground" />
-                          </div>
-                        </>
-                      ) : (
-                        <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
-                          <Music className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                      )}
-                    </div>
+                    {song.albumImageUrl ? (
+                      <AlbumImage src={song.albumImageUrl} alt={song.name} size={40} />
+                    ) : (
+                      <div className="h-10 w-10 rounded bg-muted flex items-center justify-center shrink-0">
+                        <Music className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                    )}
                     <div>
                       <p className="font-medium">{song.name}</p>
                       <p className="text-sm text-muted-foreground">
