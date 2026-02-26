@@ -36,6 +36,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid source" }, { status: 400 });
     }
 
+    // MIME type check
+    const ALLOWED_MIME_TYPES = [
+      "application/zip",
+      "application/x-zip-compressed",
+      "application/x-zip",
+      "application/octet-stream",
+    ];
+    if (file.type && !ALLOWED_MIME_TYPES.includes(file.type)) {
+      return NextResponse.json(
+        { error: "Invalid file type. Only ZIP files are allowed." },
+        { status: 400 },
+      );
+    }
+
     // File size limit: 100MB
     const MAX_FILE_SIZE = 100 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
@@ -60,8 +74,9 @@ export async function POST(request: NextRequest) {
     const allSongs: ProviderMusic[] = [];
 
     // Zip bomb protection
-    const MAX_ENTRIES = 500;
+    const MAX_ENTRIES = 700;
     const MAX_DECOMPRESSED_SIZE = 500 * 1024 * 1024; // 500MB total decompressed
+    const MAX_ENTRY_SIZE = 50 * 1024 * 1024; // 50MB per individual entry
     const entries = zip.getEntries();
     if (entries.length > MAX_ENTRIES) {
       return NextResponse.json(
@@ -80,7 +95,14 @@ export async function POST(request: NextRequest) {
       )
         continue;
 
-      totalDecompressedSize += entry.header.size;
+      const data = entry.getData();
+      if (data.length > MAX_ENTRY_SIZE) {
+        return NextResponse.json(
+          { error: "Individual entry too large" },
+          { status: 400 },
+        );
+      }
+      totalDecompressedSize += data.length;
       if (totalDecompressedSize > MAX_DECOMPRESSED_SIZE) {
         return NextResponse.json(
           { error: "Decompressed content too large" },
@@ -89,7 +111,7 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        const fileContent = entry.getData().toString("utf8");
+        const fileContent = data.toString("utf8");
         const json = JSON.parse(fileContent);
 
         if (source === "enchor") {
