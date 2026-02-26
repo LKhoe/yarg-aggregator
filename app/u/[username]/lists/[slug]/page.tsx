@@ -87,8 +87,8 @@ export default function PublicListPage() {
 
   const downloadUrls = list
     ? list.songs
-      .filter((song) => song.downloadUrls.length > 0)
-      .map((song) => song.downloadUrls[0].url)
+        .filter((song) => song.downloadUrls.length > 0)
+        .map((song) => song.downloadUrls[0].url)
     : [];
 
   const handleDownloadAll = async () => {
@@ -186,7 +186,9 @@ export default function PublicListPage() {
                     disabled={downloadUrls.length === 0 || isDownloading}
                   >
                     <Download className="h-4 w-4 mr-2" />
-                    {isDownloading ? t("lists.downloading") : t("lists.downloadAll")}
+                    {isDownloading
+                      ? t("lists.downloading")
+                      : t("lists.downloadAll")}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
@@ -195,7 +197,10 @@ export default function PublicListPage() {
                       {t("lists.downloadAllConfirm")}
                     </AlertDialogTitle>
                     <AlertDialogDescription>
-                      {t("lists.downloadAllDescription").replace("{count}", String(downloadUrls.length))}
+                      {t("lists.downloadAllDescription").replace(
+                        "{count}",
+                        String(downloadUrls.length),
+                      )}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -219,36 +224,40 @@ export default function PublicListPage() {
               {list.songs.map((song) => {
                 const hasDownload = song.downloadUrls.length > 0;
                 return (
-                <div
-                  key={song.id}
-                  className="flex items-center justify-between p-3 border rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    {song.albumImageUrl ? (
-                      <AlbumImage src={song.albumImageUrl} alt={song.name} size={40} />
-                    ) : (
-                      <div className="h-10 w-10 rounded bg-muted flex items-center justify-center shrink-0">
-                        <Music className="h-5 w-5 text-muted-foreground" />
+                  <div
+                    key={song.id}
+                    className="flex items-center justify-between p-3 border rounded-lg"
+                  >
+                    <div className="flex items-center gap-3">
+                      {song.albumImageUrl ? (
+                        <AlbumImage
+                          src={song.albumImageUrl}
+                          alt={song.name}
+                          size={40}
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded bg-muted flex items-center justify-center shrink-0">
+                          <Music className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-medium">{song.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {song.artist}
+                          {song.album && ` • ${song.album}`}
+                        </p>
                       </div>
-                    )}
-                    <div>
-                      <p className="font-medium">{song.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {song.artist}
-                        {song.album && ` • ${song.album}`}
-                      </p>
                     </div>
+                    {!hasDownload && (
+                      <Badge
+                        variant="outline"
+                        className="text-xs text-muted-foreground gap-1 shrink-0 ml-2"
+                      >
+                        <AlertCircle className="h-3 w-3" />
+                        {t("lists.noDownloadLink")}
+                      </Badge>
+                    )}
                   </div>
-                  {!hasDownload && (
-                    <Badge
-                      variant="outline"
-                      className="text-xs text-muted-foreground gap-1 shrink-0 ml-2"
-                    >
-                      <AlertCircle className="h-3 w-3" />
-                      {t("lists.noDownloadLink")}
-                    </Badge>
-                  )}
-                </div>
                 );
               })}
             </div>
