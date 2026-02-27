@@ -41,7 +41,9 @@ export class PlaylistMatcherService {
     return results;
   }
 
-  private static async matchSingleTrack(track: ExternalTrack): Promise<MatchResult> {
+  private static async matchSingleTrack(
+    track: ExternalTrack,
+  ): Promise<MatchResult> {
     try {
       const scoreExpr = sql<number>`(similarity(${song.title}, ${track.title}) * 0.6 + similarity(${artist.name}, ${track.artist}) * 0.4)`;
 

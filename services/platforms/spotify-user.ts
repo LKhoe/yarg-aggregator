@@ -24,12 +24,12 @@ interface SpotifyPlaylistRaw {
   id: string;
   name: string;
   images: { url: string }[];
-  tracks: { total: number };
+  items: { total: number };
   owner: { display_name: string };
 }
 
 interface SpotifyPlaylistTrackRaw {
-  track: {
+  item: {
     name: string;
     artists: { name: string }[];
     album: { name: string };
@@ -46,19 +46,22 @@ async function fetchWithAuth<T>(url: string, accessToken: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function getUserPlaylists(accessToken: string): Promise<SpotifyPlaylist[]> {
+export async function getUserPlaylists(
+  accessToken: string,
+): Promise<SpotifyPlaylist[]> {
   const playlists: SpotifyPlaylist[] = [];
   let nextUrl: string | null = `${SPOTIFY_API}/me/playlists?limit=50`;
 
   while (nextUrl) {
-    const data: SpotifyPaginatedResponse<SpotifyPlaylistRaw> = await fetchWithAuth(nextUrl, accessToken);
+    const data: SpotifyPaginatedResponse<SpotifyPlaylistRaw> =
+      await fetchWithAuth(nextUrl, accessToken);
 
     for (const item of data.items) {
       playlists.push({
         id: item.id,
         name: item.name,
         imageUrl: item.images?.[0]?.url ?? null,
-        trackCount: item.tracks.total,
+        trackCount: item.items.total,
         owner: item.owner.display_name,
       });
     }
@@ -69,20 +72,27 @@ export async function getUserPlaylists(accessToken: string): Promise<SpotifyPlay
   return playlists;
 }
 
-export async function getPlaylistTracks(accessToken: string, playlistId: string): Promise<SpotifyTrackInfo[]> {
+export async function getPlaylistTracks(
+  accessToken: string,
+  playlistId: string,
+): Promise<SpotifyTrackInfo[]> {
   const tracks: SpotifyTrackInfo[] = [];
-  let nextUrl: string | null = `${SPOTIFY_API}/playlists/${playlistId}/tracks?limit=100&fields=items(track(name,artists(name),album(name))),next`;
+  let nextUrl: string | null =
+    `${SPOTIFY_API}/playlists/${playlistId}/items?limit=100&fields=items(item(name, artists(name), album(name)))`;
 
   while (nextUrl) {
-    const data: SpotifyPaginatedResponse<SpotifyPlaylistTrackRaw> = await fetchWithAuth(nextUrl, accessToken);
+    const data: SpotifyPaginatedResponse<SpotifyPlaylistTrackRaw> =
+      await fetchWithAuth(nextUrl, accessToken);
 
     for (const item of data.items) {
       // Skip null tracks (local files)
-      if (!item.track) continue;
+      if (!item.item) continue;
       tracks.push({
-        title: item.track.name,
-        artist: item.track.artists.map((a) => a.name).join(", "),
-        album: item.track.album.name,
+        title: item.item.name,
+        artist: item.item.artists[0].name,
+        // Test the strategy bellow, to check which one is better on the matching
+        // artist: item.item.artists.map((a) => a.name).join(", "),
+        album: item.item.album.name,
       });
     }
 
