@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export function proxy(request: NextRequest) {
+  // Redirect HTTP to HTTPS (production only)
+  if (
+    process.env.NODE_ENV === "production" &&
+    (request.headers.get("x-forwarded-proto") === "http" ||
+      request.nextUrl.protocol === "http:")
+  ) {
+    const httpsUrl = request.nextUrl.clone();
+    httpsUrl.protocol = "https:";
+    return NextResponse.redirect(httpsUrl, { status: 308 });
+  }
+
   const response = NextResponse.next();
 
   // Security headers
