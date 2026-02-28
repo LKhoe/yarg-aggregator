@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { songList, songListItem, song, artist, album, downloadUrl, userProfile, installationSong } from "@/lib/db/schema";
-import { eq, and, sql, or, desc, inArray, ne, ilike } from "drizzle-orm";
+import { eq, and, sql, or, desc, inArray, ne, ilike, count } from "drizzle-orm";
 import type { SongList, SongListItem, Song } from "@/lib/db/schema";
 
 export type ListWithItemCount = SongList & {
@@ -44,46 +44,45 @@ function generateSlug(name: string): string {
 
 export class ListService {
   static async getUserLists(userId: string): Promise<ListWithItemCount[]> {
-    const listsResult = await db.select().from(songList).where(eq(songList.userId, userId));
-    const lists = listsResult;
+    const rows = await db
+      .select({
+        id: songList.id,
+        userId: songList.userId,
+        name: songList.name,
+        slug: songList.slug,
+        isFavorites: songList.isFavorites,
+        isPublic: songList.isPublic,
+        createdAt: songList.createdAt,
+        updatedAt: songList.updatedAt,
+        itemCount: count(songListItem.id),
+      })
+      .from(songList)
+      .leftJoin(songListItem, eq(songListItem.listId, songList.id))
+      .where(eq(songList.userId, userId))
+      .groupBy(songList.id);
 
-    // Get item counts for each list
-    const listsWithCounts = await Promise.all(
-      lists.map(async (list) => {
-        const [countResult] = await db
-          .select({ count: sql<number>`count(*)` })
-          .from(songListItem)
-          .where(eq(songListItem.listId, list.id));
-
-        return {
-          ...list,
-          itemCount: Number(countResult?.count ?? 0),
-        };
-      }),
-    );
-
-    return listsWithCounts;
+    return rows.map((row) => ({ ...row, itemCount: Number(row.itemCount) }));
   }
 
   static async getPublicLists(userId: string): Promise<ListWithItemCount[]> {
-    const listsResult = await db.select().from(songList).where(and(eq(songList.userId, userId), eq(songList.isPublic, true)));
-    const lists = listsResult;
+    const rows = await db
+      .select({
+        id: songList.id,
+        userId: songList.userId,
+        name: songList.name,
+        slug: songList.slug,
+        isFavorites: songList.isFavorites,
+        isPublic: songList.isPublic,
+        createdAt: songList.createdAt,
+        updatedAt: songList.updatedAt,
+        itemCount: count(songListItem.id),
+      })
+      .from(songList)
+      .leftJoin(songListItem, eq(songListItem.listId, songList.id))
+      .where(and(eq(songList.userId, userId), eq(songList.isPublic, true)))
+      .groupBy(songList.id);
 
-    const listsWithCounts = await Promise.all(
-      lists.map(async (list) => {
-        const [countResult] = await db
-          .select({ count: sql<number>`count(*)` })
-          .from(songListItem)
-          .where(eq(songListItem.listId, list.id));
-
-        return {
-          ...list,
-          itemCount: Number(countResult?.count ?? 0),
-        };
-      }),
-    );
-
-    return listsWithCounts;
+    return rows.map((row) => ({ ...row, itemCount: Number(row.itemCount) }));
   }
 
   static async getListById(
@@ -468,9 +467,11 @@ export class ListService {
         id: songList.id,
         name: songList.name,
         ownerDisplayName: userProfile.displayName,
+        itemCount: count(songListItem.id),
       })
       .from(songList)
       .innerJoin(userProfile, eq(songList.userId, userProfile.userId))
+      .leftJoin(songListItem, eq(songListItem.listId, songList.id))
       .where(
         and(
           eq(songList.isPublic, true),
@@ -481,25 +482,15 @@ export class ListService {
           ),
         ),
       )
+      .groupBy(songList.id, userProfile.displayName)
       .limit(50);
 
-    const listsWithCounts = await Promise.all(
-      results.map(async (list) => {
-        const [countResult] = await db
-          .select({ count: sql<number>`count(*)` })
-          .from(songListItem)
-          .where(eq(songListItem.listId, list.id));
-
-        return {
-          id: list.id,
-          name: list.name,
-          ownerDisplayName: list.ownerDisplayName,
-          itemCount: Number(countResult?.count ?? 0),
-        };
-      }),
-    );
-
-    return listsWithCounts;
+    return results.map((row) => ({
+      id: row.id,
+      name: row.name,
+      ownerDisplayName: row.ownerDisplayName,
+      itemCount: Number(row.itemCount),
+    }));
   }
 
   static async getIntersectionSongs(

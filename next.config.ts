@@ -15,6 +15,18 @@ const nextConfig: NextConfig = {
           { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'" },
         ],
       },
+      {
+        source: "/api/genres",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=3600, stale-while-revalidate=86400" },
+        ],
+      },
+      {
+        source: "/api/music",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=30, stale-while-revalidate=120" },
+        ],
+      },
     ];
   },
   images: {

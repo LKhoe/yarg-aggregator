@@ -1,0 +1,2 @@
+CREATE INDEX "installation_song_compound_idx" ON "installation_song" USING btree ("installation_id","song_id");--> statement-breakpoint
+CREATE INDEX "song_list_user_public_idx" ON "song_list" USING btree ("user_id","is_public");

@@ -148,6 +148,7 @@ export const songList = pgTable(
   (table) => [
     index("song_list_user_id_idx").on(table.userId),
     index("song_list_slug_idx").on(table.slug),
+    index("song_list_user_public_idx").on(table.userId, table.isPublic),
   ],
 );
 
@@ -293,6 +294,7 @@ export const installationSong = pgTable(
   (table) => [
     index("installation_song_installation_id_idx").on(table.installationId),
     index("installation_song_song_id_idx").on(table.songId),
+    index("installation_song_compound_idx").on(table.installationId, table.songId),
   ],
 );
 

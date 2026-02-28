@@ -7,13 +7,20 @@ export interface Genre {
   name: string;
 }
 
+// Module-level cache — genres change only when a provider sync runs
+let cachedGenres: Genre[] | null = null;
+
 export function useGenres() {
-  const [genres, setGenres] = useState<Genre[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [genres, setGenres] = useState<Genre[]>(cachedGenres ?? []);
+  const [loading, setLoading] = useState(cachedGenres === null);
   const isMounted = useRef(false);
 
   useEffect(() => {
     isMounted.current = true;
+
+    if (cachedGenres !== null) {
+      return () => { isMounted.current = false; };
+    }
 
     async function fetchAllGenres() {
       setLoading(true);
@@ -21,8 +28,9 @@ export function useGenres() {
         const response = await fetch("/api/genres?all=true");
         if (response.ok) {
           const result = await response.json();
+          cachedGenres = result.genres as Genre[];
           if (isMounted.current) {
-            setGenres(result.genres);
+            setGenres(cachedGenres);
           }
         }
       } catch (error) {

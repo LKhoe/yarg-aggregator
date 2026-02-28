@@ -134,6 +134,121 @@ const LoadingSkeleton = () =>
     </TableRow>
   ));
 
+interface MusicRowProps {
+  music: ProviderMusic;
+  isAuthenticated: boolean;
+  toggleFavorite: (songId: string) => Promise<boolean>;
+  lists: Array<{ id: string; name: string }>;
+  onAddToList: (listId: string, songId: string) => Promise<unknown>;
+  onSongSelect?: (song: ProviderMusic) => void;
+}
+
+const MusicRow = memo(function MusicRow({
+  music,
+  isAuthenticated,
+  toggleFavorite,
+  lists,
+  onAddToList,
+  onSongSelect,
+}: MusicRowProps) {
+  return (
+    <TableRow
+      className={`cursor-pointer ${music.installed ? "bg-green-500/5 hover:bg-green-500/10" : ""}`}
+      onClick={() => onSongSelect?.(music)}
+    >
+      <TableCell className="hidden sm:table-cell">
+        <div className="relative h-8 w-8 sm:h-12 sm:w-12 rounded">
+          {music.coverUrl ? (
+            <AlbumImage src={music.coverUrl} alt={music.name} size={48} responsiveSize={48} />
+          ) : (
+            <div className="h-8 w-8 sm:h-12 sm:w-12 rounded bg-muted flex items-center justify-center">
+              <Music className="h-4 w-4 sm:h-6 sm:w-6 text-muted-foreground" />
+            </div>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="font-medium">
+        <div className="flex items-start gap-2 sm:gap-3">
+          <div className="relative h-8 w-8 rounded shrink-0 sm:hidden">
+            {music.coverUrl ? (
+              <AlbumImage src={music.coverUrl} alt={music.name} size={32} />
+            ) : (
+              <div className="h-8 w-8 rounded bg-muted flex items-center justify-center">
+                <Music className="h-4 w-4 text-muted-foreground" />
+              </div>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className={`max-w-25 sm:max-w-50 truncate text-xs sm:text-sm flex items-center gap-1 ${music.installed ? "text-green-600 dark:text-green-400 font-medium" : ""}`}>
+              {music.installed && <CheckCircle className="h-3 w-3 shrink-0" />}
+              {music.name}
+            </div>
+            <div className={`max-w-25 sm:max-w-50 truncate text-xs sm:text-sm sm:hidden ${music.installed ? "text-green-600/80 dark:text-green-400/80" : "text-muted-foreground"}`}>
+              {music.artist}
+            </div>
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className={`max-w-15 sm:max-w-37.5 truncate text-xs sm:text-sm hidden sm:table-cell ${music.installed ? "text-green-600 dark:text-green-400" : ""}`}>
+        {music.artist}
+      </TableCell>
+      <TableCell className={`hidden md:table-cell max-w-15 sm:max-w-37.5 truncate text-xs sm:text-sm ${music.installed ? "text-green-600/80 dark:text-green-400/80" : ""}`}>
+        {music.album}
+      </TableCell>
+      <TableCell className="hidden lg:table-cell">
+        <div className="flex gap-1 sm:gap-2">
+          {INSTRUMENTS.map((inst: string) => {
+            const diff = music.instruments[inst as keyof typeof music.instruments];
+            if (diff === null) return null;
+            return (
+              <div key={inst} className="flex items-center gap-1" title={inst}>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <DifficultyMedal level={diff} size="sm" icon={<InstrumentIcon instrument={inst} />} />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {inst.charAt(0).toUpperCase() + inst.slice(1)} ({diff} / 7)
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            );
+          })}
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-0.5">
+          {isAuthenticated && music.id && (
+            <SongActions
+              songId={music.id}
+              isFavorited={!!music.favorited}
+              onToggleFavorite={toggleFavorite}
+              lists={lists}
+              onAddToList={onAddToList}
+            />
+          )}
+          {music.downloadUrls?.length ? (
+            <Button variant="ghost" size="icon" asChild className="h-8 w-8 sm:h-10 sm:w-10">
+              <a href={music.downloadUrls[0].url} target="_blank" rel="noopener noreferrer">
+                <Download className="h-3 w-3 sm:h-4 sm:w-4" />
+              </a>
+            </Button>
+          ) : (
+            <Button variant="ghost" size="icon" disabled className="h-8 w-8 sm:h-10 sm:w-10">
+              <Download className="h-3 w-3 sm:h-4 sm:w-4" />
+            </Button>
+          )}
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}, (prev, next) =>
+  prev.music.id === next.music.id &&
+  prev.music.installed === next.music.installed &&
+  prev.music.favorited === next.music.favorited &&
+  prev.isAuthenticated === next.isAuthenticated &&
+  prev.lists === next.lists
+);
+
 export default function MusicTable({
   onTotalChange,
   onSongSelect,
@@ -158,7 +273,7 @@ export default function MusicTable({
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const isMounted = useRef(false);
-  const requestIdRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Get selected installation from context
   const { selectedInstallationId } = useInstallation();
@@ -227,7 +342,12 @@ export default function MusicTable({
         setLoading(true);
       }
 
-      const requestId = ++requestIdRef.current;
+      // Cancel any in-flight request (only for fresh fetches, not load-more)
+      if (!isLoadMore) {
+        abortRef.current?.abort();
+        abortRef.current = new AbortController();
+      }
+      const signal = !isLoadMore ? abortRef.current!.signal : undefined;
 
       try {
         const params = new URLSearchParams({
@@ -253,11 +373,11 @@ export default function MusicTable({
           params.set("cursor", cursor);
         }
 
-        const response = await fetch(`/api/music?${params}`);
+        const response = await fetch(`/api/music?${params}`, { signal });
         if (response.ok) {
           const result: PaginatedResponse<ProviderMusic> =
             await response.json();
-          if (isMounted.current && requestId === requestIdRef.current) {
+          if (isMounted.current) {
             if (isLoadMore) {
               // Append data for infinite scroll
               setData((prev) => [...prev, ...result.data]);
@@ -279,9 +399,10 @@ export default function MusicTable({
           );
         }
       } catch (error: unknown) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
         console.error("Error fetching music:", error);
       } finally {
-        if (isMounted.current && requestId === requestIdRef.current) {
+        if (isMounted.current) {
           setLoading(false);
           setLoadingMore(false);
         }
@@ -700,148 +821,15 @@ export default function MusicTable({
               </TableRow>
             ) : (
               data.map((music) => (
-                <TableRow
+                <MusicRow
                   key={music.id}
-                  className={`cursor-pointer ${
-                    music.installed
-                      ? "bg-green-500/5 hover:bg-green-500/10"
-                      : ""
-                  }`}
-                  onClick={() => onSongSelect?.(music)}
-                >
-                  <TableCell className="hidden sm:table-cell">
-                    <div className="relative h-8 w-8 sm:h-12 sm:w-12 rounded">
-                      {music.coverUrl ? (
-                        <AlbumImage
-                          src={music.coverUrl}
-                          alt={music.name}
-                          size={48}
-                          responsiveSize={48}
-                        />
-                      ) : (
-                        <div className="h-8 w-8 sm:h-12 sm:w-12 rounded bg-muted flex items-center justify-center">
-                          <Music className="h-4 w-4 sm:h-6 sm:w-6 text-muted-foreground" />
-                        </div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    <div className="flex items-start gap-2 sm:gap-3">
-                      {/* Album image - shown on all screen sizes in this cell for mobile layout */}
-                      <div className="relative h-8 w-8 rounded shrink-0 sm:hidden">
-                        {music.coverUrl ? (
-                          <AlbumImage
-                            src={music.coverUrl}
-                            alt={music.name}
-                            size={32}
-                          />
-                        ) : (
-                          <div className="h-8 w-8 rounded bg-muted flex items-center justify-center">
-                            <Music className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Song and artist info */}
-                      <div className="min-w-0 flex-1">
-                        <div
-                          className={`max-w-25 sm:max-w-50 truncate text-xs sm:text-sm flex items-center gap-1 ${music.installed ? "text-green-600 dark:text-green-400 font-medium" : ""}`}
-                        >
-                          {music.installed && (
-                            <CheckCircle className="h-3 w-3 shrink-0" />
-                          )}
-                          {music.name}
-                        </div>
-                        <div
-                          className={`max-w-25 sm:max-w-50 truncate text-xs sm:text-sm sm:hidden ${music.installed ? "text-green-600/80 dark:text-green-400/80" : "text-muted-foreground"}`}
-                        >
-                          {music.artist}
-                        </div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell
-                    className={`max-w-15 sm:max-w-37.5 truncate text-xs sm:text-sm hidden sm:table-cell ${music.installed ? "text-green-600 dark:text-green-400" : ""}`}
-                  >
-                    {music.artist}
-                  </TableCell>
-                  <TableCell
-                    className={`hidden md:table-cell max-w-15 sm:max-w-37.5 truncate text-xs sm:text-sm ${music.installed ? "text-green-600/80 dark:text-green-400/80" : ""}`}
-                  >
-                    {music.album}
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    <div className="flex gap-1 sm:gap-2">
-                      {INSTRUMENTS.map((inst: string) => {
-                        const diff =
-                          music.instruments[
-                            inst as keyof typeof music.instruments
-                          ];
-                        if (diff === null) return null;
-                        return (
-                          <div
-                            key={inst}
-                            className="flex items-center gap-1"
-                            title={inst}
-                          >
-                            <Tooltip>
-                              <TooltipTrigger>
-                                <DifficultyMedal
-                                  level={diff}
-                                  size="sm"
-                                  icon={<InstrumentIcon instrument={inst} />}
-                                />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {inst.charAt(0).toUpperCase() + inst.slice(1)} (
-                                {diff} / 7)
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </TableCell>
-
-                  <TableCell>
-                    <div className="flex items-center gap-0.5">
-                      {isAuthenticated && music.id && (
-                        <SongActions
-                          songId={music.id}
-                          isFavorited={!!music.favorited}
-                          onToggleFavorite={toggleFavorite}
-                          lists={nonFavoriteLists}
-                          onAddToList={addSongToList}
-                        />
-                      )}
-                      {music.downloadUrls?.length ? (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          asChild
-                          className="h-8 w-8 sm:h-10 sm:w-10"
-                        >
-                          <a
-                            href={music.downloadUrls[0].url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <Download className="h-3 w-3 sm:h-4 sm:w-4" />
-                          </a>
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          disabled
-                          className="h-8 w-8 sm:h-10 sm:w-10"
-                        >
-                          <Download className="h-3 w-3 sm:h-4 sm:w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
+                  music={music}
+                  isAuthenticated={isAuthenticated}
+                  toggleFavorite={toggleFavorite}
+                  lists={nonFavoriteLists}
+                  onAddToList={addSongToList}
+                  onSongSelect={onSongSelect}
+                />
               ))
             )}
           </TableBody>
