@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
+import { sql, eq, and } from "drizzle-orm";
 import { song, artist } from "@/lib/db/schema";
-import { sql, eq } from "drizzle-orm";
 
 export interface ExternalTrack {
   title: string;
@@ -23,64 +23,127 @@ export interface MatchResult {
 
 const CONFIDENT_THRESHOLD = 0.4;
 const MIN_THRESHOLD = 0.3;
-const BATCH_SIZE = 10;
+
+// Must sum up to 1.0
+const SIMILARITY_TITLE_WEIGHT = 0.6;
+const SIMILARITY_ARTIST_WEIGHT = 0.4;
 
 export class PlaylistMatcherService {
   static async matchTracks(tracks: ExternalTrack[]): Promise<MatchResult[]> {
-    const results: MatchResult[] = [];
+    if (tracks.length === 0) return [];
 
-    // Process in batches for efficiency
-    for (let i = 0; i < tracks.length; i += BATCH_SIZE) {
-      const batch = tracks.slice(i, i + BATCH_SIZE);
-      const batchResults = await Promise.all(
-        batch.map((track) => this.matchSingleTrack(track)),
-      );
-      results.push(...batchResults);
+    // Deduplicate tracks by canonical title+artist key
+    const seen = new Map<string, number>(); // key → unique index
+    const uniqueTracks: ExternalTrack[] = [];
+    const indexMap: number[] = []; // original index → unique index
+
+    for (let i = 0; i < tracks.length; i++) {
+      const key = `${tracks[i].title.toLowerCase()}|||${tracks[i].artist.toLowerCase()}`;
+      if (!seen.has(key)) {
+        seen.set(key, uniqueTracks.length);
+        uniqueTracks.push(tracks[i]);
+      }
+      indexMap.push(seen.get(key)!);
     }
 
-    return results;
-  }
-
-  private static async matchSingleTrack(
-    track: ExternalTrack,
-  ): Promise<MatchResult> {
     try {
-      const scoreExpr = sql<number>`(similarity(${song.title}, ${track.title}) * 0.6 + similarity(${artist.name}, ${track.artist}) * 0.4)`;
+      // Build a VALUES list: Drizzle expands arrays as individual $N params (a tuple),
+      // which PostgreSQL can't cast to text[]. Using VALUES avoids the unnest/cast issue.
+      const valuesList = sql.join(
+        uniqueTracks.map(
+          (t, i) => sql`(${i + 1}::int, ${t.title}::text, ${t.artist}::text)`,
+        ),
+        sql`, `,
+      );
 
-      const rows = await db
+      // CTE 1: input tracks from VALUES list
+      const inputTracks = db.$with("input_tracks").as(
+        db
+          .select({
+            idx: sql<number>`idx`.as("idx"),
+            inputTitle: sql<string>`input_title`.as("input_title"),
+            inputArtist: sql<string>`input_artist`.as("input_artist"),
+          })
+          .from(
+            sql`(VALUES ${valuesList}) AS t(idx, input_title, input_artist)`,
+          ),
+      );
+
+      // CTE 2: scored candidates with window function to pick best match per track
+      const scored = db.$with("scored").as(
+        db
+          .select({
+            idx: inputTracks.idx,
+            songId: song.id,
+            title: song.title,
+            artistName: artist.name,
+            albumImageUrl: song.albumImageUrl,
+            score: sql<number>`(
+              similarity(${song.title}, ${inputTracks.inputTitle}) * ${SIMILARITY_TITLE_WEIGHT} +
+              similarity(${artist.name}, ${inputTracks.inputArtist}) * ${SIMILARITY_ARTIST_WEIGHT}
+            )`.as("score"),
+            rn: sql<number>`ROW_NUMBER() OVER (
+              PARTITION BY ${inputTracks.idx}
+              ORDER BY (
+                similarity(${song.title}, ${inputTracks.inputTitle}) * ${SIMILARITY_TITLE_WEIGHT} +
+                similarity(${artist.name}, ${inputTracks.inputArtist}) * ${SIMILARITY_ARTIST_WEIGHT}
+              ) DESC,
+              GREATEST(
+                similarity(${song.title}, ${inputTracks.inputTitle}),
+                similarity(${artist.name}, ${inputTracks.inputArtist})
+              ) DESC
+            )`.as("rn"),
+          })
+          .from(inputTracks)
+          .crossJoin(song)
+          .innerJoin(artist, eq(song.artistId, artist.id))
+          .where(
+            and(
+              sql`similarity(${song.title}, ${inputTracks.inputTitle}) >= ${MIN_THRESHOLD}`,
+              sql`similarity(${artist.name}, ${inputTracks.inputArtist}) >= ${MIN_THRESHOLD}`,
+            ),
+          ),
+      );
+
+      const result = await db
+        .with(inputTracks, scored)
         .select({
-          songId: song.id,
-          title: song.title,
-          artist: artist.name,
-          albumImageUrl: song.albumImageUrl,
-          score: scoreExpr,
+          idx: scored.idx,
+          songId: scored.songId,
+          title: scored.title,
+          artistName: scored.artistName,
+          albumImageUrl: scored.albumImageUrl,
+          score: scored.score,
         })
-        .from(song)
-        .innerJoin(artist, eq(song.artistId, artist.id))
+        .from(scored)
         .where(
-          sql`similarity(${song.title}, ${track.title}) >= ${MIN_THRESHOLD} OR similarity(${artist.name}, ${track.artist}) >= ${MIN_THRESHOLD}`,
+          and(sql`${scored.rn} = 1`, sql`${scored.score} >= ${MIN_THRESHOLD}`),
         )
-        .orderBy(sql`${scoreExpr} DESC`)
-        .limit(1);
+        .orderBy(scored.idx);
 
-      if (rows.length === 0 || rows[0].score < MIN_THRESHOLD) {
-        return { externalTrack: track, match: null };
-      }
+      // Build map from unique index (1-based) → row
+      const matchMap = new Map(result.map((r) => [r.idx, r]));
 
-      const row = rows[0];
-      return {
-        externalTrack: track,
-        match: {
-          songId: row.songId,
-          title: row.title,
-          artist: row.artist,
-          albumImageUrl: row.albumImageUrl,
-          score: row.score,
-          confident: row.score >= CONFIDENT_THRESHOLD,
-        },
-      };
-    } catch {
-      return { externalTrack: track, match: null };
+      // Expand results back to original track list via dedup index map
+      return tracks.map((track, i) => {
+        const uniqueIdx = indexMap[i] + 1; // VALUES indices are 1-based
+        const row = matchMap.get(uniqueIdx);
+        if (!row) return { externalTrack: track, match: null };
+        return {
+          externalTrack: track,
+          match: {
+            songId: row.songId,
+            title: row.title,
+            artist: row.artistName,
+            albumImageUrl: row.albumImageUrl,
+            score: Number(row.score),
+            confident: Number(row.score) >= CONFIDENT_THRESHOLD,
+          },
+        };
+      });
+    } catch (err) {
+      console.error("[PlaylistMatcher] Batch match failed:", err);
+      return tracks.map((track) => ({ externalTrack: track, match: null }));
     }
   }
 }
