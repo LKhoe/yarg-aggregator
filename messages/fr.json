@@ -494,6 +494,7 @@
     "continueWithUsername": "Continuer",
     "changeUsername": "modifier",
     "lastfmPublicNote": "Votre historique d'écoute est récupéré via l'API publique Last.fm.",
+    "likedSongs": "Titres aimés",
     "lovedTracks": "Titres favoris",
     "recentTracks": "Titres récents",
     "personalTags": "Étiquettes personnelles",

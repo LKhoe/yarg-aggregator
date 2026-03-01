@@ -4,7 +4,10 @@ import {
   getValidAccessToken,
   generateAppleMusicDeveloperToken,
 } from "@/lib/services/platform-auth";
-import { getUserPlaylists as getSpotifyPlaylists } from "@/services/platforms/spotify-user";
+import {
+  getUserPlaylists as getSpotifyPlaylists,
+  getLikedTracksCount,
+} from "@/services/platforms/spotify-user";
 import { getUserPlaylists as getYouTubePlaylists } from "@/services/platforms/youtube-user";
 import { getUserPlaylists as getAppleMusicPlaylists } from "@/services/platforms/apple-music-user";
 
@@ -66,8 +69,20 @@ export async function GET(request: NextRequest) {
     }
 
     if (provider === "spotify") {
-      const playlists = await getSpotifyPlaylists(accessToken);
-      return NextResponse.json(playlists);
+      const [likedCount, playlists] = await Promise.all([
+        getLikedTracksCount(accessToken),
+        getSpotifyPlaylists(accessToken),
+      ]);
+      return NextResponse.json([
+        {
+          id: "liked",
+          name: "Liked Songs",
+          imageUrl: null,
+          trackCount: likedCount,
+          owner: undefined,
+        },
+        ...playlists,
+      ]);
     } else if (provider === "google") {
       const playlists = await getYouTubePlaylists(accessToken);
       return NextResponse.json(playlists);

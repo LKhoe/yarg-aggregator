@@ -5,7 +5,7 @@ import { createSign } from "crypto";
 
 const REQUIRED_SCOPES: Record<string, string[]> = {
   google: ["https://www.googleapis.com/auth/youtube.readonly"],
-  spotify: ["playlist-read-private", "playlist-read-collaborative"],
+  spotify: ["playlist-read-private", "playlist-read-collaborative", "user-library-read"],
   apple: [], // No OAuth scopes — just needs a stored music user token
   lastfm: [], // No OAuth scopes — session key stored in accessToken
 };

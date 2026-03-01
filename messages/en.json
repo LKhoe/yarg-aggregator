@@ -499,6 +499,7 @@
     "continueWithUsername": "Continue",
     "changeUsername": "change",
     "lastfmPublicNote": "Your listening history is fetched from the public Last.fm API.",
+    "likedSongs": "Liked Songs",
     "lovedTracks": "Loved Tracks",
     "recentTracks": "Recent Tracks",
     "personalTags": "Personal Tags",

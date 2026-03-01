@@ -36,6 +36,14 @@ interface SpotifyPlaylistTrackRaw {
   } | null;
 }
 
+interface SpotifySavedTrackRaw {
+  track: {
+    name: string;
+    artists: { name: string }[];
+    album: { name: string };
+  } | null;
+}
+
 async function fetchWithAuth<T>(url: string, accessToken: string): Promise<T> {
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -93,6 +101,39 @@ export async function getPlaylistTracks(
         // Test the strategy bellow, to check which one is better on the matching
         // artist: item.item.artists.map((a) => a.name).join(", "),
         album: item.item.album.name,
+      });
+    }
+
+    nextUrl = data.next;
+  }
+
+  return tracks;
+}
+
+export async function getLikedTracksCount(
+  accessToken: string,
+): Promise<number> {
+  const data: SpotifyPaginatedResponse<SpotifySavedTrackRaw> =
+    await fetchWithAuth(`${SPOTIFY_API}/me/tracks?limit=1`, accessToken);
+  return data.total;
+}
+
+export async function getLikedTracks(
+  accessToken: string,
+): Promise<SpotifyTrackInfo[]> {
+  const tracks: SpotifyTrackInfo[] = [];
+  let nextUrl: string | null = `${SPOTIFY_API}/me/tracks?limit=50`;
+
+  while (nextUrl) {
+    const data: SpotifyPaginatedResponse<SpotifySavedTrackRaw> =
+      await fetchWithAuth(nextUrl, accessToken);
+
+    for (const item of data.items) {
+      if (!item.track) continue;
+      tracks.push({
+        title: item.track.name,
+        artist: item.track.artists[0].name,
+        album: item.track.album.name,
       });
     }
 

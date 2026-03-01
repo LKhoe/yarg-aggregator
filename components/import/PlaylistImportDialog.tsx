@@ -60,6 +60,7 @@ import {
   ExternalLink,
   Tag,
   Link as LinkIcon,
+  Heart,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -856,7 +857,15 @@ export function PlaylistImportDialog({
                                 )}
                               </div>
                             ) : playlist.imageUrl ? (
-                              <AlbumImage src={playlist.imageUrl} alt={playlist.name} size={48} />
+                              <AlbumImage
+                                src={playlist.imageUrl}
+                                alt={playlist.name}
+                                size={48}
+                              />
+                            ) : playlist.id === "liked" ? (
+                              <div className="h-12 w-12 rounded bg-muted flex items-center justify-center">
+                                <Heart className="h-6 w-6 text-muted-foreground" />
+                              </div>
                             ) : (
                               <div className="h-12 w-12 rounded bg-muted flex items-center justify-center">
                                 <Music className="h-6 w-6 text-muted-foreground" />
@@ -866,7 +875,9 @@ export function PlaylistImportDialog({
                               <div className="font-medium truncate">
                                 {selectedProvider === "lastfm"
                                   ? getLastfmCollectionLabel(playlist.id)
-                                  : playlist.name}
+                                  : playlist.id === "liked"
+                                    ? t("import.likedSongs")
+                                    : playlist.name}
                               </div>
                               {!isTagsItem && (
                                 <div className="text-sm text-muted-foreground">
@@ -972,7 +983,11 @@ export function PlaylistImportDialog({
                                   }
                                 />
                                 {r.match!.albumImageUrl && (
-                                  <AlbumImage src={r.match!.albumImageUrl} alt="" size={32} />
+                                  <AlbumImage
+                                    src={r.match!.albumImageUrl}
+                                    alt=""
+                                    size={32}
+                                  />
                                 )}
                                 <div className="flex-1 min-w-0">
                                   <div className="text-sm truncate">
@@ -1003,9 +1018,9 @@ export function PlaylistImportDialog({
                           <div className="max-h-30 overflow-y-auto space-y-1 border rounded-lg p-2 opacity-60">
                             {matchResults.results
                               .filter((r) => !r.match)
-                              .map((r) => (
+                              .map((r, index) => (
                                 <div
-                                  key={`${r.externalTrack.title}-${r.externalTrack.artist}`}
+                                  key={`${r.externalTrack.title}-${r.externalTrack.artist}-${index}`}
                                   className="text-sm py-1 px-1"
                                 >
                                   <span>{r.externalTrack.title}</span>

@@ -59,7 +59,7 @@ export const auth = betterAuth({
     spotify: {
       clientId: process.env.SPOTIFY_CLIENT_ID!,
       clientSecret: process.env.SPOTIFY_CLIENT_SECRET!,
-      scope: ["playlist-read-private", "playlist-read-collaborative"],
+      scope: ["playlist-read-private", "playlist-read-collaborative", "user-library-read"],
     },
     ...(process.env.APPLE_CLIENT_ID
       ? {

@@ -4,7 +4,10 @@ import {
   getValidAccessToken,
   generateAppleMusicDeveloperToken,
 } from "@/lib/services/platform-auth";
-import { getPlaylistTracks } from "@/services/platforms/spotify-user";
+import {
+  getPlaylistTracks,
+  getLikedTracks,
+} from "@/services/platforms/spotify-user";
 import { getPlaylistItems } from "@/services/platforms/youtube-user";
 import { getPlaylistTracks as getAppleMusicPlaylistTracks } from "@/services/platforms/apple-music-user";
 import {
@@ -82,7 +85,10 @@ export async function POST(request: NextRequest) {
       }
 
       if (provider === "spotify") {
-        const spotifyTracks = await getPlaylistTracks(accessToken, playlistId);
+        const spotifyTracks =
+          playlistId === "liked"
+            ? await getLikedTracks(accessToken)
+            : await getPlaylistTracks(accessToken, playlistId);
         tracks = spotifyTracks.map((t) => ({
           title: t.title,
           artist: t.artist,
