@@ -8,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Users, Shield, HardDrive } from "lucide-react";
+import { Users, Shield, HardDrive, Activity } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 
@@ -43,6 +43,12 @@ function AdminDashboardContent() {
       description: t("admin.installations.description"),
       href: "/admin/installations",
       icon: HardDrive,
+    },
+    {
+      title: "Monitoring",
+      description: "Queue health, DB stats, Web Vitals, and API errors",
+      href: "/admin/monitoring",
+      icon: Activity,
     },
   ];
 

@@ -28,7 +28,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate UUID format
-    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const UUID_REGEX =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const validIds = musicIds.filter((id: string) => UUID_REGEX.test(id));
 
     // Limit the number of IDs to prevent excessive database queries
@@ -64,9 +65,17 @@ export async function GET(request: NextRequest) {
     const instrumentsParam = searchParams.get("instruments");
 
     // Validate sortBy against whitelist
-    const validSortBy = ["name", "artist", "album", "createdAt", "relevance"] as const;
+    const validSortBy = [
+      "name",
+      "artist",
+      "album",
+      "createdAt",
+      "relevance",
+    ] as const;
     const rawSortBy = searchParams.get("sortBy") || "createdAt";
-    const sortBy = validSortBy.includes(rawSortBy as (typeof validSortBy)[number])
+    const sortBy = validSortBy.includes(
+      rawSortBy as (typeof validSortBy)[number],
+    )
       ? (rawSortBy as SearchParams["sortBy"])
       : "createdAt";
 
@@ -77,7 +86,9 @@ export async function GET(request: NextRequest) {
     // Validate source
     const validSources = ["", "enchor", "rhythmverse"] as const;
     const rawSource = searchParams.get("source") || "";
-    const source = validSources.includes(rawSource as (typeof validSources)[number])
+    const source = validSources.includes(
+      rawSource as (typeof validSources)[number],
+    )
       ? (rawSource as SearchParams["source"])
       : "";
 
@@ -89,7 +100,10 @@ export async function GET(request: NextRequest) {
 
     const params: SearchParams = {
       query: searchParams.get("query") || "",
-      limit: Math.min(Math.max(parseInt(searchParams.get("limit") || "20", 10), 1), 100),
+      limit: Math.min(
+        Math.max(parseInt(searchParams.get("limit") || "20", 10), 1),
+        100,
+      ),
       sortBy,
       sortOrder,
       genre: searchParams.get("genre") || "",
