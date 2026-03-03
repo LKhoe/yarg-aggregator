@@ -139,7 +139,7 @@
     "songcacheDialog": {
       "title": "Dónde encontrar songcache.bin",
       "windows": "Windows",
-      "macos": "MacOS", 
+      "macos": "MacOS",
       "linux": "Linux",
       "quickAccess": "Acceso rápido: presiona",
       "andPaste": "y pega:",

@@ -13,8 +13,9 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Music, Calendar, Globe } from "lucide-react";
+import { Music, Calendar, Globe, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 interface PublicProfile {
   displayName: string;
@@ -96,6 +97,11 @@ export default function PublicProfilePage() {
     <div className="max-w-4xl mx-auto space-y-6">
       <Card>
         <CardHeader className="flex flex-row items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
           <Avatar className="h-20 w-20">
             <AvatarImage
               src={profile.avatarUrl || undefined}

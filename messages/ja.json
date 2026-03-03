@@ -139,7 +139,7 @@
     "songcacheDialog": {
       "title": "songcache.binの場所",
       "windows": "Windows",
-      "macos": "MacOS", 
+      "macos": "MacOS",
       "linux": "Linux",
       "quickAccess": "クイックアクセス：押す",
       "andPaste": "して貼り付け：",

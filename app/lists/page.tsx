@@ -50,6 +50,7 @@ import {
   Globe,
   Download,
   GitMerge,
+  ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -140,11 +141,18 @@ function ListsContent() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t("lists.myLists")}</h1>
-          <p className="text-muted-foreground">
-            {t("lists.myListsDescription")}
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">{t("lists.myLists")}</h1>
+            <p className="text-muted-foreground">
+              {t("lists.myListsDescription")}
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2 sm:flex-nowrap">
           <Button variant="outline" onClick={() => setIsImportOpen(true)}>
