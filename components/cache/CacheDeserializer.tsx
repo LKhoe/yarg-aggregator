@@ -2,13 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
@@ -33,7 +27,6 @@ import {
 } from "@/components/ui/dialog";
 import {
   Upload,
-  FileText,
   Music,
   AlertCircle,
   CheckCircle,
@@ -43,7 +36,6 @@ import {
   Plus,
   Trash2,
   Trophy,
-  HelpCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { SongEntry } from "@/services/cache-reader/Song/Entries/SongEntry";
@@ -220,8 +212,7 @@ export default function CacheDeserializer() {
   const [detailType, setDetailType] = useState<
     "added" | "updated" | "linked" | null
   >(null);
-  const [showPathHelp, setShowPathHelp] = useState(false);
-
+  const [pathHelpOpen, setPathHelpOpen] = useState(true);
   const duplicates = useMemo(() => findDuplicates(songs), [songs]);
 
   const pathsToDelete = useMemo(() => {
@@ -300,6 +291,7 @@ export default function CacheDeserializer() {
     try {
       const songEntries = await deserializeCache(fileToProcess);
       setSongs(songEntries);
+      setPathHelpOpen(false);
       toast.success(
         t("cacheDeserializer.successLoaded", { count: songEntries.length }),
       );
@@ -404,14 +396,81 @@ export default function CacheDeserializer() {
 
   return (
     <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="h-5 w-5" />
-          {t("cacheDeserializer.title")}
-        </CardTitle>
-        <CardDescription>{t("cacheDeserializer.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 pt-6">
+        {/* Path Help — inline, collapses after deserialization */}
+        <Collapsible open={pathHelpOpen} onOpenChange={setPathHelpOpen}>
+          <CollapsibleTrigger className="w-full flex items-center gap-2 text-left group cursor-pointer select-none">
+            <ChevronRight className="h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-90 text-muted-foreground shrink-0" />
+            <span className="text-sm font-semibold">
+              {t("cacheDeserializer.songcacheDialog.title")}
+            </span>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+        <div className="space-y-3 text-sm border rounded-lg p-4 bg-muted/30 mt-2">
+          <div className="space-y-1">
+            <div className="flex items-center gap-1">
+              <Image src="/operational-systems/windows.svg" alt="Windows" className="h-4 w-4" width={16} height={16} />
+              <p className="font-semibold">{t("cacheDeserializer.songcacheDialog.windows")}</p>
+            </div>
+            <code className="block bg-muted rounded px-3 py-2 text-xs break-all">
+              C:\Users\&lt;{t("cacheDeserializer.songcacheDialog.yourUsername")}&gt;\AppData\LocalLow\YARC\YARG\release\songcache.bin
+            </code>
+            <p className="text-muted-foreground text-xs py-1">
+              {t("cacheDeserializer.songcacheDialog.quickAccess")}{" "}
+              <kbd className="rounded border px-1 text-xs font-mono bg-muted">Win</kbd>{" "}+{" "}
+              <kbd className="rounded border px-1 text-xs font-mono bg-muted">R</kbd>{" "}
+              {t("cacheDeserializer.songcacheDialog.andPaste")}
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 bg-muted rounded px-3 py-2 text-xs break-all">
+                %userprofile%\AppData\LocalLow\YARC\YARG\release\songcache.bin
+              </code>
+              <Button type="button" variant="outline" size="icon" className="shrink-0"
+                onClick={() => { navigator.clipboard.writeText("%userprofile%\\AppData\\LocalLow\\YARC\\YARG\\release\\songcache.bin"); toast.success(t("cacheDeserializer.songcacheDialog.copiedToClipboard")); }}>
+                <Copy className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1">
+              <Image src="/operational-systems/macos.svg" alt="MacOS" className="h-4 w-4" width={16} height={16} />
+              <p className="font-semibold">{t("cacheDeserializer.songcacheDialog.macos")}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 bg-muted rounded px-3 py-2 text-xs break-all">
+                ~/Library/Application Support/YARC/YARG/release/songcache.bin
+              </code>
+              <Button type="button" variant="outline" size="icon" className="shrink-0"
+                onClick={() => { navigator.clipboard.writeText("~/Library/Application Support/YARC/YARG/release/songcache.bin"); toast.success(t("cacheDeserializer.songcacheDialog.copiedToClipboard")); }}>
+                <Copy className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1">
+              <Image src="/operational-systems/linux.svg" alt="Linux" className="h-4 w-4" width={16} height={16} />
+              <p className="font-semibold">{t("cacheDeserializer.songcacheDialog.linux")}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 bg-muted rounded px-3 py-2 text-xs break-all">
+                ~/.config/unity3d/YARC/YARG/release/songcache.bin
+              </code>
+              <Button type="button" variant="outline" size="icon" className="shrink-0"
+                onClick={() => { navigator.clipboard.writeText("~/.config/unity3d/YARC/YARG/release/songcache.bin"); toast.success(t("cacheDeserializer.songcacheDialog.copiedToClipboard")); }}>
+                <Copy className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+          <p className="text-muted-foreground text-xs border-t pt-3">
+            {t("cacheDeserializer.songcacheDialog.devBuildNote")}{" "}
+            <code className="bg-muted rounded px-1">dev</code>{" "}
+            {t("cacheDeserializer.songcacheDialog.insteadOf")}{" "}
+            <code className="bg-muted rounded px-1">release</code>.
+          </p>
+        </div>
+          </CollapsibleContent>
+        </Collapsible>
+
         {/* File Input */}
         <div className="space-y-2">
           <div className="flex items-center gap-2">
@@ -431,15 +490,6 @@ export default function CacheDeserializer() {
                   {t("cacheDeserializer.deserialize")}
                 </>
               )}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => setShowPathHelp(true)}
-              title="Where to find songcache.bin"
-            >
-              <HelpCircle className="h-4 w-4" />
             </Button>
           </div>
           {selectedFile && (
@@ -945,148 +995,6 @@ export default function CacheDeserializer() {
         )}
       </CardContent>
 
-      {/* Path Help Dialog */}
-      <Dialog open={showPathHelp} onOpenChange={setShowPathHelp}>
-        <DialogContent className="max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {t("cacheDeserializer.songcacheDialog.title")}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 text-sm">
-            <div className="space-y-1">
-              <div className="flex items-center gap-1">
-                <Image
-                  src="/operational-systems/windows.svg"
-                  alt="Windows"
-                  className="h-4 w-4"
-                  width={16}
-                  height={16}
-                />
-                <p className="font-semibold">
-                  {t("cacheDeserializer.songcacheDialog.windows")}
-                </p>
-              </div>
-              <code className="block bg-muted rounded px-3 py-2 text-xs break-all">
-                C:\Users\&lt;
-                {t("cacheDeserializer.songcacheDialog.yourUsername")}
-                &gt;\AppData\LocalLow\YARC\YARG\release\songcache.bin
-              </code>
-              <p className="text-muted-foreground text-xs">
-                {t("cacheDeserializer.songcacheDialog.quickAccess")}{" "}
-                <kbd className="rounded border px-1 py-px text-xs font-mono bg-muted">
-                  Win
-                </kbd>{" "}
-                +{" "}
-                <kbd className="rounded border px-1 py-px text-xs font-mono bg-muted">
-                  R
-                </kbd>{" "}
-                {t("cacheDeserializer.songcacheDialog.andPaste")}
-              </p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 bg-muted rounded px-3 py-2 text-xs break-all">
-                  %userprofile%\AppData\LocalLow\YARC\YARG\release\songcache.bin
-                </code>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="shrink-0"
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      "%userprofile%\\AppData\\LocalLow\\YARC\\YARG\\release\\songcache.bin",
-                    );
-                    toast.success(
-                      t("cacheDeserializer.songcacheDialog.copiedToClipboard"),
-                    );
-                  }}
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center gap-1">
-                <Image
-                  src="/operational-systems/macos.svg"
-                  alt="MacOS"
-                  className="h-4 w-4"
-                  width={16}
-                  height={16}
-                />
-                <p className="font-semibold">
-                  {t("cacheDeserializer.songcacheDialog.macos")}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 bg-muted rounded px-3 py-2 text-xs break-all">
-                  ~/Library/Application Support/YARC/YARG/release/songcache.bin
-                </code>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="shrink-0"
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      "~/Library/Application Support/YARC/YARG/release/songcache.bin",
-                    );
-                    toast.success(
-                      t("cacheDeserializer.songcacheDialog.copiedToClipboard"),
-                    );
-                  }}
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center gap-1">
-                <Image
-                  src="/operational-systems/linux.svg"
-                  alt="Linux"
-                  className="h-4 w-4"
-                  width={16}
-                  height={16}
-                />
-                <p className="font-semibold">
-                  {t("cacheDeserializer.songcacheDialog.linux")}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 bg-muted rounded px-3 py-2 text-xs break-all">
-                  ~/.config/unity3d/YARC/YARG/release/songcache.bin
-                </code>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="shrink-0"
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      "~/.config/unity3d/YARC/YARG/release/songcache.bin",
-                    );
-                    toast.success(
-                      t("cacheDeserializer.songcacheDialog.copiedToClipboard"),
-                    );
-                  }}
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-
-            <p className="text-muted-foreground text-xs border-t pt-3">
-              {t("cacheDeserializer.songcacheDialog.devBuildNote")}{" "}
-              <code className="bg-muted rounded px-1">dev</code>{" "}
-              {t("cacheDeserializer.songcacheDialog.insteadOf")}{" "}
-              <code className="bg-muted rounded px-1">release</code>.
-            </p>
-          </div>
-        </DialogContent>
-      </Dialog>
     </Card>
   );
 }

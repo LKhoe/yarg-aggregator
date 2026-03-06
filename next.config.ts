@@ -5,6 +5,19 @@ const withNextIntl = createNextIntlPlugin("./i18n.ts");
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  generateBuildId: async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { version } = require("./package.json");
+    return version;
+  },
+  webpack: (config) => {
+    // Resolve .ts files when importing with .js extension (ESM convention used by batch-extractor)
+    config.resolve.extensionAlias = {
+      ".js": [".ts", ".js"],
+      ".mjs": [".mts", ".mjs"],
+    };
+    return config;
+  },
   async headers() {
     return [
       {

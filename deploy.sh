@@ -18,6 +18,11 @@ REMOTE_DIR="/home/${PI_USER}/yarg-aggregator"
 
 START_TIME=$(date +%s)
 
+echo "==> Bumping version..."
+npm version patch --no-git-tag-version
+git add package.json package-lock.json
+git commit -m "chore: bump version for deploy"
+
 echo "==> Pushing to git..."
 git push origin main
 

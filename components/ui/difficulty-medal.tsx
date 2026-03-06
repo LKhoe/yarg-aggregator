@@ -61,7 +61,7 @@ function DifficultyMedal({
       {...props}
     >
       <div
-        className="absolute inset-0 rounded-full [mask-image:radial-gradient(farthest-side,transparent_85%,black_65%)]"
+        className="absolute inset-0 rounded-full mask-[radial-gradient(farthest-side,transparent_85%,black_65%)]"
         style={{
           background: `
             repeating-conic-gradient(

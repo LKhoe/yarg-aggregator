@@ -628,5 +628,41 @@
     "notConfigured": "{platform} is not configured",
     "noPreview": "No preview available",
     "unauthorized": "Sign in to listen on platforms"
+  },
+  "batchExtractor": {
+    "title": "Batch Extractor",
+    "description": "Extract song data from STFS / CON packages in your browser",
+    "dropFiles": {
+      "title": "Drop Files",
+      "description": "Upload one or more CON / STFS files to extract song info and download a ready-to-use ZIP"
+    },
+    "dragDrop": {
+      "release": "Release to upload",
+      "drag": "Drag & drop files here",
+      "browse": "or click to browse — CON, STFS packages"
+    },
+    "processingQueue": {
+      "title": "Processing Queue",
+      "songsExtracted": "{count} song extracted",
+      "songsExtracted_plural": "{count} songs extracted"
+    },
+    "fileStatus": {
+      "queued": "Queued",
+      "processing": "Processing",
+      "done": "Done",
+      "error": "Error",
+      "downloadZip": "Download ZIP",
+      "songsExtracted": "{count} song extracted",
+      "songsExtracted_plural": "{count} songs extracted",
+      "failedToProcess": "Failed to process file"
+    },
+    "instruments": {
+      "guitar": "Guitar",
+      "bass": "Bass", 
+      "drums": "Drums",
+      "keys": "Keys",
+      "vocals": "Vocals",
+      "noInstruments": "No instruments"
+    }
   }
 }

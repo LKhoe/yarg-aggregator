@@ -628,5 +628,41 @@
     "fetchError": "Échec du chargement des listes.",
     "saveError": "Échec de la sauvegarde de la playlist.",
     "saveSuccess": "Playlist sauvegardée avec succès !"
+  },
+  "batchExtractor": {
+    "title": "Extracteur par Lot",
+    "description": "Extraire les données des chansons des paquets STFS / CON dans votre navigateur",
+    "dropFiles": {
+      "title": "Déposer les Fichiers",
+      "description": "Téléchargez un ou plusieurs fichiers CON / STFS pour extraire les informations des chansons et télécharger un ZIP prêt à l'emploi"
+    },
+    "dragDrop": {
+      "release": "Relâcher pour télécharger",
+      "drag": "Glissez et déposez les fichiers ici",
+      "browse": "ou cliquez pour parcourir — paquets CON, STFS"
+    },
+    "processingQueue": {
+      "title": "File d'Attente",
+      "songsExtracted": "{count} chanson extraite",
+      "songsExtracted_plural": "{count} chansons extraites"
+    },
+    "fileStatus": {
+      "queued": "En attente",
+      "processing": "En cours",
+      "done": "Terminé",
+      "error": "Erreur",
+      "downloadZip": "Télécharger ZIP",
+      "songsExtracted": "{count} chanson extraite",
+      "songsExtracted_plural": "{count} chansons extraites",
+      "failedToProcess": "Échec du traitement du fichier"
+    },
+    "instruments": {
+      "guitar": "Guitare",
+      "bass": "Basse", 
+      "drums": "Batterie",
+      "keys": "Claviers",
+      "vocals": "Chant",
+      "noInstruments": "Aucun instrument"
+    }
   }
 }

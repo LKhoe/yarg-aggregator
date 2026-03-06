@@ -628,5 +628,41 @@
     "fetchError": "加载列表失败。",
     "saveError": "保存播放列表失败。",
     "saveSuccess": "播放列表保存成功！"
+  },
+  "batchExtractor": {
+    "title": "批量提取器",
+    "description": "在浏览器中从STFS / CON包提取歌曲数据",
+    "dropFiles": {
+      "title": "拖放文件",
+      "description": "上传一个或多个CON / STFS文件以提取歌曲信息并下载可用的ZIP"
+    },
+    "dragDrop": {
+      "release": "释放以上传",
+      "drag": "拖放文件到这里",
+      "browse": "或点击浏览 — CON、STFS包"
+    },
+    "processingQueue": {
+      "title": "处理队列",
+      "songsExtracted": "已提取{count}首歌曲",
+      "songsExtracted_plural": "已提取{count}首歌曲"
+    },
+    "fileStatus": {
+      "queued": "排队中",
+      "processing": "处理中",
+      "done": "完成",
+      "error": "错误",
+      "downloadZip": "下载ZIP",
+      "songsExtracted": "已提取{count}首歌曲",
+      "songsExtracted_plural": "已提取{count}首歌曲",
+      "failedToProcess": "文件处理失败"
+    },
+    "instruments": {
+      "guitar": "吉他",
+      "bass": "贝斯", 
+      "drums": "鼓",
+      "keys": "键盘",
+      "vocals": "人声",
+      "noInstruments": "无乐器"
+    }
   }
 }

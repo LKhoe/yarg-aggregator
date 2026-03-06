@@ -2,13 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -30,7 +24,6 @@ import {
 import { useTranslations } from "@/hooks/use-translations";
 import {
   CloudDownload,
-  RefreshCw,
   ChevronRight,
   Clock,
   Music,
@@ -565,14 +558,7 @@ export default function ProviderPanel() {
 
   return (
     <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <RefreshCw className="h-5 w-5" />
-          {t("provider.title")}
-        </CardTitle>
-        <CardDescription>{t("provider.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 pt-6">
         <div className="grid grid-cols-2 gap-3">
           {["enchor", "rhythmverse"].map((src) => (
             <ProviderCard

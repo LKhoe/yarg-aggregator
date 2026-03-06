@@ -628,5 +628,41 @@
     "fetchError": "Fehler beim Laden der Listen.",
     "saveError": "Fehler beim Speichern der Playlist.",
     "saveSuccess": "Playlist erfolgreich gespeichert!"
+  },
+  "batchExtractor": {
+    "title": "Stapel-Extraktor",
+    "description": "Songdaten aus STFS / CON Paketen im Browser extrahieren",
+    "dropFiles": {
+      "title": "Dateien ablegen",
+      "description": "Laden Sie eine oder mehrere CON / STFS Dateien hoch, um Song-Informationen zu extrahieren und ein gebrauchsfertiges ZIP herunterzuladen"
+    },
+    "dragDrop": {
+      "release": "Loslassen zum Hochladen",
+      "drag": "Dateien hier ablegen",
+      "browse": "oder klicken zum Durchsuchen — CON, STFS Pakete"
+    },
+    "processingQueue": {
+      "title": "Verarbeitungswarteschlange",
+      "songsExtracted": "{count} Song extrahiert",
+      "songsExtracted_plural": "{count} Songs extrahiert"
+    },
+    "fileStatus": {
+      "queued": "In Warteschlange",
+      "processing": "Verarbeitung",
+      "done": "Abgeschlossen",
+      "error": "Fehler",
+      "downloadZip": "ZIP herunterladen",
+      "songsExtracted": "{count} Song extrahiert",
+      "songsExtracted_plural": "{count} Songs extrahiert",
+      "failedToProcess": "Fehler bei der Verarbeitung der Datei"
+    },
+    "instruments": {
+      "guitar": "Gitarre",
+      "bass": "Bass", 
+      "drums": "Schlagzeug",
+      "keys": "Tasten",
+      "vocals": "Gesang",
+      "noInstruments": "Keine Instrumente"
+    }
   }
 }

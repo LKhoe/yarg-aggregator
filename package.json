@@ -32,6 +32,7 @@
     "better-auth": "^1.4.17",
     "bullmq": "^5.66.2",
     "class-variance-authority": "^0.7.1",
+    "client-zip": "^2.5.0",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "drizzle-kit": "^0.31.8",

@@ -628,5 +628,41 @@
     "fetchError": "リストの読み込みに失敗しました。",
     "saveError": "プレイリストの保存に失敗しました。",
     "saveSuccess": "プレイリストが正常に保存されました！"
+  },
+  "batchExtractor": {
+    "title": "バッチ抽出ツール",
+    "description": "ブラウザでSTFS / CONパッケージから楽曲データを抽出",
+    "dropFiles": {
+      "title": "ファイルをドロップ",
+      "description": "1つ以上のCON / STFSファイルをアップロードして楽曲情報を抽出し、使用可能なZIPをダウンロード"
+    },
+    "dragDrop": {
+      "release": "アップロードするにはリリース",
+      "drag": "ここにファイルをドラッグ＆ドロップ",
+      "browse": "またはクリックして参照 — CON、STFSパッケージ"
+    },
+    "processingQueue": {
+      "title": "処理キュー",
+      "songsExtracted": "{count}曲抽出済み",
+      "songsExtracted_plural": "{count}曲抽出済み"
+    },
+    "fileStatus": {
+      "queued": "キュー待ち",
+      "processing": "処理中",
+      "done": "完了",
+      "error": "エラー",
+      "downloadZip": "ZIPダウンロード",
+      "songsExtracted": "{count}曲抽出済み",
+      "songsExtracted_plural": "{count}曲抽出済み",
+      "failedToProcess": "ファイルの処理に失敗しました"
+    },
+    "instruments": {
+      "guitar": "ギター",
+      "bass": "ベース", 
+      "drums": "ドラム",
+      "keys": "キー",
+      "vocals": "ボーカル",
+      "noInstruments": "楽器なし"
+    }
   }
 }
