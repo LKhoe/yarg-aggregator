@@ -664,5 +664,30 @@
       "vocals": "人声",
       "noInstruments": "无乐器"
     }
+  },
+  "agent": {
+    "title": "AI代理",
+    "subtitle": "自然语言搜索、推荐和歌单策划",
+    "chat": {
+      "title": "YARG AI代理",
+      "description": "使用自然语言搜索歌曲、探索流派、获取统计数据和策划歌单。",
+      "starterPrompts": {
+        "howManySongs": "数据库中有多少首歌曲？",
+        "whatGenres": "有哪些流派可用？",
+        "jazzGuitar": "找到吉他难度4级或更高的爵士歌曲",
+        "beginnerDrummers": "为初学鼓手推荐5首歌曲的歌单"
+      },
+      "input": {
+        "placeholder": "询问关于歌曲、流派或歌单的任何问题…（回车发送）"
+      },
+      "thinking": "思考中…",
+      "poweredBy": "由OpenRouter驱动",
+      "toolCalls": {
+        "args": "参数",
+        "result": "结果",
+        "noArgs": "无参数"
+      },
+      "error": "抱歉，出了点问题：{error}"
+    }
   }
 }

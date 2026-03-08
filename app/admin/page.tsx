@@ -17,6 +17,7 @@ import {
   FileArchive,
   FileText,
   CloudDownload,
+  Bot,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,13 @@ function AdminDashboardContent() {
       href: "/admin/providers",
       icon: CloudDownload,
     },
+    {
+      title: "AI Agent",
+      description:
+        "Natural language search, recommendations, and setlist curation",
+      href: "/admin/agent",
+      icon: Bot,
+    },
   ];
 
   return (
@@ -83,10 +91,10 @@ function AdminDashboardContent() {
       <div className="grid gap-4 md:grid-cols-2">
         {adminLinks.map((link) => (
           <Link key={link.href} href={link.href}>
-            <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full justify-center">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-primary/10">
+                  <div className="flex items-center justify-center h-10 min-w-10 rounded-lg bg-primary/10">
                     <link.icon className="h-5 w-5 text-primary" />
                   </div>
                   <div>

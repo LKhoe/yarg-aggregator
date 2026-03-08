@@ -81,9 +81,9 @@ function MonitoringContent() {
           disabled={isLoading}
         >
           <RefreshCw
-            className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
+            className={`h-4 w-4 sm:mr-2 ${isLoading ? "animate-spin" : ""}`}
           />
-          {t("admin.monitoring.refresh")}
+          <span className="hidden sm:inline">{t("admin.monitoring.refresh")}</span>
         </Button>
       </div>
 

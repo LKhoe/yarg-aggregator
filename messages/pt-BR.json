@@ -664,5 +664,30 @@
       "vocals": "Vocais",
       "noInstruments": "Sem instrumentos"
     }
+  },
+  "agent": {
+    "title": "Agente IA",
+    "subtitle": "Busca em linguagem natural, recomendações e curadoria de setlists",
+    "chat": {
+      "title": "Agente IA YARG",
+      "description": "Busque músicas, explore gêneros, obtenha estatísticas e cure setlists usando linguagem natural.",
+      "starterPrompts": {
+        "howManySongs": "Quantas músicas existem no banco de dados?",
+        "whatGenres": "Quais gêneros estão disponíveis?",
+        "jazzGuitar": "Encontre músicas de jazz com dificuldade de guitarra 4 ou superior",
+        "beginnerDrummers": "Sugira uma setlist de 5 músicas para bateristas iniciantes"
+      },
+      "input": {
+        "placeholder": "Pergunte qualquer coisa sobre músicas, gêneros ou setlists… (Enter para enviar)"
+      },
+      "thinking": "Pensando…",
+      "poweredBy": "Desenvolvido por OpenRouter",
+      "toolCalls": {
+        "args": "Argumentos",
+        "result": "Resultado",
+        "noArgs": "sem argumentos"
+      },
+      "error": "Desculpe, algo deu errado: {error}"
+    }
   }
 }

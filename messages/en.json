@@ -664,5 +664,30 @@
       "vocals": "Vocals",
       "noInstruments": "No instruments"
     }
+  },
+  "agent": {
+    "title": "AI Agent",
+    "subtitle": "Natural language search, recommendations, and setlist curation",
+    "chat": {
+      "title": "YARG AI Agent",
+      "description": "Search songs, explore genres, get stats, and curate setlists using natural language.",
+      "starterPrompts": {
+        "howManySongs": "How many songs are in the database?",
+        "whatGenres": "What genres are available?",
+        "jazzGuitar": "Find jazz songs with guitar difficulty 4 or higher",
+        "beginnerDrummers": "Suggest a 5-song setlist for beginner drummers"
+      },
+      "input": {
+        "placeholder": "Ask anything about songs, genres, or setlists… (Enter to send)"
+      },
+      "thinking": "Thinking…",
+      "poweredBy": "Powered by OpenRouter",
+      "toolCalls": {
+        "args": "Args",
+        "result": "Result",
+        "noArgs": "no args"
+      },
+      "error": "Sorry, something went wrong: {error}"
+    }
   }
 }

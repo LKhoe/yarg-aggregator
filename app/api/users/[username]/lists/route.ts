@@ -49,6 +49,13 @@ export async function GET(
           albumImageUrl: item.song.albumImageUrl,
           addedAt: item.addedAt,
           downloadUrls: item.song.downloadUrls,
+          instruments: {
+            guitar: item.song.diffGuitar ?? null,
+            bass: item.song.diffBass ?? null,
+            drums: item.song.diffDrums ?? null,
+            keys: item.song.diffKeys ?? null,
+            vocals: item.song.diffVocals ?? null,
+          },
         })),
       });
     }

@@ -23,7 +23,7 @@ export default async function batchExtract(
     ],
     namingStyle: NamingStyle.ArtistSong, // "Artist - Song"
     spaceHandling: SpaceHandling.Keep, // keep spaces in filenames
-    outputLayout: OutputLayout.YARG, // _YARG/rename/songs/... layout
+    outputLayout: OutputLayout.Flat, // All files in a flat directory
     decryptMogg: true, // decrypt MOGG after extracting
     onProgress,
   });

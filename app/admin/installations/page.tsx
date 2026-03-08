@@ -101,15 +101,20 @@ function InstallationsContent() {
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
-        <div>
-          <h1 className="text-2xl font-bold">
-            {t("admin.installations.title")}
-          </h1>
-          <p className="text-muted-foreground">
-            {t("admin.installations.totalInstallations", {
-              count: installations.length,
-            })}
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-primary/10">
+            <HardDrive className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold leading-none">
+              {t("admin.installations.title")}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {t("admin.installations.totalInstallations", {
+                count: installations.length,
+              })}
+            </p>
+          </div>
         </div>
       </div>
 

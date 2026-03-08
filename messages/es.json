@@ -664,5 +664,30 @@
       "vocals": "Voz",
       "noInstruments": "Sin instrumentos"
     }
+  },
+  "agent": {
+    "title": "Agente IA",
+    "subtitle": "Búsqueda en lenguaje natural, recomendaciones y curación de setlists",
+    "chat": {
+      "title": "Agente IA de YARG",
+      "description": "Busca canciones, explora géneros, obtén estadísticas y cura setlists usando lenguaje natural.",
+      "starterPrompts": {
+        "howManySongs": "¿Cuántas canciones hay en la base de datos?",
+        "whatGenres": "¿Qué géneros están disponibles?",
+        "jazzGuitar": "Encuentra canciones de jazz con dificultad de guitarra 4 o superior",
+        "beginnerDrummers": "Sugiere un setlist de 5 canciones para bateristas principiantes"
+      },
+      "input": {
+        "placeholder": "Pregunta cualquier cosa sobre canciones, géneros o setlists… (Enter para enviar)"
+      },
+      "thinking": "Pensando…",
+      "poweredBy": "Desarrollado por OpenRouter",
+      "toolCalls": {
+        "args": "Argumentos",
+        "result": "Resultado",
+        "noArgs": "sin argumentos"
+      },
+      "error": "Lo siento, algo salió mal: {error}"
+    }
   }
 }

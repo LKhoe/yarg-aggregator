@@ -664,5 +664,30 @@
       "vocals": "Chant",
       "noInstruments": "Aucun instrument"
     }
+  },
+  "agent": {
+    "title": "Agent IA",
+    "subtitle": "Recherche en langage naturel, recommandations et curaison de setlists",
+    "chat": {
+      "title": "Agent IA YARG",
+      "description": "Cherchez des chansons, explorez des genres, obtenez des statistiques et curez des setlists en utilisant le langage naturel.",
+      "starterPrompts": {
+        "howManySongs": "Combien de chansons y a-t-il dans la base de données ?",
+        "whatGenres": "Quels genres sont disponibles ?",
+        "jazzGuitar": "Trouvez des chansons de jazz avec difficulté guitare 4 ou plus",
+        "beginnerDrummers": "Suggérez un setlist de 5 chansons pour batteurs débutants"
+      },
+      "input": {
+        "placeholder": "Demandez n'importe quoi sur les chansons, genres ou setlists… (Entrée pour envoyer)"
+      },
+      "thinking": "Réflexion…",
+      "poweredBy": "Alimenté par OpenRouter",
+      "toolCalls": {
+        "args": "Arguments",
+        "result": "Résultat",
+        "noArgs": "aucun argument"
+      },
+      "error": "Désolé, quelque chose s'est mal passé : {error}"
+    }
   }
 }

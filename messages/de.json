@@ -664,5 +664,30 @@
       "vocals": "Gesang",
       "noInstruments": "Keine Instrumente"
     }
+  },
+  "agent": {
+    "title": "KI-Agent",
+    "subtitle": "Natürlichsprachige Suche, Empfehlungen und Setlist-Kuration",
+    "chat": {
+      "title": "YARG KI-Agent",
+      "description": "Suchen Sie Songs, erkunden Sie Genres, erhalten Sie Statistiken und kuratieren Sie Setlists mit natürlicher Sprache.",
+      "starterPrompts": {
+        "howManySongs": "Wie viele Songs sind in der Datenbank?",
+        "whatGenres": "Welche Genres sind verfügbar?",
+        "jazzGuitar": "Finden Sie Jazz-Songs mit Gitarrenschwierigkeit 4 oder höher",
+        "beginnerDrummers": "Schlagen Sie eine 5-Song-Setlist für Anfänger-Schlagzeuger vor"
+      },
+      "input": {
+        "placeholder": "Fragen Sie alles über Songs, Genres oder Setlists… (Enter zum Senden)"
+      },
+      "thinking": "Denke nach…",
+      "poweredBy": "Angetrieben von OpenRouter",
+      "toolCalls": {
+        "args": "Argumente",
+        "result": "Ergebnis",
+        "noArgs": "keine Argumente"
+      },
+      "error": "Entschuldigung, etwas ist schief gelaufen: {error}"
+    }
   }
 }

@@ -37,7 +37,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Search, ArrowLeft, Trash2, Shield, User, UserCog } from "lucide-react";
+import {
+  Search,
+  ArrowLeft,
+  Trash2,
+  Shield,
+  User,
+  UserCog,
+  Users,
+} from "lucide-react";
 import type { Role } from "@/lib/db/schema";
 import Link from "next/link";
 
@@ -108,7 +116,7 @@ function AdminUsersContent() {
     fetchUsers();
   }, [fetchUsers]);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e: React.SubmitEvent) => {
     e.preventDefault();
     setPage(0);
     fetchUsers();
@@ -152,7 +160,7 @@ function AdminUsersContent() {
 
       if (response.ok) {
         setUsers(users.filter((u) => u.id !== userId));
-        setTotal(prev => prev - 1);
+        setTotal((prev) => prev - 1);
         toast.success(t("admin.userDeleted"));
       } else {
         const data = await response.json();
@@ -183,11 +191,18 @@ function AdminUsersContent() {
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
-        <div>
-          <h1 className="text-2xl font-bold">{t("admin.userManagement")}</h1>
-          <p className="text-muted-foreground">
-            {t("admin.totalUsers", { count: total })}
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-primary/10">
+            <Users className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold leading-none">
+              {t("admin.userManagement")}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {t("admin.totalUsers", { count: total })}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -276,7 +291,10 @@ function AdminUsersContent() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Badge variant={RoleColor} className="flex items-center gap-1">
+                            <Badge
+                              variant={RoleColor}
+                              className="flex items-center gap-1"
+                            >
                               <RoleIcon className="h-3 w-3" />
                               {user.profile.role}
                             </Badge>
@@ -376,7 +394,7 @@ function AdminUsersContent() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setPage(prev => prev - 1)}
+                      onClick={() => setPage((prev) => prev - 1)}
                       disabled={page === 0}
                     >
                       {t("admin.previous")}
@@ -384,7 +402,7 @@ function AdminUsersContent() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setPage(prev => prev + 1)}
+                      onClick={() => setPage((prev) => prev + 1)}
                       disabled={page >= totalPages - 1}
                     >
                       {t("admin.next")}

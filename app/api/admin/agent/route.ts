@@ -1,0 +1,327 @@
+import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/middleware/auth";
+import { MusicService } from "@/lib/services/music";
+import { ListService } from "@/lib/services/list";
+import { db } from "@/lib/db";
+import { genre, song, artist, album, userProfile } from "@/lib/db/schema";
+import { count, eq } from "drizzle-orm";
+
+const SYSTEM_PROMPT = `You are an AI assistant for the YARG Content Aggregator, an admin tool for managing music charts for YARG (Yet Another Rhythm Game) — an open-source rhythm game similar to Rock Band and Guitar Hero.
+
+## About the Platform
+- Charts (songs) are indexed from external sources: Enchor.us and Rhythmverse
+- Each chart supports up to 5 instruments: guitar, bass, drums, keys, vocals
+- Difficulty is rated 0–6 per instrument (0 = easiest, 6 = hardest)
+- Users can create song lists/playlists and mark favorites
+- Songs can be linked to local game installations
+
+## Your Capabilities
+You can help admins with:
+1. Natural language song search with filters (genre, instrument, difficulty, source)
+2. Platform statistics and insights
+3. Setlist/playlist curation and recommendations
+4. Browsing available genres and user lists
+
+## Guidelines
+- Always use tools to fetch real data before answering questions about songs or stats
+- When recommending setlists, search for songs matching the criteria and present the results
+- Keep responses concise and useful for an admin context
+- Difficulty 0–2 = beginner, 3–4 = intermediate, 5–6 = expert`;
+
+const TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "search_songs",
+      description:
+        "Search for songs in the database. Returns up to 10 matching songs with title, artist, genre, instruments, and difficulty.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Search query (song title, artist, charter, etc.)",
+          },
+          genre: {
+            type: "string",
+            description: "Filter by genre name (exact match)",
+          },
+          instruments: {
+            type: "array",
+            items: {
+              type: "string",
+              enum: ["guitar", "bass", "drums", "keys", "vocals"],
+            },
+            description: "Filter to songs that have these instruments charted",
+          },
+          source: {
+            type: "string",
+            enum: ["", "enchor", "rhythmverse"],
+            description: "Filter by data source",
+          },
+          sortBy: {
+            type: "string",
+            enum: ["relevance", "name", "artist", "album", "createdAt"],
+            description: "Sort field (default: relevance)",
+          },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_song_details",
+      description:
+        "Get detailed information about a specific song by its ID, including all difficulty levels and download URLs.",
+      parameters: {
+        type: "object",
+        properties: {
+          id: {
+            type: "string",
+            description: "Song UUID",
+          },
+        },
+        required: ["id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_genres",
+      description: "Get all available genre names in the database.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_stats",
+      description:
+        "Get platform statistics: total number of songs, artists, and albums.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_user_lists",
+      description:
+        "Get public song lists/playlists for a user by display name.",
+      parameters: {
+        type: "object",
+        properties: {
+          username: {
+            type: "string",
+            description: "User's display name",
+          },
+        },
+        required: ["username"],
+      },
+    },
+  },
+];
+
+type ToolCallTrace = {
+  name: string;
+  args: Record<string, unknown>;
+  result: unknown;
+};
+
+type OpenRouterMessage =
+  | { role: "system" | "user" | "assistant"; content: string }
+  | { role: "assistant"; content: string | null; tool_calls: unknown[] }
+  | { role: "tool"; tool_call_id: string; content: string };
+
+async function executeTool(
+  name: string,
+  args: Record<string, unknown>,
+): Promise<unknown> {
+  switch (name) {
+    case "search_songs": {
+      const result = await MusicService.search({
+        query: (args.query as string) ?? "",
+        limit: 10,
+        sortBy: ((args.sortBy as string) ?? "relevance") as
+          | "relevance"
+          | "name"
+          | "artist"
+          | "album"
+          | "createdAt",
+        sortOrder: "desc",
+        genre: (args.genre as string) ?? "",
+        instruments: (args.instruments as string[]) ?? [],
+        source: ((args.source as string) ?? "") as
+          | ""
+          | "enchor"
+          | "rhythmverse",
+        cursor: null,
+      });
+      return {
+        total: result.total,
+        returned: result.data.length,
+        songs: result.data.map((s) => ({
+          id: s.id,
+          name: s.name,
+          artist: s.artist,
+          album: s.album,
+          genre: s.genre,
+          year: s.year,
+          charter: s.charter,
+          instruments: s.instruments,
+        })),
+      };
+    }
+
+    case "get_song_details": {
+      return await MusicService.findById(args.id as string);
+    }
+
+    case "get_genres": {
+      const genres = await db.select({ name: genre.name }).from(genre);
+      return { genres: genres.map((g) => g.name).sort() };
+    }
+
+    case "get_stats": {
+      const [songCount, artistCount, albumCount] = await Promise.all([
+        db.select({ count: count() }).from(song),
+        db.select({ count: count() }).from(artist),
+        db.select({ count: count() }).from(album),
+      ]);
+      return {
+        songs: songCount[0].count,
+        artists: artistCount[0].count,
+        albums: albumCount[0].count,
+      };
+    }
+
+    case "get_user_lists": {
+      const profileResult = await db
+        .select({ userId: userProfile.userId })
+        .from(userProfile)
+        .where(eq(userProfile.displayName, args.username as string))
+        .limit(1);
+      if (!profileResult[0]) return { error: "User not found" };
+      const lists = await ListService.getPublicLists(profileResult[0].userId);
+      return { lists };
+    }
+
+    default:
+      return { error: `Unknown tool: ${name}` };
+  }
+}
+
+async function runAgentLoop(
+  clientMessages: { role: "user" | "assistant"; content: string }[],
+): Promise<{ reply: string; toolCalls: ToolCallTrace[] }> {
+  const messages: OpenRouterMessage[] = [
+    { role: "system", content: SYSTEM_PROMPT },
+    ...clientMessages,
+  ];
+  const toolCalls: ToolCallTrace[] = [];
+
+  for (let i = 0; i < 5; i++) {
+    const response = await fetch(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "arcee-ai/trinity-large-preview:free",
+          messages,
+          tools: TOOLS,
+          tool_choice: "auto",
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`OpenRouter error ${response.status}: ${err}`);
+    }
+
+    const data = await response.json();
+    const choice = data.choices?.[0];
+    if (!choice) throw new Error("No choices in OpenRouter response");
+
+    const assistantMessage = choice.message;
+    messages.push(assistantMessage);
+
+    if (choice.finish_reason === "tool_calls" && assistantMessage.tool_calls) {
+      const toolResultMessages: OpenRouterMessage[] = [];
+
+      for (const toolCall of assistantMessage.tool_calls) {
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(toolCall.function.arguments);
+        } catch {
+          args = {};
+        }
+
+        const result = await executeTool(toolCall.function.name, args);
+        toolCalls.push({ name: toolCall.function.name, args, result });
+
+        toolResultMessages.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          content: JSON.stringify(result),
+        });
+      }
+
+      messages.push(...toolResultMessages);
+    } else {
+      return {
+        reply:
+          assistantMessage.content ??
+          "I was unable to generate a response. Please try again.",
+        toolCalls,
+      };
+    }
+  }
+
+  return {
+    reply:
+      "I reached the maximum number of tool-calling iterations. Please try a more specific query.",
+    toolCalls,
+  };
+}
+
+export const POST = withAuth(
+  async (request: NextRequest) => {
+    const body = await request.json();
+    const { messages } = body as {
+      messages: { role: "user" | "assistant"; content: string }[];
+    };
+
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return NextResponse.json(
+        { error: "messages array is required" },
+        { status: 400 },
+      );
+    }
+
+    if (!process.env.OPENROUTER_API_KEY) {
+      return NextResponse.json(
+        { error: "OPENROUTER_API_KEY is not configured" },
+        { status: 503 },
+      );
+    }
+
+    const { reply, toolCalls } = await runAgentLoop(messages);
+    return NextResponse.json({ reply, toolCalls });
+  },
+  { requiredRole: "admin" },
+);

@@ -664,5 +664,30 @@
       "vocals": "ボーカル",
       "noInstruments": "楽器なし"
     }
+  },
+  "agent": {
+    "title": "AIエージェント",
+    "subtitle": "自然言語検索、レコメンデーション、セットリスト作成",
+    "chat": {
+      "title": "YARG AIエージェント",
+      "description": "自然言語を使用して楽曲を検索し、ジャンルを探索し、統計を取得し、セットリストを作成します。",
+      "starterPrompts": {
+        "howManySongs": "データベースには何曲ありますか？",
+        "whatGenres": "利用可能なジャンルは何ですか？",
+        "jazzGuitar": "ギター難易度4以上のジャズ楽曲を見つけて",
+        "beginnerDrummers": "初心者ドラマー向けの5曲セットリストを提案して"
+      },
+      "input": {
+        "placeholder": "楽曲、ジャンル、セットリストについて何でも質問…（Enterで送信）"
+      },
+      "thinking": "考え中…",
+      "poweredBy": "OpenRouter搭載",
+      "toolCalls": {
+        "args": "引数",
+        "result": "結果",
+        "noArgs": "引数なし"
+      },
+      "error": "申し訳ありません、何かがうまくいきませんでした：{error}"
+    }
   }
 }
