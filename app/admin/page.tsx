@@ -18,6 +18,7 @@ import {
   FileText,
   CloudDownload,
   Bot,
+  Music2,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,12 @@ function AdminDashboardContent() {
         "Natural language search, recommendations, and setlist curation",
       href: "/admin/agent",
       icon: Bot,
+    },
+    {
+      title: "Chart Editor",
+      description: "Upload, edit, and export .mid/.chart files",
+      href: "/admin/chart-editor",
+      icon: Music2,
     },
   ];
 
