@@ -36,6 +36,10 @@ RUN npm install -g tsx
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# Install migration dependencies before copying app files for better layer caching
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
+RUN npm install pg postgres drizzle-orm drizzle-kit
+
 # Copy only the necessary files for standalone mode
 COPY --from=builder /app/public ./public
 
@@ -52,12 +56,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Note: drizzle.config.ts specifies out: './lib/db/migrations'
 COPY --from=builder --chown=nextjs:nodejs /app/drizzle.config.ts ./
 COPY --from=builder --chown=nextjs:nodejs /app/lib/db ./lib/db
-
-# Copy package.json for drizzle-kit to read
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
-
-# Install migration dependencies locally (drizzle-kit needs drizzle-orm as peer)
-RUN npm install pg postgres drizzle-orm drizzle-kit
 
 # Copy and setup entrypoint script
 COPY --chown=nextjs:nodejs docker-entrypoint.sh /usr/local/bin/
