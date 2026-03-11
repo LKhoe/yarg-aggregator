@@ -79,6 +79,12 @@ export interface RhythmVerseSongEntry {
     author?: {
       name: string;
     };
+    diff_drums?: number | null;
+    diff_guitar?: number | null;
+    diff_bass?: number | null;
+    diff_vocals?: number | null;
+    diff_keys?: number | null;
+    diff_prokeys?: number | null;
   };
 }
 
@@ -98,12 +104,19 @@ export function parseRhythmverseData(
     const coverUrl = `${RHYTHMVERSE_BASE_URL}${data.album_art}`;
 
     // Parse difficulties once to avoid duplicate function calls
-    const drums = parseDifficulty(data.diff_drums);
-    const bass = parseDifficulty(data.diff_bass);
-    const guitar = parseDifficulty(data.diff_guitar);
+    const drums =
+      parseDifficulty(data.diff_drums) ?? parseDifficulty(file.diff_drums);
+    const bass =
+      parseDifficulty(data.diff_bass) ?? parseDifficulty(file.diff_bass);
+    const guitar =
+      parseDifficulty(data.diff_guitar) ?? parseDifficulty(file.diff_guitar);
     const keys =
-      parseDifficulty(data.diff_prokeys) ?? parseDifficulty(data.diff_keys);
-    const vocals = parseDifficulty(data.diff_vocals);
+      parseDifficulty(data.diff_prokeys) ??
+      parseDifficulty(data.diff_keys) ??
+      parseDifficulty(file.diff_prokeys) ??
+      parseDifficulty(data.diff_keys);
+    const vocals =
+      parseDifficulty(data.diff_vocals) ?? parseDifficulty(file.diff_vocals);
 
     return {
       name,
@@ -204,7 +217,10 @@ export async function fetchRhythmverse(
   }
 }
 
-function parseDifficulty(diff: string | null | number): number | null {
+function parseDifficulty(
+  diff: string | null | number | undefined,
+): number | null {
+  // Return a number [1-7] or null
   if (diff === null || diff === undefined) return null;
   if (typeof diff === "number") return diff === -1 || diff === 0 ? null : diff;
   const parsed = parseInt(diff, 10);
