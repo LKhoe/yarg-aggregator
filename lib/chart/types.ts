@@ -7,6 +7,19 @@ export type Instrument =
   | "Vocals";
 export type TrackKey = `${Difficulty}${Instrument}`;
 
+export interface NoteFlags {
+  forceHopo?: boolean;
+  forceStrum?: boolean;
+  tap?: boolean;
+}
+
+export interface Section {
+  id: string;
+  tick: number;
+  name: string;
+  type: "section" | "solo";
+}
+
 export interface ChartData {
   metadata: {
     name: string;
@@ -23,6 +36,7 @@ export interface ChartData {
     timeSignatures: { tick: number; numerator: number; denominator: number }[];
   };
   events: { tick: number; text: string }[];
+  sections: Section[];
   tracks: Partial<Record<TrackKey, Track>>;
 }
 
@@ -38,6 +52,7 @@ export interface Note {
   tick: number;
   fret: number; // 0-6; for drums: 0=kick, 1=red, 2=yellow, 3=blue, 4=green
   length: number;
+  flags?: NoteFlags;
 }
 
 export interface Phrase {

@@ -18,6 +18,7 @@ export interface PropertiesPanelProps {
     length: number
   ) => void;
   onDeleteNotes: (ids: string[]) => void;
+  onToggleFlag?: (id: string, flag: "forceHopo" | "forceStrum" | "tap") => void;
 }
 
 export function PropertiesPanel({
@@ -26,6 +27,7 @@ export function PropertiesPanel({
   selectedNoteIds,
   onUpdateNote,
   onDeleteNotes,
+  onToggleFlag,
 }: PropertiesPanelProps) {
   const isDrums = trackKey?.includes("Drums") ?? false;
 
@@ -124,6 +126,42 @@ export function PropertiesPanel({
               />
             </div>
           </div>
+
+          {/* Note Flags */}
+          {onToggleFlag && (
+            <div className="space-y-1.5 pt-1">
+              <Label className="text-xs text-muted-foreground">Flags</Label>
+              <div className="space-y-1">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={singleNote.flags?.forceHopo ?? false}
+                    onChange={() => onToggleFlag(singleNote.id, "forceHopo")}
+                    className="h-3 w-3"
+                  />
+                  <span className="text-xs">Force HOPO (H)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={singleNote.flags?.forceStrum ?? false}
+                    onChange={() => onToggleFlag(singleNote.id, "forceStrum")}
+                    className="h-3 w-3"
+                  />
+                  <span className="text-xs">Force Strum (S)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={singleNote.flags?.tap ?? false}
+                    onChange={() => onToggleFlag(singleNote.id, "tap")}
+                    className="h-3 w-3"
+                  />
+                  <span className="text-xs">Tap</span>
+                </label>
+              </div>
+            </div>
+          )}
 
           <Button size="sm" className="w-full h-7 text-xs" onClick={handleApply}>
             Apply

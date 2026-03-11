@@ -97,9 +97,30 @@ function serializeSyncTrack(chart: ChartData): string {
 
 function serializeEvents(chart: ChartData): string {
   const lines = ["[Events]", "{"];
-  for (const ev of chart.events) {
-    lines.push(indent(`${ev.tick} = E "${ev.text}"`));
+
+  // Combine regular events and sections, sorted by tick
+  type RawEvent =
+    | { tick: number; kind: "event"; text: string }
+    | { tick: number; kind: "section"; name: string };
+
+  const allEvents: RawEvent[] = [
+    ...chart.events.map((e) => ({ tick: e.tick, kind: "event" as const, text: e.text })),
+    ...(chart.sections ?? []).map((s) => ({
+      tick: s.tick,
+      kind: "section" as const,
+      name: s.name,
+    })),
+  ];
+  allEvents.sort((a, b) => a.tick - b.tick);
+
+  for (const ev of allEvents) {
+    if (ev.kind === "event") {
+      lines.push(indent(`${ev.tick} = E "${ev.text}"`));
+    } else {
+      lines.push(indent(`${ev.tick} = E "section ${ev.name}"`));
+    }
   }
+
   lines.push("}");
   return lines.join("\n");
 }
@@ -107,29 +128,49 @@ function serializeEvents(chart: ChartData): string {
 function serializeTrack(sectionName: string, track: Track): string {
   const lines = [`[${sectionName}]`, "{"];
 
-  // Combine notes and phrases, sort by tick
+  // Combine notes (with flags), phrases, sorted by tick
   type RawEntry =
     | { tick: number; kind: "note"; fret: number; length: number }
+    | { tick: number; kind: "flag"; fret: number }
     | { tick: number; kind: "phrase"; phraseType: number; length: number };
-  const entries: RawEntry[] = [
-    ...track.notes.map((n) => ({
+
+  const entries: RawEntry[] = [];
+
+  for (const n of track.notes) {
+    entries.push({
       tick: n.tick,
-      kind: "note" as const,
+      kind: "note",
       fret: n.fret,
       length: n.length,
-    })),
-    ...track.phrases.map((p) => ({
+    });
+    // Emit modifier note entries for flags
+    if (n.flags?.forceHopo) {
+      entries.push({ tick: n.tick, kind: "flag", fret: 5 });
+    }
+    if (n.flags?.forceStrum) {
+      entries.push({ tick: n.tick, kind: "flag", fret: 6 });
+    }
+    if (n.flags?.tap) {
+      entries.push({ tick: n.tick, kind: "flag", fret: 32 });
+    }
+  }
+
+  for (const p of track.phrases) {
+    entries.push({
       tick: p.tick,
-      kind: "phrase" as const,
+      kind: "phrase",
       phraseType: PHRASE_TYPE_TO_INT[p.type],
       length: p.length,
-    })),
-  ];
+    });
+  }
+
   entries.sort((a, b) => a.tick - b.tick);
 
   for (const entry of entries) {
     if (entry.kind === "note") {
       lines.push(indent(`${entry.tick} = N ${entry.fret} ${entry.length}`));
+    } else if (entry.kind === "flag") {
+      lines.push(indent(`${entry.tick} = N ${entry.fret} 0`));
     } else {
       lines.push(
         indent(`${entry.tick} = S ${entry.phraseType} ${entry.length}`)

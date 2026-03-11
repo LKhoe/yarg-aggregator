@@ -18,7 +18,12 @@ import {
   Redo2,
   Eye,
   Gauge,
+  Pencil,
+  Star,
+  Activity,
+  BarChart2,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface ToolbarProps {
   isPlaying: boolean;
@@ -39,6 +44,15 @@ export interface ToolbarProps {
   onRedo: () => void;
   currentTick: number;
   bpm: number;
+  // Edit mode
+  editMode: "note" | "phrase";
+  onEditModeChange: (mode: "note" | "phrase") => void;
+  phraseType: string;
+  onPhraseTypeChange: (type: string) => void;
+  // Visualization mode
+  vizMode: "waveform" | "spectrogram";
+  onVizModeChange: (mode: "waveform" | "spectrogram") => void;
+  spectrogramLoading?: boolean;
 }
 
 const SNAP_OPTIONS = [
@@ -67,6 +81,13 @@ const RENDER_DIST_OPTIONS = [
   { value: 3, label: "3x" },
 ];
 
+const PHRASE_TYPE_OPTIONS = [
+  { value: "starPower", label: "Star Power" },
+  { value: "bre", label: "BRE" },
+  { value: "tremolo", label: "Tremolo" },
+  { value: "trill", label: "Trill" },
+];
+
 export function Toolbar({
   isPlaying,
   onPlayPause,
@@ -86,6 +107,13 @@ export function Toolbar({
   onRedo,
   currentTick,
   bpm,
+  editMode,
+  onEditModeChange,
+  phraseType,
+  onPhraseTypeChange,
+  vizMode,
+  onVizModeChange,
+  spectrogramLoading,
 }: ToolbarProps) {
   return (
     <div className="flex items-center gap-2 px-4 py-2 border-b bg-background/80 backdrop-blur-sm">
@@ -136,6 +164,48 @@ export function Toolbar({
           <Redo2 className="h-4 w-4" />
         </Button>
       </div>
+
+      <div className="w-px h-5 bg-border mx-1" />
+
+      {/* Edit Mode Toggle */}
+      <div className="flex items-center gap-1 rounded-md border p-0.5 bg-muted/30">
+        <Button
+          variant={editMode === "note" ? "secondary" : "ghost"}
+          size="sm"
+          className={cn("h-6 px-2 gap-1 text-xs", editMode === "note" && "shadow-sm")}
+          onClick={() => onEditModeChange("note")}
+          title="Note editing mode"
+        >
+          <Pencil className="h-3 w-3" />
+          Notes
+        </Button>
+        <Button
+          variant={editMode === "phrase" ? "secondary" : "ghost"}
+          size="sm"
+          className={cn("h-6 px-2 gap-1 text-xs", editMode === "phrase" && "shadow-sm")}
+          onClick={() => onEditModeChange("phrase")}
+          title="Phrase editing mode"
+        >
+          <Star className="h-3 w-3" />
+          Phrases
+        </Button>
+      </div>
+
+      {/* Phrase type selector (only visible in phrase mode) */}
+      {editMode === "phrase" && (
+        <Select value={phraseType} onValueChange={onPhraseTypeChange}>
+          <SelectTrigger className="h-7 w-[8rem] text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PHRASE_TYPE_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
       <div className="w-px h-5 bg-border mx-1" />
 
@@ -229,6 +299,36 @@ export function Toolbar({
       </div>
 
       <div className="flex-1" />
+
+      {/* Visualization mode toggle */}
+      <div
+        className="flex items-center gap-1 rounded-md border p-0.5 bg-muted/30"
+        title="Switch between waveform and spectrogram overlay"
+      >
+        <Button
+          variant={vizMode === "waveform" ? "secondary" : "ghost"}
+          size="sm"
+          className={cn("h-6 px-2 gap-1 text-xs", vizMode === "waveform" && "shadow-sm")}
+          onClick={() => onVizModeChange("waveform")}
+          title="Waveform overlay"
+        >
+          <Activity className="h-3 w-3" />
+          Wave
+        </Button>
+        <Button
+          variant={vizMode === "spectrogram" ? "secondary" : "ghost"}
+          size="sm"
+          className={cn("h-6 px-2 gap-1 text-xs", vizMode === "spectrogram" && "shadow-sm")}
+          onClick={() => onVizModeChange("spectrogram")}
+          title="Mel spectrogram overlay"
+          disabled={spectrogramLoading}
+        >
+          <BarChart2 className="h-3 w-3" />
+          {spectrogramLoading ? "…" : "Spec"}
+        </Button>
+      </div>
+
+      <div className="w-px h-5 bg-border mx-1" />
 
       {/* Status */}
       <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">

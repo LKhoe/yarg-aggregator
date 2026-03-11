@@ -4,7 +4,9 @@ import type {
   Difficulty,
   Instrument,
   Note,
+  NoteFlags,
   Phrase,
+  Section,
   Track,
   TrackKey,
 } from "./types";
@@ -97,19 +99,51 @@ function parseSyncTrack(content: string): ChartData["syncTrack"] {
     bpmEvents.push({ tick: 0, bpm: 120 });
   }
 
+  // Ensure there's at least a default time signature
+  if (timeSignatures.length === 0) {
+    timeSignatures.push({ tick: 0, numerator: 4, denominator: 4 });
+  }
+
   return { bpmEvents, timeSignatures };
 }
 
-function parseEvents(content: string): { tick: number; text: string }[] {
+function parseEvents(content: string): {
+  events: { tick: number; text: string }[];
+  sections: Section[];
+} {
   const events: { tick: number; text: string }[] = [];
+  const sections: Section[] = [];
   const lines = content.split("\n");
   for (const line of lines) {
     const match = line.trim().match(/^(\d+)\s*=\s*E\s+"([^"]*)"$/);
     if (match) {
-      events.push({ tick: parseInt(match[1], 10), text: match[2] });
+      const tick = parseInt(match[1], 10);
+      const text = match[2];
+      // Check if this is a section event
+      const sectionMatch = text.match(/^section\s+(.+)$/i);
+      const soloMatch = text.match(/^solo$/i);
+      const soloEndMatch = text.match(/^soloend$/i);
+      if (sectionMatch) {
+        sections.push({
+          id: uuidv4(),
+          tick,
+          name: sectionMatch[1].trim(),
+          type: "section",
+        });
+      } else if (soloMatch) {
+        sections.push({
+          id: uuidv4(),
+          tick,
+          name: "Solo",
+          type: "solo",
+        });
+      } else if (!soloEndMatch) {
+        // Keep non-section, non-solo events
+        events.push({ tick, text });
+      }
     }
   }
-  return events;
+  return { events, sections };
 }
 
 const PHRASE_TYPE_MAP: Record<number, Phrase["type"]> = {
@@ -117,6 +151,13 @@ const PHRASE_TYPE_MAP: Record<number, Phrase["type"]> = {
   64: "bre",
   65: "tremolo",
   66: "trill",
+};
+
+// Modifier fret values that become flags on notes at the same tick
+const FLAG_FRETS: Record<number, keyof NoteFlags> = {
+  5: "forceHopo",
+  6: "forceStrum",
+  32: "tap",
 };
 
 function parseTrackSection(
@@ -127,18 +168,30 @@ function parseTrackSection(
   const notes: Note[] = [];
   const phrases: Phrase[] = [];
 
+  // First pass: collect raw note data and modifier flags
+  const rawNotes: { tick: number; fret: number; length: number }[] = [];
+  const tickFlags: Map<number, NoteFlags> = new Map();
+
   const lines = content.split("\n");
   for (const line of lines) {
     const trimmed = line.trim();
     // Note: "tick = N fret length"
     const noteMatch = trimmed.match(/^(\d+)\s*=\s*N\s+(\d+)\s+(\d+)$/);
     if (noteMatch) {
-      notes.push({
-        id: uuidv4(),
-        tick: parseInt(noteMatch[1], 10),
-        fret: parseInt(noteMatch[2], 10),
-        length: parseInt(noteMatch[3], 10),
-      });
+      const tick = parseInt(noteMatch[1], 10);
+      const fret = parseInt(noteMatch[2], 10);
+      const length = parseInt(noteMatch[3], 10);
+
+      // Check if this is a modifier fret
+      const flagKey = FLAG_FRETS[fret];
+      if (flagKey !== undefined) {
+        // This is a modifier — apply to the flags map for this tick
+        const existing = tickFlags.get(tick) ?? {};
+        existing[flagKey] = true;
+        tickFlags.set(tick, existing);
+      } else {
+        rawNotes.push({ tick, fret, length });
+      }
       continue;
     }
     // Special phrase: "tick = S type length"
@@ -155,6 +208,21 @@ function parseTrackSection(
         });
       }
     }
+  }
+
+  // Second pass: create Note objects, applying flags from the same tick
+  for (const raw of rawNotes) {
+    const flags = tickFlags.get(raw.tick);
+    const note: Note = {
+      id: uuidv4(),
+      tick: raw.tick,
+      fret: raw.fret,
+      length: raw.length,
+    };
+    if (flags && Object.keys(flags).length > 0) {
+      note.flags = flags;
+    }
+    notes.push(note);
   }
 
   notes.sort((a, b) => a.tick - b.tick);
@@ -194,7 +262,7 @@ function extractSections(text: string): Record<string, string> {
 }
 
 export function parseChart(text: string): ChartData {
-  const sections = extractSections(text);
+  const rawSections = extractSections(text);
 
   const chart: ChartData = {
     metadata: {
@@ -209,16 +277,19 @@ export function parseChart(text: string): ChartData {
     },
     syncTrack: { bpmEvents: [], timeSignatures: [] },
     events: [],
+    sections: [],
     tracks: {},
   };
 
-  for (const [sectionName, content] of Object.entries(sections)) {
+  for (const [sectionName, content] of Object.entries(rawSections)) {
     if (sectionName === "Song") {
       chart.metadata = parseSongSection(content);
     } else if (sectionName === "SyncTrack") {
       chart.syncTrack = parseSyncTrack(content);
     } else if (sectionName === "Events") {
-      chart.events = parseEvents(content);
+      const parsed = parseEvents(content);
+      chart.events = parsed.events;
+      chart.sections = parsed.sections;
     } else if (SECTION_NAME_MAP[sectionName]) {
       const { difficulty, instrument } = SECTION_NAME_MAP[sectionName];
       const key: TrackKey = makeTrackKey(difficulty, instrument);
@@ -229,6 +300,11 @@ export function parseChart(text: string): ChartData {
   // Ensure at least one BPM event
   if (chart.syncTrack.bpmEvents.length === 0) {
     chart.syncTrack.bpmEvents.push({ tick: 0, bpm: 120 });
+  }
+
+  // Ensure at least one time signature
+  if (chart.syncTrack.timeSignatures.length === 0) {
+    chart.syncTrack.timeSignatures.push({ tick: 0, numerator: 4, denominator: 4 });
   }
 
   return chart;

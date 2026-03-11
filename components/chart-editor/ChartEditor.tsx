@@ -9,7 +9,7 @@ import {
   useMemo,
 } from "react";
 import { v4 as uuidv4 } from "uuid";
-import type { ChartData, Instrument, Note, TrackKey } from "@/lib/chart/types";
+import type { ChartData, Instrument, Note, Phrase, Section, TrackKey } from "@/lib/chart/types";
 import {
   makeTrackKey,
   parseTrackKey,
@@ -19,11 +19,14 @@ import {
 import { parseChart } from "@/lib/chart/parser-chart";
 import { parseMidi } from "@/lib/chart/parser-midi";
 import { computeWaveform, type WaveformData } from "@/lib/chart/waveform";
+import { computeSpectrogram, type SpectrogramData } from "@/lib/chart/spectrogram";
 import {
   buildTempoMap,
   getBpmAtTick,
+  getChartDurationTicks,
   snapDivisionToTicks,
   snapToGrid,
+  tickToSeconds,
 } from "@/lib/chart/tempo-utils";
 import { FileUpload } from "./FileUpload";
 import { Toolbar } from "./Toolbar";
@@ -31,6 +34,8 @@ import { TrackSelector } from "./TrackSelector";
 import { TrackLane } from "./TrackLane";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { ExportDialog } from "./ExportDialog";
+import { ChartRuler } from "./ChartRuler";
+import { TimelineBar } from "./TimelineBar";
 import { Button } from "@/components/ui/button";
 import { Download, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -77,7 +82,24 @@ type EditAction =
     }
   | { type: "RESIZE_NOTE"; track: TrackKey; id: string; newLength: number }
   | { type: "UPDATE_NOTE"; track: TrackKey; note: Note }
-  | { type: "SET_CHART"; chart: ChartData };
+  | { type: "SET_CHART"; chart: ChartData }
+  // BPM / Tempo map
+  | { type: "ADD_BPM"; tick: number; bpm: number }
+  | { type: "DELETE_BPM"; tick: number }
+  | { type: "ADD_TIME_SIGNATURE"; tick: number; numerator: number; denominator: number }
+  | { type: "DELETE_TIME_SIGNATURE"; tick: number }
+  // Phrases
+  | { type: "ADD_PHRASE"; track: TrackKey; phrase: Phrase }
+  | { type: "DELETE_PHRASE"; track: TrackKey; id: string }
+  | { type: "RESIZE_PHRASE"; track: TrackKey; id: string; newLength: number }
+  // Note flags
+  | { type: "TOGGLE_NOTE_FLAG"; track: TrackKey; ids: string[]; flag: "forceHopo" | "forceStrum" | "tap" }
+  // Sections
+  | { type: "ADD_SECTION"; section: Section }
+  | { type: "RENAME_SECTION"; id: string; name: string }
+  | { type: "DELETE_SECTION"; id: string }
+  // Copy/paste
+  | { type: "PASTE_NOTES"; track: TrackKey; notes: Note[] };
 
 function applyAction(chart: ChartData, action: EditAction): ChartData {
   switch (action.type) {
@@ -141,7 +163,7 @@ function applyAction(chart: ChartData, action: EditAction): ChartData {
           [action.track]: {
             ...track,
             notes: track.notes.map((n) =>
-              n.id === action.id ? { ...n, length: action.newLength } : n
+              n.id === action.id ? { ...n, length: Math.max(0, action.newLength) } : n
             ),
           },
         },
@@ -162,6 +184,119 @@ function applyAction(chart: ChartData, action: EditAction): ChartData {
               .sort((a, b) => a.tick - b.tick),
           },
         },
+      };
+    }
+
+    case "ADD_BPM": {
+      const events = chart.syncTrack.bpmEvents.filter((e) => e.tick !== action.tick);
+      events.push({ tick: action.tick, bpm: action.bpm });
+      events.sort((a, b) => a.tick - b.tick);
+      return { ...chart, syncTrack: { ...chart.syncTrack, bpmEvents: events } };
+    }
+
+    case "DELETE_BPM": {
+      const events = chart.syncTrack.bpmEvents.filter((e) => e.tick !== action.tick);
+      // Always keep at least one BPM event at tick 0
+      if (events.length === 0) events.push({ tick: 0, bpm: 120 });
+      return { ...chart, syncTrack: { ...chart.syncTrack, bpmEvents: events } };
+    }
+
+    case "ADD_TIME_SIGNATURE": {
+      const sigs = chart.syncTrack.timeSignatures.filter((e) => e.tick !== action.tick);
+      sigs.push({ tick: action.tick, numerator: action.numerator, denominator: action.denominator });
+      sigs.sort((a, b) => a.tick - b.tick);
+      return { ...chart, syncTrack: { ...chart.syncTrack, timeSignatures: sigs } };
+    }
+
+    case "DELETE_TIME_SIGNATURE": {
+      const sigs = chart.syncTrack.timeSignatures.filter((e) => e.tick !== action.tick);
+      return { ...chart, syncTrack: { ...chart.syncTrack, timeSignatures: sigs } };
+    }
+
+    case "ADD_PHRASE": {
+      const track = chart.tracks[action.track];
+      if (!track) return chart;
+      const phrases = [...track.phrases, action.phrase].sort((a, b) => a.tick - b.tick);
+      return {
+        ...chart,
+        tracks: { ...chart.tracks, [action.track]: { ...track, phrases } },
+      };
+    }
+
+    case "DELETE_PHRASE": {
+      const track = chart.tracks[action.track];
+      if (!track) return chart;
+      return {
+        ...chart,
+        tracks: {
+          ...chart.tracks,
+          [action.track]: {
+            ...track,
+            phrases: track.phrases.filter((p) => p.id !== action.id),
+          },
+        },
+      };
+    }
+
+    case "RESIZE_PHRASE": {
+      const track = chart.tracks[action.track];
+      if (!track) return chart;
+      return {
+        ...chart,
+        tracks: {
+          ...chart.tracks,
+          [action.track]: {
+            ...track,
+            phrases: track.phrases.map((p) =>
+              p.id === action.id ? { ...p, length: Math.max(0, action.newLength) } : p
+            ),
+          },
+        },
+      };
+    }
+
+    case "TOGGLE_NOTE_FLAG": {
+      const track = chart.tracks[action.track];
+      if (!track) return chart;
+      const idSet = new Set(action.ids);
+      const notes = track.notes.map((n) => {
+        if (!idSet.has(n.id)) return n;
+        const flags = { ...(n.flags ?? {}) };
+        flags[action.flag] = !flags[action.flag];
+        // Clean up false values
+        if (!flags[action.flag]) delete flags[action.flag];
+        return { ...n, flags: Object.keys(flags).length > 0 ? flags : undefined };
+      });
+      return {
+        ...chart,
+        tracks: { ...chart.tracks, [action.track]: { ...track, notes } },
+      };
+    }
+
+    case "ADD_SECTION": {
+      const sections = [...(chart.sections ?? []), action.section].sort((a, b) => a.tick - b.tick);
+      return { ...chart, sections };
+    }
+
+    case "RENAME_SECTION": {
+      const sections = (chart.sections ?? []).map((s) =>
+        s.id === action.id ? { ...s, name: action.name } : s
+      );
+      return { ...chart, sections };
+    }
+
+    case "DELETE_SECTION": {
+      const sections = (chart.sections ?? []).filter((s) => s.id !== action.id);
+      return { ...chart, sections };
+    }
+
+    case "PASTE_NOTES": {
+      const track = chart.tracks[action.track];
+      if (!track) return chart;
+      const notes = [...track.notes, ...action.notes].sort((a, b) => a.tick - b.tick);
+      return {
+        ...chart,
+        tracks: { ...chart.tracks, [action.track]: { ...track, notes } },
       };
     }
 
@@ -199,6 +334,7 @@ const INITIAL_CHART: ChartData = {
     timeSignatures: [{ tick: 0, numerator: 4, denominator: 4 }],
   },
   events: [],
+  sections: [],
   tracks: {},
 };
 
@@ -261,6 +397,20 @@ export function ChartEditor() {
   const [exportOpen, setExportOpen] = useState(false);
   const [chartFileName, setChartFileName] = useState<string>();
 
+  // Edit mode state
+  const [editMode, setEditMode] = useState<"note" | "phrase">("note");
+  const [phraseType, setPhraseType] = useState<Phrase["type"]>("starPower");
+
+  // Clipboard for copy/paste
+  const clipboardRef = useRef<Note[]>([]);
+
+  // Visualization mode (waveform vs mel spectrogram)
+  const [vizMode, setVizMode] = useState<"waveform" | "spectrogram">("waveform");
+  const [spectrograms, setSpectrograms] = useState<Map<string, SpectrogramData>>(new Map());
+  const [spectrogramLoading, setSpectrogramLoading] = useState(false);
+  const spectrogramsRef = useRef(spectrograms);
+  spectrogramsRef.current = spectrograms;
+
   // Multi-stem audio state
   const [stems, setStems] = useState<Map<string, AudioStem>>(new Map());
   const [mutedStems, setMutedStems] = useState<Set<string>>(new Set());
@@ -274,6 +424,12 @@ export function ChartEditor() {
   mutedStemsRef.current = mutedStems;
   const playbackSpeedRef = useRef(playbackSpeed);
   playbackSpeedRef.current = playbackSpeed;
+  const selectedNoteIdsRef = useRef(selectedNoteIds);
+  selectedNoteIdsRef.current = selectedNoteIds;
+  const selectedTrackRef = useRef(selectedTrack);
+  selectedTrackRef.current = selectedTrack;
+  const currentTickRef = useRef(currentTick);
+  currentTickRef.current = currentTick;
 
   // Audio engine refs
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -303,9 +459,51 @@ export function ChartEditor() {
       const stem = stems.get(label);
       if (stem) return stem.waveform;
     }
-    // Fallback: any available stem
     return stems.values().next().value?.waveform;
   }, [selectedTrack, stems]);
+
+  // Active spectrogram = same stem priority as waveform
+  const activeSpectrogram = useMemo<SpectrogramData | undefined>(() => {
+    if (spectrograms.size === 0) return undefined;
+    if (!selectedTrack) {
+      const firstLabel = stems.keys().next().value;
+      return firstLabel ? spectrograms.get(firstLabel) : undefined;
+    }
+    const parsed = parseTrackKey(selectedTrack);
+    if (!parsed) {
+      const firstLabel = stems.keys().next().value;
+      return firstLabel ? spectrograms.get(firstLabel) : undefined;
+    }
+    const priorities = INSTRUMENT_STEMS[parsed.instrument];
+    for (const label of priorities) {
+      const spec = spectrograms.get(label);
+      if (spec) return spec;
+    }
+    const firstLabel = stems.keys().next().value;
+    return firstLabel ? spectrograms.get(firstLabel) : undefined;
+  }, [selectedTrack, stems, spectrograms]);
+
+  // Lazily compute spectrograms when switching to spectrogram mode
+  const handleVizModeChange = useCallback((mode: "waveform" | "spectrogram") => {
+    setVizMode(mode);
+    if (mode !== "spectrogram") return;
+    // Check if any stems need computing
+    const missing = [...stemsRef.current.keys()].filter(
+      (label) => !spectrogramsRef.current.has(label)
+    );
+    if (missing.length === 0) return;
+    setSpectrogramLoading(true);
+    // Defer so the loading state renders before the blocking compute
+    setTimeout(() => {
+      const next = new Map(spectrogramsRef.current);
+      for (const label of missing) {
+        const stem = stemsRef.current.get(label);
+        if (stem) next.set(label, computeSpectrogram(stem.buffer, chartRef.current));
+      }
+      setSpectrograms(next);
+      setSpectrogramLoading(false);
+    }, 50);
+  }, []);
 
   // Auto-select first track when chart loads
   useEffect(() => {
@@ -368,7 +566,6 @@ export function ChartEditor() {
     setIsPlaying(false);
     setSelectedNoteIds(new Set());
 
-    // Recompute waveforms against new chart tempo map
     if (stemsRef.current.size > 0) {
       const newStems = new Map<string, AudioStem>();
       for (const [label, stem] of stemsRef.current) {
@@ -377,7 +574,10 @@ export function ChartEditor() {
           waveform: computeWaveform(stem.buffer, parsed),
         });
       }
-      setTimeout(() => setStems(newStems), 0);
+      setTimeout(() => {
+        setStems(newStems);
+        setSpectrograms(new Map()); // clear spectrograms — tempo map changed
+      }, 0);
     }
   }, []);
 
@@ -395,10 +595,17 @@ export function ChartEditor() {
         next.set(label, { label, buffer: decoded, waveform });
         return next;
       });
+      // Invalidate cached spectrogram for this stem so it gets recomputed
+      setSpectrograms((prev) => {
+        if (!prev.has(label)) return prev;
+        const next = new Map(prev);
+        next.delete(label);
+        return next;
+      });
     }
   }, []);
 
-  // Mute toggle — also updates gain node immediately if playing
+  // Mute toggle
   const toggleMute = useCallback((label: string) => {
     setMutedStems((prev) => {
       const next = new Set(prev);
@@ -466,18 +673,55 @@ export function ChartEditor() {
     setCurrentTick(0);
   }, []);
 
-  // Live speed change: update source playbackRate + reset time refs
+  // Seek to a tick — restarts audio at the new position if currently playing
+  const handleSeek = useCallback((tick: number) => {
+    const playing = isPlaying;
+    // Stop existing sources
+    for (const src of sourceNodesRef.current.values()) {
+      try { src.stop(); } catch { /* already stopped */ }
+    }
+    sourceNodesRef.current.clear();
+    gainNodesRef.current.clear();
+
+    setCurrentTick(tick);
+
+    if (!playing) return;
+
+    // Restart audio from new position
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+
+    const currentChart = chartRef.current;
+    const resolution   = currentChart.metadata.resolution || 192;
+    const bpm          = currentChart.syncTrack.bpmEvents[0]?.bpm ?? 120;
+    const startOffset  = (tick / resolution / bpm) * 60;
+    const speed        = playbackSpeedRef.current;
+
+    for (const [label, stem] of stemsRef.current) {
+      const source = ctx.createBufferSource();
+      source.buffer = stem.buffer;
+      source.playbackRate.value = speed;
+      const gain = ctx.createGain();
+      gain.gain.value = mutedStemsRef.current.has(label) ? 0 : 1;
+      source.connect(gain);
+      gain.connect(ctx.destination);
+      source.start(0, Math.max(0, startOffset + currentChart.metadata.offset));
+      sourceNodesRef.current.set(label, source);
+      gainNodesRef.current.set(label, gain);
+    }
+
+    playbackStartTimeRef.current = ctx.currentTime;
+    playbackStartTickRef.current = tick;
+  }, [isPlaying]);
+
+  // Live speed change
   useEffect(() => {
     if (!isPlaying) return;
     const ctx = audioCtxRef.current;
     if (!ctx) return;
-
-    // Update playback rate on all source nodes
     for (const src of sourceNodesRef.current.values()) {
       src.playbackRate.value = playbackSpeed;
     }
-
-    // Reset reference points so tick tracking stays in sync
     playbackStartTickRef.current = currentTick;
     playbackStartTimeRef.current = ctx.currentTime;
   }, [playbackSpeed]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -497,18 +741,21 @@ export function ChartEditor() {
         return;
       }
 
+      const track = selectedTrackRef.current;
+      const noteIds = selectedNoteIdsRef.current;
+
       if (
         (e.key === "Delete" || e.key === "Backspace") &&
-        selectedNoteIds.size > 0 &&
-        selectedTrack
+        noteIds.size > 0 &&
+        track
       ) {
         e.preventDefault();
         dispatch({
           type: "DO",
           action: {
             type: "DELETE_NOTES",
-            track: selectedTrack,
-            ids: [...selectedNoteIds],
+            track,
+            ids: [...noteIds],
           },
         });
         setSelectedNoteIds(new Set());
@@ -526,23 +773,137 @@ export function ChartEditor() {
           dispatch({ type: "REDO" });
           return;
         }
+        if (e.key === "c") {
+          // Copy
+          if (noteIds.size > 0 && track) {
+            e.preventDefault();
+            const currentTrack = chartRef.current.tracks[track];
+            if (currentTrack) {
+              clipboardRef.current = currentTrack.notes.filter((n) => noteIds.has(n.id));
+            }
+          }
+          return;
+        }
+        if (e.key === "v") {
+          // Paste at current tick
+          if (clipboardRef.current.length > 0 && track) {
+            e.preventDefault();
+            const clipboard = clipboardRef.current;
+            const minTick = Math.min(...clipboard.map((n) => n.tick));
+            const pastedTick = currentTickRef.current;
+            const offset = pastedTick - minTick;
+            const newNotes: Note[] = clipboard.map((n) => ({
+              ...n,
+              id: uuidv4(),
+              tick: Math.max(0, n.tick + offset),
+            }));
+            dispatch({
+              type: "DO",
+              action: { type: "PASTE_NOTES", track, notes: newNotes },
+            });
+            setSelectedNoteIds(new Set(newNotes.map((n) => n.id)));
+          }
+          return;
+        }
+        if (e.key === "d") {
+          // Duplicate: copy + paste offset by selection length
+          if (noteIds.size > 0 && track) {
+            e.preventDefault();
+            const currentTrack = chartRef.current.tracks[track];
+            if (currentTrack) {
+              const selected = currentTrack.notes.filter((n) => noteIds.has(n.id));
+              if (selected.length > 0) {
+                const minTick = Math.min(...selected.map((n) => n.tick));
+                const maxTick = Math.max(...selected.map((n) => n.tick + n.length));
+                const selectionLength = maxTick - minTick;
+                const newNotes: Note[] = selected.map((n) => ({
+                  ...n,
+                  id: uuidv4(),
+                  tick: n.tick + selectionLength,
+                }));
+                dispatch({
+                  type: "DO",
+                  action: { type: "PASTE_NOTES", track, notes: newNotes },
+                });
+                setSelectedNoteIds(new Set(newNotes.map((n) => n.id)));
+              }
+            }
+          }
+          return;
+        }
+        return;
+      }
+
+      // H key: toggle Force HOPO on selected notes
+      if (e.key === "h" || e.key === "H") {
+        if (noteIds.size > 0 && track) {
+          e.preventDefault();
+          dispatch({
+            type: "DO",
+            action: {
+              type: "TOGGLE_NOTE_FLAG",
+              track,
+              ids: [...noteIds],
+              flag: "forceHopo",
+            },
+          });
+        }
+        return;
+      }
+
+      // S key: toggle Force Strum on selected notes
+      if (e.key === "s" || e.key === "S") {
+        if (noteIds.size > 0 && track) {
+          e.preventDefault();
+          dispatch({
+            type: "DO",
+            action: {
+              type: "TOGGLE_NOTE_FLAG",
+              track,
+              ids: [...noteIds],
+              flag: "forceStrum",
+            },
+          });
+        }
+        return;
+      }
+
+      // M key: add section at current playhead
+      if (e.key === "m" || e.key === "M") {
+        e.preventDefault();
+        const name = window.prompt("Section name:");
+        if (name && name.trim()) {
+          dispatch({
+            type: "DO",
+            action: {
+              type: "ADD_SECTION",
+              section: {
+                id: uuidv4(),
+                tick: Math.round(currentTickRef.current),
+                name: name.trim(),
+                type: "section",
+              },
+            },
+          });
+        }
+        return;
       }
 
       if (
         (e.key === "ArrowUp" || e.key === "ArrowDown") &&
-        selectedNoteIds.size > 0 &&
-        selectedTrack
+        noteIds.size > 0 &&
+        track
       ) {
         e.preventDefault();
-        const resolution = chart.metadata.resolution || 192;
+        const resolution = chartRef.current.metadata.resolution || 192;
         const gridTicks = snapDivisionToTicks(resolution, snapDivision);
         const deltaTick = e.key === "ArrowUp" ? gridTicks : -gridTicks;
         dispatch({
           type: "DO",
           action: {
             type: "MOVE_NOTES",
-            track: selectedTrack,
-            ids: [...selectedNoteIds],
+            track,
+            ids: [...noteIds],
             deltaTick,
             deltaFret: 0,
           },
@@ -552,8 +913,8 @@ export function ChartEditor() {
 
       if (
         (e.key === "ArrowLeft" || e.key === "ArrowRight") &&
-        selectedNoteIds.size > 0 &&
-        selectedTrack
+        noteIds.size > 0 &&
+        track
       ) {
         e.preventDefault();
         const deltaFret = e.key === "ArrowRight" ? 1 : -1;
@@ -561,8 +922,8 @@ export function ChartEditor() {
           type: "DO",
           action: {
             type: "MOVE_NOTES",
-            track: selectedTrack,
-            ids: [...selectedNoteIds],
+            track,
+            ids: [...noteIds],
             deltaTick: 0,
             deltaFret,
           },
@@ -573,16 +934,14 @@ export function ChartEditor() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [
-    selectedNoteIds,
-    selectedTrack,
     handlePlayPause,
-    chart.metadata.resolution,
     snapDivision,
   ]);
 
-  const hasChart = Object.keys(chart.tracks).length > 0;
-  const tempoMap = buildTempoMap(chart);
-  const bpm = getBpmAtTick(currentTick, tempoMap);
+  const hasChart  = Object.keys(chart.tracks).length > 0;
+  const tempoMap  = buildTempoMap(chart);
+  const bpm       = getBpmAtTick(currentTick, tempoMap);
+  const totalTicks = getChartDurationTicks(chart);
 
   // Which stem label is "active" for the current instrument (for UI highlight)
   const activeStemLabel = useMemo<string | null>(() => {
@@ -656,6 +1015,13 @@ export function ChartEditor() {
             onRedo={() => dispatch({ type: "REDO" })}
             currentTick={currentTick}
             bpm={bpm}
+            editMode={editMode}
+            onEditModeChange={setEditMode}
+            phraseType={phraseType}
+            onPhraseTypeChange={(t) => setPhraseType(t as Phrase["type"])}
+            vizMode={vizMode}
+            onVizModeChange={handleVizModeChange}
+            spectrogramLoading={spectrogramLoading}
           />
 
           <TrackSelector
@@ -665,6 +1031,48 @@ export function ChartEditor() {
               setSelectedTrack(key);
               setSelectedNoteIds(new Set());
             }}
+          />
+
+          {/* Chart Ruler */}
+          <ChartRuler
+            bpmEvents={chart.syncTrack.bpmEvents}
+            timeSignatures={chart.syncTrack.timeSignatures}
+            sections={chart.sections ?? []}
+            currentTick={currentTick}
+            zoom={zoom}
+            resolution={chart.metadata.resolution || 192}
+            renderDistance={renderDistance}
+            onAddBpm={(tick, bpm) =>
+              dispatch({ type: "DO", action: { type: "ADD_BPM", tick, bpm } })
+            }
+            onDeleteBpm={(tick) =>
+              dispatch({ type: "DO", action: { type: "DELETE_BPM", tick } })
+            }
+            onAddTimeSignature={(tick, numerator, denominator) =>
+              dispatch({
+                type: "DO",
+                action: { type: "ADD_TIME_SIGNATURE", tick, numerator, denominator },
+              })
+            }
+            onDeleteTimeSignature={(tick) =>
+              dispatch({
+                type: "DO",
+                action: { type: "DELETE_TIME_SIGNATURE", tick },
+              })
+            }
+            onAddSection={(id, tick, name) =>
+              dispatch({
+                type: "DO",
+                action: {
+                  type: "ADD_SECTION",
+                  section: { id, tick, name, type: "section" },
+                },
+              })
+            }
+            onDeleteSection={(id) =>
+              dispatch({ type: "DO", action: { type: "DELETE_SECTION", id } })
+            }
+            onSeek={(tick) => setCurrentTick(tick)}
           />
 
           <div className="flex flex-1 overflow-hidden">
@@ -721,7 +1129,52 @@ export function ChartEditor() {
                       },
                     });
                   }}
+                  onResizeNote={(id, newLength) => {
+                    if (!selectedTrack) return;
+                    dispatch({
+                      type: "DO",
+                      action: {
+                        type: "RESIZE_NOTE",
+                        track: selectedTrack,
+                        id,
+                        newLength,
+                      },
+                    });
+                  }}
+                  onAddPhrase={(tick, length) => {
+                    if (!selectedTrack) return;
+                    dispatch({
+                      type: "DO",
+                      action: {
+                        type: "ADD_PHRASE",
+                        track: selectedTrack,
+                        phrase: {
+                          id: uuidv4(),
+                          tick,
+                          length,
+                          type: phraseType,
+                        },
+                      },
+                    });
+                  }}
+                  onDeletePhrase={(id) => {
+                    if (!selectedTrack) return;
+                    dispatch({
+                      type: "DO",
+                      action: {
+                        type: "DELETE_PHRASE",
+                        track: selectedTrack,
+                        id,
+                      },
+                    });
+                  }}
+                  onSeekToTick={(tick) => setCurrentTick(tick)}
+                  editMode={editMode}
+                  phraseType={phraseType}
+                  sections={chart.sections ?? []}
                   waveform={activeWaveform}
+                  vizMode={vizMode}
+                  spectrogram={activeSpectrogram}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
@@ -758,6 +1211,29 @@ export function ChartEditor() {
                 });
                 setSelectedNoteIds(new Set());
               }}
+              onToggleFlag={(id, flag) => {
+                if (!selectedTrack) return;
+                dispatch({
+                  type: "DO",
+                  action: {
+                    type: "TOGGLE_NOTE_FLAG",
+                    track: selectedTrack,
+                    ids: [id],
+                    flag,
+                  },
+                });
+              }}
+            />
+          </div>
+
+          {/* Timeline scrubber */}
+          <div className="border-t bg-background px-3">
+            <TimelineBar
+              currentTick={currentTick}
+              totalTicks={totalTicks}
+              sections={chart.sections ?? []}
+              tempoMap={tempoMap}
+              onSeek={handleSeek}
             />
           </div>
 
@@ -789,7 +1265,6 @@ export function ChartEditor() {
                 onChange={(e) => {
                   const files = Array.from(e.target.files ?? []);
                   if (files.length) handleAudioFiles(files);
-                  // reset so same files can be re-added
                   e.target.value = "";
                 }}
               />

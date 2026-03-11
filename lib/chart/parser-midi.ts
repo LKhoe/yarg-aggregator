@@ -115,6 +115,7 @@ export function parseMidi(buffer: ArrayBuffer): ChartData {
     },
     syncTrack: { bpmEvents, timeSignatures },
     events: [],
+    sections: [],
     tracks: {},
   };
 
