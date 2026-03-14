@@ -98,10 +98,10 @@ function serializeSyncTrack(chart: ChartData): string {
 function serializeEvents(chart: ChartData): string {
   const lines = ["[Events]", "{"];
 
-  // Combine regular events and sections, sorted by tick
   type RawEvent =
     | { tick: number; kind: "event"; text: string }
-    | { tick: number; kind: "section"; name: string };
+    | { tick: number; kind: "section"; name: string }
+    | { tick: number; kind: "lyric"; text: string };
 
   const allEvents: RawEvent[] = [
     ...chart.events.map((e) => ({ tick: e.tick, kind: "event" as const, text: e.text })),
@@ -110,14 +110,19 @@ function serializeEvents(chart: ChartData): string {
       kind: "section" as const,
       name: s.name,
     })),
+    ...(chart.lyrics ?? [])
+      .filter((l) => l.tick !== null)
+      .map((l) => ({ tick: l.tick as number, kind: "lyric" as const, text: l.text })),
   ];
   allEvents.sort((a, b) => a.tick - b.tick);
 
   for (const ev of allEvents) {
     if (ev.kind === "event") {
       lines.push(indent(`${ev.tick} = E "${ev.text}"`));
-    } else {
+    } else if (ev.kind === "section") {
       lines.push(indent(`${ev.tick} = E "section ${ev.name}"`));
+    } else {
+      lines.push(indent(`${ev.tick} = E "lyric ${ev.text}"`));
     }
   }
 
@@ -135,6 +140,7 @@ function serializeTrack(sectionName: string, track: Track): string {
     | { tick: number; kind: "phrase"; phraseType: number; length: number };
 
   const entries: RawEntry[] = [];
+  const isVocals = track.instrument === "Vocals";
 
   for (const n of track.notes) {
     entries.push({
@@ -143,15 +149,17 @@ function serializeTrack(sectionName: string, track: Track): string {
       fret: n.fret,
       length: n.length,
     });
-    // Emit modifier note entries for flags
-    if (n.flags?.forceHopo) {
-      entries.push({ tick: n.tick, kind: "flag", fret: 5 });
-    }
-    if (n.flags?.forceStrum) {
-      entries.push({ tick: n.tick, kind: "flag", fret: 6 });
-    }
-    if (n.flags?.tap) {
-      entries.push({ tick: n.tick, kind: "flag", fret: 32 });
+    // Emit modifier note entries for flags (not for Vocals — frets 5/6/32 are valid pitches)
+    if (!isVocals) {
+      if (n.flags?.forceHopo) {
+        entries.push({ tick: n.tick, kind: "flag", fret: 5 });
+      }
+      if (n.flags?.forceStrum) {
+        entries.push({ tick: n.tick, kind: "flag", fret: 6 });
+      }
+      if (n.flags?.tap) {
+        entries.push({ tick: n.tick, kind: "flag", fret: 32 });
+      }
     }
   }
 

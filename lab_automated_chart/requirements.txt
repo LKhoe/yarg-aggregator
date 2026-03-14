@@ -1,0 +1,21 @@
+# Core ML / audio
+torch
+torchaudio
+demucs
+
+# Beat & pitch detection
+librosa
+basic-pitch
+
+# Vocal pitch
+torchcrepe
+
+# MIDI manipulation
+pretty_midi
+
+# Audio I/O
+soundfile
+
+# Compat (pkg_resources needed by madmom / resampy)
+setuptools<72
+cython

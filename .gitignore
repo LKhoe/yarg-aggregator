@@ -44,3 +44,8 @@ next-env.d.ts
 /.agent
 /.agents
 /.windsurf
+
+# automated chart lab
+/lab_automated_chart/.venv
+/lab_automated_chart/output
+/lab_automated_chart/input

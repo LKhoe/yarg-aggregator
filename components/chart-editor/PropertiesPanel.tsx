@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { memo, useState, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -19,29 +19,33 @@ export interface PropertiesPanelProps {
   ) => void;
   onDeleteNotes: (ids: string[]) => void;
   onToggleFlag?: (id: string, flag: "forceHopo" | "forceStrum" | "tap") => void;
+  isVocals?: boolean;
 }
 
-export function PropertiesPanel({
+export const PropertiesPanel = memo(function PropertiesPanel({
   chart,
   trackKey,
   selectedNoteIds,
   onUpdateNote,
   onDeleteNotes,
   onToggleFlag,
+  isVocals = false,
 }: PropertiesPanelProps) {
   const isDrums = trackKey?.includes("Drums") ?? false;
 
-  const selectedNotes: Note[] = [];
-  if (trackKey) {
+  const selectedNotes = useMemo<Note[]>(() => {
+    if (!trackKey || selectedNoteIds.size === 0) return [];
     const track = chart.tracks[trackKey];
-    if (track) {
-      for (const note of track.notes) {
-        if (selectedNoteIds.has(note.id)) {
-          selectedNotes.push(note);
-        }
+    if (!track) return [];
+    const result: Note[] = [];
+    for (const note of track.notes) {
+      if (selectedNoteIds.has(note.id)) {
+        result.push(note);
+        if (result.length === selectedNoteIds.size) break;
       }
     }
-  }
+    return result;
+  }, [chart, trackKey, selectedNoteIds]);
 
   const singleNote = selectedNotes.length === 1 ? selectedNotes[0] : null;
 
@@ -67,7 +71,7 @@ export function PropertiesPanel({
     : FRET_COLORS[fret] ?? "#888";
 
   return (
-    <div className="p-4 border-l bg-muted/10 min-w-[200px] max-w-[240px] flex flex-col gap-4">
+    <div className="p-4 bg-muted/10 min-w-[200px] max-w-[240px] flex flex-col gap-4">
       <div>
         <h3 className="text-sm font-semibold mb-1">Properties</h3>
         {selectedNotes.length === 0 && (
@@ -82,14 +86,16 @@ export function PropertiesPanel({
 
       {singleNote && (
         <div className="space-y-3">
-          {/* Fret color indicator */}
+          {/* Fret/Pitch color indicator */}
           <div className="flex items-center gap-2">
-            <div
-              className="w-4 h-4 rounded-sm"
-              style={{ backgroundColor: fretColor }}
-            />
+            {!isVocals && (
+              <div
+                className="w-4 h-4 rounded-sm"
+                style={{ backgroundColor: fretColor }}
+              />
+            )}
             <span className="text-xs text-muted-foreground">
-              {isDrums ? getDrumLabel(fret) : `Fret ${fret}`}
+              {isVocals ? midiToName(fret) : isDrums ? getDrumLabel(fret) : `Fret ${fret}`}
             </span>
           </div>
 
@@ -105,14 +111,14 @@ export function PropertiesPanel({
               />
             </div>
             <div>
-              <Label className="text-xs">Fret</Label>
+              <Label className="text-xs">{isVocals ? "Pitch (MIDI)" : "Fret"}</Label>
               <Input
                 type="number"
                 value={fret}
                 onChange={(e) => setFret(Number(e.target.value))}
                 className="h-7 text-xs mt-1"
-                min={0}
-                max={4}
+                min={isVocals ? 36 : 0}
+                max={isVocals ? 97 : 4}
               />
             </div>
             <div>
@@ -128,7 +134,7 @@ export function PropertiesPanel({
           </div>
 
           {/* Note Flags */}
-          {onToggleFlag && (
+          {onToggleFlag && !isVocals && (
             <div className="space-y-1.5 pt-1">
               <Label className="text-xs text-muted-foreground">Flags</Label>
               <div className="space-y-1">
@@ -188,7 +194,7 @@ export function PropertiesPanel({
       )}
     </div>
   );
-}
+});
 
 function getDrumLabel(fret: number): string {
   const labels: Record<number, string> = {
@@ -199,4 +205,13 @@ function getDrumLabel(fret: number): string {
     4: "Green (Floor)",
   };
   return labels[fret] ?? `Pad ${fret}`;
+}
+
+function midiToName(pitch: number): string {
+  if (pitch === 96) return "Perc (playable)";
+  if (pitch === 97) return "Perc (non-play)";
+  const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const octave = Math.floor(pitch / 12) - 1;
+  const note = noteNames[pitch % 12];
+  return `${note}${octave} (${pitch})`;
 }

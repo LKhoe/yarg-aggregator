@@ -5,6 +5,9 @@ const withNextIntl = createNextIntlPlugin("./i18n.ts");
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  experimental: {
+    optimizePackageImports: ["lucide-react"],
+  },
   generateBuildId: async () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { version } = require("./package.json");

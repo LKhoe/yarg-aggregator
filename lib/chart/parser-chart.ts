@@ -3,6 +3,7 @@ import type {
   ChartData,
   Difficulty,
   Instrument,
+  LyricEvent,
   Note,
   NoteFlags,
   Phrase,
@@ -110,16 +111,23 @@ function parseSyncTrack(content: string): ChartData["syncTrack"] {
 function parseEvents(content: string): {
   events: { tick: number; text: string }[];
   sections: Section[];
+  lyrics: LyricEvent[];
 } {
   const events: { tick: number; text: string }[] = [];
   const sections: Section[] = [];
+  const lyrics: LyricEvent[] = [];
   const lines = content.split("\n");
   for (const line of lines) {
     const match = line.trim().match(/^(\d+)\s*=\s*E\s+"([^"]*)"$/);
     if (match) {
       const tick = parseInt(match[1], 10);
       const text = match[2];
-      // Check if this is a section event
+      // Check if this is a lyric event
+      const lyricMatch = text.match(/^lyric\s+(.+)$/i);
+      if (lyricMatch) {
+        lyrics.push({ id: uuidv4(), tick, text: lyricMatch[1].trim() });
+        continue;
+      }
       const sectionMatch = text.match(/^section\s+(.+)$/i);
       const soloMatch = text.match(/^solo$/i);
       const soloEndMatch = text.match(/^soloend$/i);
@@ -138,12 +146,11 @@ function parseEvents(content: string): {
           type: "solo",
         });
       } else if (!soloEndMatch) {
-        // Keep non-section, non-solo events
         events.push({ tick, text });
       }
     }
   }
-  return { events, sections };
+  return { events, sections, lyrics };
 }
 
 const PHRASE_TYPE_MAP: Record<number, Phrase["type"]> = {
@@ -182,16 +189,18 @@ function parseTrackSection(
       const fret = parseInt(noteMatch[2], 10);
       const length = parseInt(noteMatch[3], 10);
 
-      // Check if this is a modifier fret
-      const flagKey = FLAG_FRETS[fret];
-      if (flagKey !== undefined) {
-        // This is a modifier — apply to the flags map for this tick
-        const existing = tickFlags.get(tick) ?? {};
-        existing[flagKey] = true;
-        tickFlags.set(tick, existing);
-      } else {
-        rawNotes.push({ tick, fret, length });
+      // Check if this is a modifier fret (skip for Vocals — frets 5/6/32 are valid pitches)
+      if (instrument !== "Vocals") {
+        const flagKey = FLAG_FRETS[fret];
+        if (flagKey !== undefined) {
+          // This is a modifier — apply to the flags map for this tick
+          const existing = tickFlags.get(tick) ?? {};
+          existing[flagKey] = true;
+          tickFlags.set(tick, existing);
+          continue;
+        }
       }
+      rawNotes.push({ tick, fret, length });
       continue;
     }
     // Special phrase: "tick = S type length"
@@ -278,6 +287,7 @@ export function parseChart(text: string): ChartData {
     syncTrack: { bpmEvents: [], timeSignatures: [] },
     events: [],
     sections: [],
+    lyrics: [],
     tracks: {},
   };
 
@@ -290,6 +300,7 @@ export function parseChart(text: string): ChartData {
       const parsed = parseEvents(content);
       chart.events = parsed.events;
       chart.sections = parsed.sections;
+      chart.lyrics = parsed.lyrics;
     } else if (SECTION_NAME_MAP[sectionName]) {
       const { difficulty, instrument } = SECTION_NAME_MAP[sectionName];
       const key: TrackKey = makeTrackKey(difficulty, instrument);

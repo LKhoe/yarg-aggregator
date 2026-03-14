@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useState } from "react";
-import type { ChartData, Note, Phrase, Section, TrackKey } from "@/lib/chart/types";
+import React, { memo, useEffect, useRef, useCallback, useState } from "react";
+import type { ChartData, LyricEvent, Note, Phrase, Section, TrackKey } from "@/lib/chart/types";
 import {
   buildTempoMap,
   snapDivisionToTicks,
@@ -15,6 +15,7 @@ export interface TrackLaneProps {
   trackKey: TrackKey;
   currentTick: number;
   isPlaying: boolean;
+  currentTickRef?: React.MutableRefObject<number>;
   zoom: number;
   renderDistance: number;
   snapDivision: number;
@@ -24,7 +25,7 @@ export interface TrackLaneProps {
   onDeleteNotes: (ids: string[]) => void;
   onMoveNotes: (ids: string[], deltaTick: number, deltaFret: number) => void;
   waveform?: WaveformData;
-  vizMode?: "waveform" | "spectrogram";
+  vizMode?: "waveform" | "spectrogram" | "none";
   spectrogram?: SpectrogramData;
   // New phase 1 props
   editMode?: "note" | "phrase";
@@ -35,6 +36,7 @@ export interface TrackLaneProps {
   onResizePhrase?: (id: string, newLength: number) => void;
   onResizeNote?: (id: string, newLength: number) => void;
   onSeekToTick?: (tick: number) => void;
+  lyrics?: LyricEvent[];
 }
 
 // ── Perspective constants ──────────────────────────────────────────
@@ -146,9 +148,10 @@ function drawPerspectiveImage(
   const prevAlpha = ctx.globalAlpha;
   if (alpha !== 1) ctx.globalAlpha = alpha;
 
-  const rows = Math.min(Math.ceil(dy), 120);
+  const rows = Math.min(Math.ceil(dy / 2), 60);
   const ih = img.height;
   const iw = img.width;
+  const stripH = dy / rows + 0.5;
 
   for (let r = 0; r <= rows; r++) {
     const t = r / rows;
@@ -158,7 +161,7 @@ function drawPerspectiveImage(
     const w = xR - xL;
     if (w < 0.5) continue;
     const srcY = t * ih;
-    ctx.drawImage(img, 0, srcY, iw, 1, xL, y, w, 1);
+    ctx.drawImage(img, 0, Math.floor(srcY), iw, Math.ceil(ih / rows) + 1, xL, y, w, stripH);
   }
 
   if (alpha !== 1) ctx.globalAlpha = prevAlpha;
@@ -205,11 +208,24 @@ function getPhraseBorderColor(type: Phrase["type"]): string {
   }
 }
 
+/** Binary-search for the first index where notes[i].tick >= minTick. */
+function lowerBound(notes: readonly Note[], minTick: number): number {
+  let lo = 0, hi = notes.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (notes[mid].tick < minTick) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
 // ── Component ──────────────────────────────────────────────────────
-export function TrackLane({
+export const TrackLane = memo(function TrackLane({
   chart,
   trackKey,
   currentTick,
+  isPlaying,
+  currentTickRef,
   zoom,
   renderDistance,
   snapDivision,
@@ -227,6 +243,7 @@ export function TrackLane({
   onAddPhrase,
   onDeletePhrase,
   onResizeNote,
+  lyrics,
 }: TrackLaneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef    = useRef<HTMLCanvasElement>(null);
@@ -249,23 +266,28 @@ export function TrackLane({
 
   const [lassoRect, setLassoRect] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   const [phraseDraw, setPhraseDraw] = useState<{ startTick: number; endTick: number } | null>(null);
-  const [cursor, setCursor] = useState<string>("crosshair");
 
   const propsRef = useRef({
-    chart, trackKey, currentTick, zoom, renderDistance, snapDivision,
+    chart, trackKey, currentTick, isPlaying, currentTickRef,
+    zoom, renderDistance, snapDivision,
     selectedNoteIds, onSelectNotes, onAddNote, onDeleteNotes, onMoveNotes,
     waveform, vizMode, spectrogram, editMode, phraseType, sections,
-    onAddPhrase, onDeletePhrase, onResizeNote,
+    onAddPhrase, onDeletePhrase, onResizeNote, lyrics,
+    lassoRect: null as { x1: number; y1: number; x2: number; y2: number } | null,
+    phraseDraw: null as { startTick: number; endTick: number } | null,
   });
   propsRef.current = {
-    chart, trackKey, currentTick, zoom, renderDistance, snapDivision,
+    chart, trackKey, currentTick, isPlaying, currentTickRef,
+    zoom, renderDistance, snapDivision,
     selectedNoteIds, onSelectNotes, onAddNote, onDeleteNotes, onMoveNotes,
     waveform, vizMode, spectrogram, editMode, phraseType, sections,
-    onAddPhrase, onDeletePhrase, onResizeNote,
+    onAddPhrase, onDeletePhrase, onResizeNote, lyrics,
+    lassoRect,
+    phraseDraw,
   };
 
   // Trigger re-render when fret images finish loading
-  const [, setImagesReady] = useState(0);
+  const [imagesReady, setImagesReady] = useState(0);
   useEffect(() => {
     preloadFretImages(() => setImagesReady((n) => n + 1));
   }, []);
@@ -286,16 +308,25 @@ export function TrackLane({
   }, []);
 
   // ── Render ─────────────────────────────────────────────────────
-  useEffect(() => {
+  const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || canvas.width < 10) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const { chart, trackKey, currentTick, zoom, renderDistance, selectedNoteIds, waveform, editMode, sections } = propsRef.current;
+    const { chart, trackKey, currentTickRef: ctRef, currentTick: propTick,
+            zoom, renderDistance, selectedNoteIds, waveform, editMode, sections, lyrics,
+            lassoRect, phraseDraw } = propsRef.current;
+    const currentTick = ctRef?.current ?? propTick;
+    const isDrums = trackKey.includes("Drums");
+    const numCols = isDrums ? 4 : NUM_FRETS;
     const track      = chart.tracks[trackKey];
     const resolution = chart.metadata.resolution || 192;
     const vt         = visibleTicksFromZoom(zoom, resolution, renderDistance);
+
+    // Visible note range via binary search (notes are sorted by tick)
+    const visStart = track ? lowerBound(track.notes, currentTick - vt) : 0;
+
     const W = canvas.width;
     const H = canvas.height;
     const hy = H * HORIZON_Y_RATIO;
@@ -444,7 +475,7 @@ export function TrackLane({
         ctx.drawImage(sc, 0, 0);
       }
 
-    } else if (waveform && waveform.peaks.length > 0) {
+    } else if (vizMode === "waveform" && waveform && waveform.peaks.length > 0) {
       // ── Waveform: classic symmetric blue shape
       const tickStep = Math.max(waveform.ticksPerSample, Math.ceil(vt / 500));
       const lxArr: number[] = [], rxArr: number[] = [], yArr: number[] = [];
@@ -522,7 +553,9 @@ export function TrackLane({
 
     // ── 7. Sustain tails
     if (track) {
-      for (const note of track.notes) {
+      for (let _ni = visStart; _ni < track.notes.length; _ni++) {
+        const note = track.notes[_ni];
+        if (note.tick > currentTick + vt) break;
         if (note.length <= 0) continue;
         const dt    = note.tick - currentTick;
         const dtEnd = dt + note.length;
@@ -582,7 +615,9 @@ export function TrackLane({
 
     // ── 8. Note heads (sorted back-to-front)
     if (track) {
-      const sorted = [...track.notes].sort((a, b) => (b.tick - currentTick) - (a.tick - currentTick));
+      let visEnd = visStart;
+      while (visEnd < track.notes.length && track.notes[visEnd].tick <= currentTick + vt) visEnd++;
+      const sorted = track.notes.slice(visStart, visEnd).sort((a, b) => (b.tick - currentTick) - (a.tick - currentTick));
 
       for (const note of sorted) {
         const dt = note.tick - currentTick;
@@ -767,6 +802,35 @@ export function TrackLane({
       }
     }
 
+    // ── 8c. Lyrics overlay (Vocals track only)
+    if (lyrics && lyrics.length > 0) {
+      const sy2 = H * STRIKE_Y_RATIO;
+      ctx.save();
+      for (const lyric of lyrics) {
+        if (lyric.tick === null) continue;
+        const dt = lyric.tick - currentTick;
+        if (dt < 0 || dt > vt) continue;
+        const d    = depthAt(dt, vt);
+        const lane = laneAt(d, W, H, numCols);
+        const y    = lane.y - 6;
+        const fontSize = Math.max(8, Math.round(11 * d));
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        const tw = ctx.measureText(lyric.text).width;
+        // Background pill
+        ctx.fillStyle = "rgba(0,0,0,0.60)";
+        ctx.beginPath();
+        ctx.roundRect(lane.cx - tw / 2 - 3, y - fontSize - 1, tw + 6, fontSize + 3, 3);
+        ctx.fill();
+        // Text
+        const alpha = Math.min(1, d * 1.4 + 0.2);
+        ctx.fillStyle = `rgba(255,160,220,${alpha})`;
+        ctx.fillText(lyric.text, lane.cx, y);
+      }
+      ctx.restore();
+    }
+
     // ── 9. Strikeline
     ctx.shadowColor = STRIKE_COLOR; ctx.shadowBlur = 40;
     ctx.fillStyle   = STRIKE_COLOR + "25";
@@ -844,7 +908,27 @@ export function TrackLane({
         ctx.stroke();
       }
     }
-  });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Static re-render: fires when any non-tick prop changes
+  useEffect(() => {
+    renderCanvas();
+  }, [
+    chart, trackKey, zoom, renderDistance, selectedNoteIds, waveform, vizMode, spectrogram,
+    editMode, sections, lyrics, isPlaying, imagesReady, lassoRect, phraseDraw, renderCanvas,
+  ]);
+
+  // Playback RAF: smooth 60fps canvas updates driven by currentTickRef
+  useEffect(() => {
+    if (!isPlaying) return;
+    let rafId: number;
+    function loop() {
+      renderCanvas();
+      rafId = requestAnimationFrame(loop);
+    }
+    rafId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafId);
+  }, [isPlaying, renderCanvas]);
 
   // ── Hit-test ────────────────────────────────────────────────
   const getNoteAt = useCallback(
@@ -1087,9 +1171,9 @@ export function TrackLane({
       // Hover cursor check for resize handles
       const resizeNote = getSustainResizeAt(cx, cy, canvas.width, canvas.height);
       const newCursor  = resizeNote ? "ns-resize" : (propsRef.current.editMode === "phrase" ? "crosshair" : "crosshair");
-      if (cursor !== newCursor) setCursor(newCursor);
+      if (canvasRef.current) canvasRef.current.style.cursor = newCursor;
     },
-    [cursor, getSustainResizeAt]
+    [getSustainResizeAt]
   );
 
   const handleMouseUp = useCallback(
@@ -1244,7 +1328,7 @@ export function TrackLane({
     <div ref={containerRef} className="w-full h-full">
       <canvas
         ref={canvasRef}
-        style={{ display: "block", width: "100%", height: "100%", cursor }}
+        style={{ display: "block", width: "100%", height: "100%", cursor: "crosshair" }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -1253,4 +1337,4 @@ export function TrackLane({
       />
     </div>
   );
-}
+});

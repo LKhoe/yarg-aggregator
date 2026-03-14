@@ -1,4 +1,5 @@
 import { Midi } from "@tonejs/midi";
+import { parseMidi as parseMidiRaw, writeMidi, type MidiEvent } from "midi-file";
 import type { ChartData, Difficulty, Instrument, Track } from "./types";
 
 // Instrument → MIDI track name
@@ -74,12 +75,13 @@ export function serializeMidi(chart: ChartData): Uint8Array {
       Track,
     ][]) {
       if (!track) continue;
-      const base = DIFFICULTY_BASE_PITCH[diff];
+      const isVocals = group.instrument === "Vocals";
       for (const note of track.notes) {
+        const midiPitch = isVocals ? note.fret : DIFFICULTY_BASE_PITCH[diff] + note.fret;
         allNotes.push({
           ticks: note.tick,
           durationTicks: Math.max(1, note.length),
-          midi: base + note.fret,
+          midi: midiPitch,
         });
       }
       for (const phrase of track.phrases) {
@@ -110,7 +112,59 @@ export function serializeMidi(chart: ChartData): Uint8Array {
     }
   }
 
-  return midi.toArray();
+  const midiBytes = midi.toArray();
+
+  // Inject lyric meta events into PART VOCALS track using midi-file round-trip
+  const lyrics = (chart.lyrics ?? []).filter((l) => l.tick !== null);
+  if (lyrics.length === 0) return midiBytes;
+
+  try {
+    const rawMidi = parseMidiRaw(new Uint8Array(midiBytes));
+    const vocalsTrackIdx = rawMidi.tracks.findIndex((t) => {
+      const nameEvent = t.find((e) => e.type === "trackName");
+      return nameEvent && "text" in nameEvent &&
+        (nameEvent as { text: string }).text.toUpperCase() === "PART VOCALS";
+    });
+    if (vocalsTrackIdx === -1) return midiBytes;
+
+    const rawTrack = rawMidi.tracks[vocalsTrackIdx];
+    // Convert absolute ticks to delta-time lyric events and splice in
+    const sortedLyrics = [...lyrics].sort((a, b) => (a.tick as number) - (b.tick as number));
+
+    // Compute absolute ticks of existing events so we can merge
+    type AbsEvent = { absTick: number; deltaTime: number; [key: string]: unknown };
+    let absTick = 0;
+    const absEvents: AbsEvent[] = rawTrack.map((ev) => {
+      absTick += ev.deltaTime;
+      return { ...ev, absTick } as AbsEvent;
+    });
+
+    // Insert lyric events at the right positions
+    for (const lyric of sortedLyrics) {
+      absEvents.push({
+        absTick: lyric.tick as number,
+        deltaTime: 0,
+        type: "lyrics",
+        text: lyric.text,
+        meta: true,
+      });
+    }
+    absEvents.sort((a, b) => a.absTick - b.absTick);
+
+    // Recompute delta times
+    let prev = 0;
+    rawMidi.tracks[vocalsTrackIdx] = absEvents.map((ev) => {
+      const delta = ev.absTick - prev;
+      prev = ev.absTick;
+      const { absTick: _at, ...rest } = ev;
+      return { ...rest, deltaTime: delta } as MidiEvent;
+    });
+
+    const out = writeMidi(rawMidi);
+    return new Uint8Array(out);
+  } catch {
+    return midiBytes;
+  }
 }
 
 export function downloadMidi(chart: ChartData, filename = "notes.mid"): void {

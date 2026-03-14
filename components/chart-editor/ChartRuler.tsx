@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
+import React, { memo, useRef, useEffect, useState, useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type { Section } from "@/lib/chart/types";
 
@@ -19,6 +19,8 @@ export interface ChartRulerProps {
   onAddSection: (id: string, tick: number, name: string) => void;
   onDeleteSection: (id: string) => void;
   onSeek: (tick: number) => void;
+  currentTickRef?: React.MutableRefObject<number>;
+  isPlaying?: boolean;
 }
 
 interface Popover {
@@ -38,7 +40,7 @@ function xToTick(x: number, currentTick: number, visibleTicks: number, W: number
   return currentTick + (x / W) * visibleTicks;
 }
 
-export function ChartRuler({
+export const ChartRuler = memo(function ChartRuler({
   bpmEvents,
   timeSignatures,
   sections,
@@ -51,6 +53,8 @@ export function ChartRuler({
   onAddSection,
   onDeleteSection,
   onSeek,
+  currentTickRef,
+  isPlaying,
 }: ChartRulerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -58,15 +62,23 @@ export function ChartRuler({
   const [inputValue, setInputValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Compute visible ticks (same formula as TrackLane)
+  // Compute visible ticks (same formula as TrackLane) — used by interaction callbacks
   const visibleTicks = ((resolution * 960) / zoom) * renderDistance;
 
+  // Stable ref so renderCanvas can always read current props
+  const propsRef = useRef({ bpmEvents, timeSignatures, sections, currentTick, currentTickRef, zoom, resolution, renderDistance });
+  propsRef.current = { bpmEvents, timeSignatures, sections, currentTick, currentTickRef, zoom, resolution, renderDistance };
+
   // Render canvas
-  useEffect(() => {
+  const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || canvas.width < 10) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    const { bpmEvents, timeSignatures, sections, currentTickRef: ctRef, currentTick: propTick, zoom, resolution, renderDistance } = propsRef.current;
+    const currentTick = ctRef?.current ?? propTick;
+    const visibleTicks = ((resolution * 960) / zoom) * renderDistance;
 
     const W = canvas.width;
     const H = canvas.height;
@@ -174,7 +186,24 @@ export function ChartRuler({
     ctx.lineTo(playheadX, 7);
     ctx.closePath();
     ctx.fill();
-  });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Static re-render: fires when any non-tick prop changes
+  useEffect(() => {
+    renderCanvas();
+  }, [bpmEvents, timeSignatures, sections, zoom, resolution, renderDistance, renderCanvas]);
+
+  // Playback RAF: smooth 60fps updates driven by currentTickRef
+  useEffect(() => {
+    if (!isPlaying) return;
+    let rafId: number;
+    function loop() {
+      renderCanvas();
+      rafId = requestAnimationFrame(loop);
+    }
+    rafId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafId);
+  }, [isPlaying, renderCanvas]);
 
   // Canvas resize observer
   useEffect(() => {
@@ -363,4 +392,4 @@ export function ChartRuler({
       )}
     </div>
   );
-}
+});

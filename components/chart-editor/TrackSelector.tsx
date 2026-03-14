@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import type { ChartData, Difficulty, Instrument, TrackKey } from "@/lib/chart/types";
 import {
@@ -15,7 +16,7 @@ export interface TrackSelectorProps {
   onSelectTrack: (key: TrackKey) => void;
 }
 
-export function TrackSelector({
+export const TrackSelector = memo(function TrackSelector({
   chart,
   selectedTrack,
   onSelectTrack,
@@ -95,4 +96,4 @@ export function TrackSelector({
       )}
     </div>
   );
-}
+});

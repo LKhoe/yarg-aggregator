@@ -32,7 +32,9 @@ import { FileUpload } from "./FileUpload";
 import { Toolbar } from "./Toolbar";
 import { TrackSelector } from "./TrackSelector";
 import { TrackLane } from "./TrackLane";
+import { VocalsLane } from "./VocalsLane";
 import { PropertiesPanel } from "./PropertiesPanel";
+import { LyricsPanel } from "./LyricsPanel";
 import { ExportDialog } from "./ExportDialog";
 import { ChartRuler } from "./ChartRuler";
 import { TimelineBar } from "./TimelineBar";
@@ -98,6 +100,8 @@ type EditAction =
   | { type: "ADD_SECTION"; section: Section }
   | { type: "RENAME_SECTION"; id: string; name: string }
   | { type: "DELETE_SECTION"; id: string }
+  // Lyrics
+  | { type: "SET_LYRICS"; lyrics: import("@/lib/chart/types").LyricEvent[] }
   // Copy/paste
   | { type: "PASTE_NOTES"; track: TrackKey; notes: Note[] };
 
@@ -138,12 +142,17 @@ function applyAction(chart: ChartData, action: EditAction): ChartData {
       const track = chart.tracks[action.track];
       if (!track) return chart;
       const idSet = new Set(action.ids);
+      const isVocalsTrack = track.instrument === "Vocals";
       const notes = track.notes.map((n) => {
         if (!idSet.has(n.id)) return n;
+        const newFret = n.fret + action.deltaFret;
+        const clampedFret = isVocalsTrack
+          ? (newFret >= 84 ? Math.min(97, Math.max(96, newFret)) : Math.max(36, Math.min(83, newFret)))
+          : Math.max(0, Math.min(4, newFret));
         return {
           ...n,
           tick: Math.max(0, n.tick + action.deltaTick),
-          fret: Math.max(0, Math.min(4, n.fret + action.deltaFret)),
+          fret: clampedFret,
         };
       });
       notes.sort((a, b) => a.tick - b.tick);
@@ -290,6 +299,9 @@ function applyAction(chart: ChartData, action: EditAction): ChartData {
       return { ...chart, sections };
     }
 
+    case "SET_LYRICS":
+      return { ...chart, lyrics: action.lyrics };
+
     case "PASTE_NOTES": {
       const track = chart.tracks[action.track];
       if (!track) return chart;
@@ -335,6 +347,7 @@ const INITIAL_CHART: ChartData = {
   },
   events: [],
   sections: [],
+  lyrics: [],
   tracks: {},
 };
 
@@ -346,7 +359,7 @@ function historyReducer(
     case "DO": {
       const next = applyAction(state.present, action.action);
       return {
-        past: [...state.past.slice(-49), state.present],
+        past: [...state.past.slice(-29), state.present],
         present: next,
         future: [],
       };
@@ -357,14 +370,14 @@ function historyReducer(
       return {
         past: state.past.slice(0, -1),
         present: previous,
-        future: [state.present, ...state.future.slice(0, 49)],
+        future: [state.present, ...state.future.slice(0, 29)],
       };
     }
     case "REDO": {
       if (state.future.length === 0) return state;
       const next = state.future[0];
       return {
-        past: [...state.past.slice(-49), state.present],
+        past: [...state.past.slice(-29), state.present],
         present: next,
         future: state.future.slice(1),
       };
@@ -400,12 +413,14 @@ export function ChartEditor() {
   // Edit mode state
   const [editMode, setEditMode] = useState<"note" | "phrase">("note");
   const [phraseType, setPhraseType] = useState<Phrase["type"]>("starPower");
+  const phraseTypeRef = useRef(phraseType);
+  phraseTypeRef.current = phraseType;
 
   // Clipboard for copy/paste
   const clipboardRef = useRef<Note[]>([]);
 
   // Visualization mode (waveform vs mel spectrogram)
-  const [vizMode, setVizMode] = useState<"waveform" | "spectrogram">("waveform");
+  const [vizMode, setVizMode] = useState<"waveform" | "spectrogram" | "none">("waveform");
   const [spectrograms, setSpectrograms] = useState<Map<string, SpectrogramData>>(new Map());
   const [spectrogramLoading, setSpectrogramLoading] = useState(false);
   const spectrogramsRef = useRef(spectrograms);
@@ -430,6 +445,7 @@ export function ChartEditor() {
   selectedTrackRef.current = selectedTrack;
   const currentTickRef = useRef(currentTick);
   currentTickRef.current = currentTick;
+  const tickFrameRef = useRef(0);
 
   // Audio engine refs
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -484,7 +500,7 @@ export function ChartEditor() {
   }, [selectedTrack, stems, spectrograms]);
 
   // Lazily compute spectrograms when switching to spectrogram mode
-  const handleVizModeChange = useCallback((mode: "waveform" | "spectrogram") => {
+  const handleVizModeChange = useCallback((mode: "waveform" | "spectrogram" | "none") => {
     setVizMode(mode);
     if (mode !== "spectrogram") return;
     // Check if any stems need computing
@@ -519,15 +535,17 @@ export function ChartEditor() {
     }
   }, [chart.tracks, selectedTrack]);
 
-  // Animation loop
+  // Animation loop — only depends on isPlaying; reads chart via chartRef to avoid
+  // restarting (and stuttering) on every chart edit while playing.
   useEffect(() => {
     if (!isPlaying) {
       cancelAnimationFrame(rafRef.current);
       return;
     }
 
-    const tempoMap = buildTempoMap(chart);
-    const resolution = chart.metadata.resolution || 192;
+    // Snapshot tempo info from refs at playback start so the frame closure is stable
+    const tempoMap = buildTempoMap(chartRef.current);
+    const resolution = chartRef.current.metadata.resolution || 192;
 
     function frame() {
       const ctx = audioCtxRef.current;
@@ -539,13 +557,17 @@ export function ChartEditor() {
       const newTick =
         playbackStartTickRef.current +
         elapsed * speed * beatsPerSecond * resolution;
-      setCurrentTick(newTick);
+      currentTickRef.current = newTick;           // always 60fps (no React)
+      tickFrameRef.current++;
+      if (tickFrameRef.current % 6 === 0) {
+        setCurrentTick(newTick);                  // ~10fps for UI elements
+      }
       rafRef.current = requestAnimationFrame(frame);
     }
 
     rafRef.current = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [isPlaying, chart]);
+  }, [isPlaying]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Chart file upload
   const handleChartFile = useCallback(async (file: File) => {
@@ -581,28 +603,33 @@ export function ChartEditor() {
     }
   }, []);
 
-  // Audio files upload (multiple stems)
+  // Audio files upload (multiple stems) — decode all files in parallel
   const handleAudioFiles = useCallback(async (files: File[]) => {
     const ctx = getAudioCtx();
     const currentChart = chartRef.current;
-    for (const file of files) {
-      const label = inferStemLabel(file.name);
-      const buf = await file.arrayBuffer();
-      const decoded = await ctx.decodeAudioData(buf);
-      const waveform = computeWaveform(decoded, currentChart);
-      setStems((prev) => {
-        const next = new Map(prev);
-        next.set(label, { label, buffer: decoded, waveform });
-        return next;
-      });
-      // Invalidate cached spectrogram for this stem so it gets recomputed
-      setSpectrograms((prev) => {
-        if (!prev.has(label)) return prev;
-        const next = new Map(prev);
-        next.delete(label);
-        return next;
-      });
-    }
+    const results = await Promise.all(
+      files.map(async (file) => {
+        const label = inferStemLabel(file.name);
+        const buf = await file.arrayBuffer();
+        const decoded = await ctx.decodeAudioData(buf);
+        const waveform = computeWaveform(decoded, currentChart);
+        return { label, buffer: decoded, waveform };
+      })
+    );
+    setStems((prev) => {
+      const next = new Map(prev);
+      for (const { label, buffer, waveform } of results) {
+        next.set(label, { label, buffer, waveform });
+      }
+      return next;
+    });
+    setSpectrograms((prev) => {
+      const labelsToDelete = results.map((r) => r.label).filter((l) => prev.has(l));
+      if (labelsToDelete.length === 0) return prev;
+      const next = new Map(prev);
+      for (const label of labelsToDelete) next.delete(label);
+      return next;
+    });
   }, []);
 
   // Mute toggle
@@ -789,7 +816,10 @@ export function ChartEditor() {
           if (clipboardRef.current.length > 0 && track) {
             e.preventDefault();
             const clipboard = clipboardRef.current;
-            const minTick = Math.min(...clipboard.map((n) => n.tick));
+            let minTick = clipboard[0].tick;
+            for (let i = 1; i < clipboard.length; i++) {
+              if (clipboard[i].tick < minTick) minTick = clipboard[i].tick;
+            }
             const pastedTick = currentTickRef.current;
             const offset = pastedTick - minTick;
             const newNotes: Note[] = clipboard.map((n) => ({
@@ -938,10 +968,118 @@ export function ChartEditor() {
     snapDivision,
   ]);
 
-  const hasChart  = Object.keys(chart.tracks).length > 0;
-  const tempoMap  = buildTempoMap(chart);
-  const bpm       = getBpmAtTick(currentTick, tempoMap);
-  const totalTicks = getChartDurationTicks(chart);
+  const hasChart   = Object.keys(chart.tracks).length > 0;
+  const tempoMap   = useMemo(() => buildTempoMap(chart), [chart.syncTrack]);
+  const bpm        = getBpmAtTick(currentTick, tempoMap);
+  const totalTicks = useMemo(() => getChartDurationTicks(chart), [chart.tracks, chart.syncTrack]);
+
+  const isVocalsTrack = selectedTrack
+    ? (parseTrackKey(selectedTrack)?.instrument === "Vocals")
+    : false;
+
+  const handleUpdateLyrics = useCallback(
+    (lyrics: import("@/lib/chart/types").LyricEvent[]) => {
+      dispatch({ type: "DO", action: { type: "SET_LYRICS", lyrics } });
+    },
+    []
+  );
+
+  // ── Stable callbacks for child components (read refs, never re-created) ───
+
+  const handleSelectNotes = useCallback((ids: string[]) => {
+    setSelectedNoteIds(new Set(ids));
+  }, []);
+
+  const handleAddNote = useCallback((tick: number, fret: number) => {
+    const track = selectedTrackRef.current;
+    if (!track) return;
+    dispatch({ type: "DO", action: { type: "ADD_NOTE", track, note: { id: uuidv4(), tick, fret, length: 0 } } });
+  }, []);
+
+  const handleLaneDeleteNotes = useCallback((ids: string[]) => {
+    const track = selectedTrackRef.current;
+    if (!track) return;
+    dispatch({ type: "DO", action: { type: "DELETE_NOTES", track, ids } });
+    setSelectedNoteIds((prev) => { const next = new Set(prev); ids.forEach((id) => next.delete(id)); return next; });
+  }, []);
+
+  const handleMoveNotes = useCallback((ids: string[], deltaTick: number, deltaFret: number) => {
+    const track = selectedTrackRef.current;
+    if (!track) return;
+    dispatch({ type: "DO", action: { type: "MOVE_NOTES", track, ids, deltaTick, deltaFret } });
+  }, []);
+
+  const handleResizeNote = useCallback((id: string, newLength: number) => {
+    const track = selectedTrackRef.current;
+    if (!track) return;
+    dispatch({ type: "DO", action: { type: "RESIZE_NOTE", track, id, newLength } });
+  }, []);
+
+  const handleSeekToTick = useCallback((tick: number) => setCurrentTick(tick), []);
+
+  const handleAddPhrase = useCallback((tick: number, length: number) => {
+    const track = selectedTrackRef.current;
+    if (!track) return;
+    dispatch({ type: "DO", action: { type: "ADD_PHRASE", track, phrase: { id: uuidv4(), tick, length, type: phraseTypeRef.current } } });
+  }, []);
+
+  const handleDeletePhrase = useCallback((id: string) => {
+    const track = selectedTrackRef.current;
+    if (!track) return;
+    dispatch({ type: "DO", action: { type: "DELETE_PHRASE", track, id } });
+  }, []);
+
+  const handleSelectTrack = useCallback((key: TrackKey) => {
+    setSelectedTrack(key);
+    setSelectedNoteIds(new Set());
+  }, []);
+
+  // ChartRuler callbacks (dispatch is stable from useReducer)
+  const handleAddBpm = useCallback((tick: number, bpm: number) => {
+    dispatch({ type: "DO", action: { type: "ADD_BPM", tick, bpm } });
+  }, []);
+  const handleDeleteBpm = useCallback((tick: number) => {
+    dispatch({ type: "DO", action: { type: "DELETE_BPM", tick } });
+  }, []);
+  const handleAddTimeSignature = useCallback((tick: number, numerator: number, denominator: number) => {
+    dispatch({ type: "DO", action: { type: "ADD_TIME_SIGNATURE", tick, numerator, denominator } });
+  }, []);
+  const handleDeleteTimeSignature = useCallback((tick: number) => {
+    dispatch({ type: "DO", action: { type: "DELETE_TIME_SIGNATURE", tick } });
+  }, []);
+  const handleAddRulerSection = useCallback((id: string, tick: number, name: string) => {
+    dispatch({ type: "DO", action: { type: "ADD_SECTION", section: { id, tick, name, type: "section" } } });
+  }, []);
+  const handleDeleteSection = useCallback((id: string) => {
+    dispatch({ type: "DO", action: { type: "DELETE_SECTION", id } });
+  }, []);
+
+  // PropertiesPanel callbacks
+  const handleUpdateNote = useCallback((id: string, tick: number, fret: number, length: number) => {
+    const track = selectedTrackRef.current;
+    if (!track) return;
+    dispatch({ type: "DO", action: { type: "UPDATE_NOTE", track, note: { id, tick, fret, length } } });
+  }, []);
+  const handlePropDeleteNotes = useCallback((ids: string[]) => {
+    const track = selectedTrackRef.current;
+    if (!track) return;
+    dispatch({ type: "DO", action: { type: "DELETE_NOTES", track, ids } });
+    setSelectedNoteIds(new Set());
+  }, []);
+  const handleToggleFlag = useCallback((id: string, flag: "forceHopo" | "forceStrum" | "tap") => {
+    const track = selectedTrackRef.current;
+    if (!track) return;
+    dispatch({ type: "DO", action: { type: "TOGGLE_NOTE_FLAG", track, ids: [id], flag } });
+  }, []);
+
+  const handleUndo = useCallback(() => dispatch({ type: "UNDO" }), []);
+  const handleRedo = useCallback(() => dispatch({ type: "REDO" }), []);
+
+  const sections = useMemo(() => chart.sections ?? [], [chart.sections]);
+
+  const handleZoomIn = useCallback(() => setZoom((z) => Math.min(z * 1.25, 800)), []);
+  const handleZoomOut = useCallback(() => setZoom((z) => Math.max(z / 1.25, 30)), []);
+  const handlePhraseTypeChange = useCallback((t: string) => setPhraseType(t as Phrase["type"]), []);
 
   // Which stem label is "active" for the current instrument (for UI highlight)
   const activeStemLabel = useMemo<string | null>(() => {
@@ -1001,8 +1139,8 @@ export function ChartEditor() {
             onPlayPause={handlePlayPause}
             onStop={handleStop}
             zoom={zoom}
-            onZoomIn={() => setZoom((z) => Math.min(z * 1.25, 800))}
-            onZoomOut={() => setZoom((z) => Math.max(z / 1.25, 30))}
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
             renderDistance={renderDistance}
             onRenderDistanceChange={setRenderDistance}
             playbackSpeed={playbackSpeed}
@@ -1011,14 +1149,14 @@ export function ChartEditor() {
             onSnapChange={setSnapDivision}
             canUndo={history.past.length > 0}
             canRedo={history.future.length > 0}
-            onUndo={() => dispatch({ type: "UNDO" })}
-            onRedo={() => dispatch({ type: "REDO" })}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
             currentTick={currentTick}
             bpm={bpm}
             editMode={editMode}
             onEditModeChange={setEditMode}
             phraseType={phraseType}
-            onPhraseTypeChange={(t) => setPhraseType(t as Phrase["type"])}
+            onPhraseTypeChange={handlePhraseTypeChange}
             vizMode={vizMode}
             onVizModeChange={handleVizModeChange}
             spectrogramLoading={spectrogramLoading}
@@ -1027,155 +1165,83 @@ export function ChartEditor() {
           <TrackSelector
             chart={chart}
             selectedTrack={selectedTrack}
-            onSelectTrack={(key) => {
-              setSelectedTrack(key);
-              setSelectedNoteIds(new Set());
-            }}
+            onSelectTrack={handleSelectTrack}
           />
 
           {/* Chart Ruler */}
           <ChartRuler
             bpmEvents={chart.syncTrack.bpmEvents}
             timeSignatures={chart.syncTrack.timeSignatures}
-            sections={chart.sections ?? []}
+            sections={sections}
             currentTick={currentTick}
             zoom={zoom}
             resolution={chart.metadata.resolution || 192}
             renderDistance={renderDistance}
-            onAddBpm={(tick, bpm) =>
-              dispatch({ type: "DO", action: { type: "ADD_BPM", tick, bpm } })
-            }
-            onDeleteBpm={(tick) =>
-              dispatch({ type: "DO", action: { type: "DELETE_BPM", tick } })
-            }
-            onAddTimeSignature={(tick, numerator, denominator) =>
-              dispatch({
-                type: "DO",
-                action: { type: "ADD_TIME_SIGNATURE", tick, numerator, denominator },
-              })
-            }
-            onDeleteTimeSignature={(tick) =>
-              dispatch({
-                type: "DO",
-                action: { type: "DELETE_TIME_SIGNATURE", tick },
-              })
-            }
-            onAddSection={(id, tick, name) =>
-              dispatch({
-                type: "DO",
-                action: {
-                  type: "ADD_SECTION",
-                  section: { id, tick, name, type: "section" },
-                },
-              })
-            }
-            onDeleteSection={(id) =>
-              dispatch({ type: "DO", action: { type: "DELETE_SECTION", id } })
-            }
-            onSeek={(tick) => setCurrentTick(tick)}
+            onAddBpm={handleAddBpm}
+            onDeleteBpm={handleDeleteBpm}
+            onAddTimeSignature={handleAddTimeSignature}
+            onDeleteTimeSignature={handleDeleteTimeSignature}
+            onAddSection={handleAddRulerSection}
+            onDeleteSection={handleDeleteSection}
+            onSeek={handleSeekToTick}
+            currentTickRef={currentTickRef}
+            isPlaying={isPlaying}
           />
 
           <div className="flex flex-1 overflow-hidden">
             {/* Lane */}
             <div className="flex-1 overflow-hidden relative bg-[#0f0f14]">
               {selectedTrack ? (
-                <TrackLane
-                  chart={chart}
-                  trackKey={selectedTrack}
-                  currentTick={currentTick}
-                  isPlaying={isPlaying}
-                  zoom={zoom}
-                  renderDistance={renderDistance}
-                  snapDivision={snapDivision}
-                  selectedNoteIds={selectedNoteIds}
-                  onSelectNotes={(ids) => setSelectedNoteIds(new Set(ids))}
-                  onAddNote={(tick, fret) => {
-                    if (!selectedTrack) return;
-                    dispatch({
-                      type: "DO",
-                      action: {
-                        type: "ADD_NOTE",
-                        track: selectedTrack,
-                        note: { id: uuidv4(), tick, fret, length: 0 },
-                      },
-                    });
-                  }}
-                  onDeleteNotes={(ids) => {
-                    if (!selectedTrack) return;
-                    dispatch({
-                      type: "DO",
-                      action: {
-                        type: "DELETE_NOTES",
-                        track: selectedTrack,
-                        ids,
-                      },
-                    });
-                    setSelectedNoteIds((prev) => {
-                      const next = new Set(prev);
-                      ids.forEach((id) => next.delete(id));
-                      return next;
-                    });
-                  }}
-                  onMoveNotes={(ids, deltaTick, deltaFret) => {
-                    if (!selectedTrack) return;
-                    dispatch({
-                      type: "DO",
-                      action: {
-                        type: "MOVE_NOTES",
-                        track: selectedTrack,
-                        ids,
-                        deltaTick,
-                        deltaFret,
-                      },
-                    });
-                  }}
-                  onResizeNote={(id, newLength) => {
-                    if (!selectedTrack) return;
-                    dispatch({
-                      type: "DO",
-                      action: {
-                        type: "RESIZE_NOTE",
-                        track: selectedTrack,
-                        id,
-                        newLength,
-                      },
-                    });
-                  }}
-                  onAddPhrase={(tick, length) => {
-                    if (!selectedTrack) return;
-                    dispatch({
-                      type: "DO",
-                      action: {
-                        type: "ADD_PHRASE",
-                        track: selectedTrack,
-                        phrase: {
-                          id: uuidv4(),
-                          tick,
-                          length,
-                          type: phraseType,
-                        },
-                      },
-                    });
-                  }}
-                  onDeletePhrase={(id) => {
-                    if (!selectedTrack) return;
-                    dispatch({
-                      type: "DO",
-                      action: {
-                        type: "DELETE_PHRASE",
-                        track: selectedTrack,
-                        id,
-                      },
-                    });
-                  }}
-                  onSeekToTick={(tick) => setCurrentTick(tick)}
-                  editMode={editMode}
-                  phraseType={phraseType}
-                  sections={chart.sections ?? []}
-                  waveform={activeWaveform}
-                  vizMode={vizMode}
-                  spectrogram={activeSpectrogram}
-                />
+                isVocalsTrack ? (
+                  <VocalsLane
+                    chart={chart}
+                    trackKey={selectedTrack}
+                    currentTick={currentTick}
+                    isPlaying={isPlaying}
+                    currentTickRef={currentTickRef}
+                    zoom={zoom}
+                    renderDistance={renderDistance}
+                    snapDivision={snapDivision}
+                    selectedNoteIds={selectedNoteIds}
+                    onSelectNotes={handleSelectNotes}
+                    onAddNote={handleAddNote}
+                    onDeleteNotes={handleLaneDeleteNotes}
+                    onMoveNotes={handleMoveNotes}
+                    onResizeNote={handleResizeNote}
+                    onSeekToTick={handleSeekToTick}
+                    sections={sections}
+                    lyrics={chart.lyrics}
+                    waveform={activeWaveform}
+                    vizMode={vizMode}
+                    spectrogram={activeSpectrogram}
+                  />
+                ) : (
+                  <TrackLane
+                    chart={chart}
+                    trackKey={selectedTrack}
+                    currentTick={currentTick}
+                    isPlaying={isPlaying}
+                    currentTickRef={currentTickRef}
+                    zoom={zoom}
+                    renderDistance={renderDistance}
+                    snapDivision={snapDivision}
+                    selectedNoteIds={selectedNoteIds}
+                    onSelectNotes={handleSelectNotes}
+                    onAddNote={handleAddNote}
+                    onDeleteNotes={handleLaneDeleteNotes}
+                    onMoveNotes={handleMoveNotes}
+                    onResizeNote={handleResizeNote}
+                    onSeekToTick={handleSeekToTick}
+                    sections={sections}
+                    onAddPhrase={handleAddPhrase}
+                    onDeletePhrase={handleDeletePhrase}
+                    editMode={editMode}
+                    phraseType={phraseType}
+                    waveform={activeWaveform}
+                    vizMode={vizMode}
+                    spectrogram={activeSpectrogram}
+                  />
+                )
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
                   No track selected
@@ -1183,47 +1249,27 @@ export function ChartEditor() {
               )}
             </div>
 
-            {/* Properties */}
-            <PropertiesPanel
-              chart={chart}
-              trackKey={selectedTrack}
-              selectedNoteIds={selectedNoteIds}
-              onUpdateNote={(id, tick, fret, length) => {
-                if (!selectedTrack) return;
-                dispatch({
-                  type: "DO",
-                  action: {
-                    type: "UPDATE_NOTE",
-                    track: selectedTrack,
-                    note: { id, tick, fret, length },
-                  },
-                });
-              }}
-              onDeleteNotes={(ids) => {
-                if (!selectedTrack) return;
-                dispatch({
-                  type: "DO",
-                  action: {
-                    type: "DELETE_NOTES",
-                    track: selectedTrack,
-                    ids,
-                  },
-                });
-                setSelectedNoteIds(new Set());
-              }}
-              onToggleFlag={(id, flag) => {
-                if (!selectedTrack) return;
-                dispatch({
-                  type: "DO",
-                  action: {
-                    type: "TOGGLE_NOTE_FLAG",
-                    track: selectedTrack,
-                    ids: [id],
-                    flag,
-                  },
-                });
-              }}
-            />
+            {/* Properties + Lyrics */}
+            <div className="flex flex-col overflow-y-auto border-l">
+              <PropertiesPanel
+                chart={chart}
+                trackKey={selectedTrack}
+                selectedNoteIds={selectedNoteIds}
+                isVocals={isVocalsTrack}
+                onUpdateNote={handleUpdateNote}
+                onDeleteNotes={handlePropDeleteNotes}
+                onToggleFlag={handleToggleFlag}
+              />
+              {isVocalsTrack && selectedTrack && (
+                <LyricsPanel
+                  chart={chart}
+                  trackKey={selectedTrack}
+                  currentTick={currentTick}
+                  isPlaying={isPlaying}
+                  onUpdateLyrics={handleUpdateLyrics}
+                />
+              )}
+            </div>
           </div>
 
           {/* Timeline scrubber */}
@@ -1231,7 +1277,7 @@ export function ChartEditor() {
             <TimelineBar
               currentTick={currentTick}
               totalTicks={totalTicks}
-              sections={chart.sections ?? []}
+              sections={sections}
               tempoMap={tempoMap}
               onSeek={handleSeek}
             />

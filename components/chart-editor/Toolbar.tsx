@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -17,6 +18,7 @@ import {
   Undo2,
   Redo2,
   Eye,
+  EyeOff,
   Gauge,
   Pencil,
   Star,
@@ -50,8 +52,8 @@ export interface ToolbarProps {
   phraseType: string;
   onPhraseTypeChange: (type: string) => void;
   // Visualization mode
-  vizMode: "waveform" | "spectrogram";
-  onVizModeChange: (mode: "waveform" | "spectrogram") => void;
+  vizMode: "waveform" | "spectrogram" | "none";
+  onVizModeChange: (mode: "waveform" | "spectrogram" | "none") => void;
   spectrogramLoading?: boolean;
 }
 
@@ -88,7 +90,7 @@ const PHRASE_TYPE_OPTIONS = [
   { value: "trill", label: "Trill" },
 ];
 
-export function Toolbar({
+export const Toolbar = memo(function Toolbar({
   isPlaying,
   onPlayPause,
   onStop,
@@ -326,6 +328,16 @@ export function Toolbar({
           <BarChart2 className="h-3 w-3" />
           {spectrogramLoading ? "…" : "Spec"}
         </Button>
+        <Button
+          variant={vizMode === "none" ? "secondary" : "ghost"}
+          size="sm"
+          className={cn("h-6 px-2 gap-1 text-xs", vizMode === "none" && "shadow-sm")}
+          onClick={() => onVizModeChange("none")}
+          title="Hide audio overlay"
+        >
+          <EyeOff className="h-3 w-3" />
+          Hide
+        </Button>
       </div>
 
       <div className="w-px h-5 bg-border mx-1" />
@@ -337,4 +349,4 @@ export function Toolbar({
       </div>
     </div>
   );
-}
+});

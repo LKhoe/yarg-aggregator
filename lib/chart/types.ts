@@ -20,6 +20,12 @@ export interface Section {
   type: "section" | "solo";
 }
 
+export interface LyricEvent {
+  id: string;
+  tick: number | null; // null = unassigned
+  text: string;
+}
+
 export interface ChartData {
   metadata: {
     name: string;
@@ -37,6 +43,7 @@ export interface ChartData {
   };
   events: { tick: number; text: string }[];
   sections: Section[];
+  lyrics: LyricEvent[];
   tracks: Partial<Record<TrackKey, Track>>;
 }
 

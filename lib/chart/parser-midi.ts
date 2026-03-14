@@ -1,9 +1,11 @@
 import { Midi } from "@tonejs/midi";
+import { parseMidi as parseMidiRaw } from "midi-file";
 import { v4 as uuidv4 } from "uuid";
 import type {
   ChartData,
   Difficulty,
   Instrument,
+  LyricEvent,
   Note,
   Phrase,
   Track,
@@ -102,6 +104,31 @@ export function parseMidi(buffer: ArrayBuffer): ChartData {
     timeSignatures.push({ tick: 0, numerator: 4, denominator: 4 });
   }
 
+  // Extract lyric meta events from raw MIDI PART VOCALS track
+  const lyrics: LyricEvent[] = [];
+  try {
+    const rawMidi = parseMidiRaw(new Uint8Array(buffer));
+    for (const rawTrack of rawMidi.tracks) {
+      const nameEvent = rawTrack.find((e) => e.type === "trackName");
+      if (!nameEvent || !("text" in nameEvent)) continue;
+      if ((nameEvent as { text: string }).text.toUpperCase() !== "PART VOCALS") continue;
+      let absTick = 0;
+      for (const event of rawTrack) {
+        absTick += event.deltaTime;
+        if (event.type === "lyrics" && "text" in event) {
+          lyrics.push({
+            id: uuidv4(),
+            tick: absTick,
+            text: (event as { text: string }).text,
+          });
+        }
+      }
+      break;
+    }
+  } catch {
+    // Ignore raw parse errors — lyric extraction is best-effort
+  }
+
   const chart: ChartData = {
     metadata: {
       name: "",
@@ -116,6 +143,7 @@ export function parseMidi(buffer: ArrayBuffer): ChartData {
     syncTrack: { bpmEvents, timeSignatures },
     events: [],
     sections: [],
+    lyrics,
     tracks: {},
   };
 
@@ -136,6 +164,21 @@ export function parseMidi(buffer: ArrayBuffer): ChartData {
       const tick = Math.round(midiNote.ticks);
       const durationTicks = Math.round(midiNote.durationTicks);
       const pitch = midiNote.midi;
+
+      // Vocals: handle separately — fret values ARE raw MIDI pitches
+      if (instrument === "Vocals") {
+        if (pitch === 116) {
+          // Star power phrase for ExpertVocals only
+          if (!tracksByDiff["Expert"]) tracksByDiff["Expert"] = { notes: [], phrases: [] };
+          tracksByDiff["Expert"]!.phrases.push({ id: uuidv4(), tick, length: durationTicks, type: "starPower" });
+          continue;
+        }
+        const isVocalPitch = (pitch >= 36 && pitch <= 83) || pitch === 96 || pitch === 97;
+        if (!isVocalPitch) continue;
+        if (!tracksByDiff["Expert"]) tracksByDiff["Expert"] = { notes: [], phrases: [] };
+        tracksByDiff["Expert"]!.notes.push({ id: uuidv4(), tick, fret: pitch, length: durationTicks });
+        continue;
+      }
 
       // Star power: pitch 116
       if (pitch === 116) {
@@ -175,7 +218,7 @@ export function parseMidi(buffer: ArrayBuffer): ChartData {
       Difficulty,
       { notes: Note[]; phrases: Phrase[] },
     ][]) {
-      if (data.notes.length === 0) continue;
+      if (data.notes.length === 0 && data.phrases.length === 0) continue;
       const key: TrackKey = makeTrackKey(diff, instrument);
       data.notes.sort((a, b) => a.tick - b.tick);
       chart.tracks[key] = {

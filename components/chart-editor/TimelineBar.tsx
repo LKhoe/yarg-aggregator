@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useCallback, useState } from "react";
+import { memo, useRef, useCallback, useState } from "react";
 import type { Section } from "@/lib/chart/types";
 import type { TempoPoint } from "@/lib/chart/tempo-utils";
 import { tickToSeconds } from "@/lib/chart/tempo-utils";
@@ -19,7 +19,7 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export function TimelineBar({
+export const TimelineBar = memo(function TimelineBar({
   currentTick,
   totalTicks,
   sections,
@@ -59,10 +59,9 @@ export function TimelineBar({
       setIsDragging(true);
       onSeek(tickFromEvent(e));
 
+      // Cache the rect once to avoid forced layout recalc on every mousemove
+      const rect = barRef.current!.getBoundingClientRect();
       const onMove = (me: MouseEvent) => {
-        const bar = barRef.current;
-        if (!bar) return;
-        const rect = bar.getBoundingClientRect();
         const frac = Math.max(0, Math.min(1, (me.clientX - rect.left) / rect.width));
         setHoverFrac(frac);
         onSeek(Math.round(frac * totalTicks));
@@ -181,4 +180,4 @@ export function TimelineBar({
       </div>
     </div>
   );
-}
+});
