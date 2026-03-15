@@ -49,7 +49,7 @@ def detect_beats(audio_path: Path) -> dict:
     beat_times_trimmed = librosa.frames_to_time(beat_frames, sr=sr)
     beat_times = beat_times_trimmed + offset_s  # restore original timeline
 
-    estimated_bpm = float(np.round(tempo, 2))
+    estimated_bpm = float(np.round(np.asarray(tempo).flatten()[0], 2))
     print(f"[beats] Estimated global BPM: {estimated_bpm}")
 
     # Build per-beat list

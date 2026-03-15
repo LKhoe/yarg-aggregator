@@ -35,6 +35,7 @@ def export_chart(
     bpm_events: list[dict],
     midi_files: dict[str, Path],
     output_dir: Path | None = None,
+    lyrics: list[dict] | None = None,
 ) -> Path:
     """
     Build a .chart file from the processed MIDI tracks.
@@ -46,6 +47,8 @@ def export_chart(
         midi_files:  Dict mapping instrument label → lane-mapped MIDI Path.
                      e.g. {"guitar": Path("..."), "drums": Path("...")}
         output_dir:  Where to write the .chart. Defaults to CHART_DIR.
+        lyrics:      Optional list of {"time_s": float, "end_s": float, "text": str}
+                     phrase dicts to emit as lyric events in [Events].
 
     Returns:
         Path to the written .chart file.
@@ -98,14 +101,28 @@ def export_chart(
 
     lines += ["}", ""]
 
-    # ── [Events] practice sections ────────────────────────────────────────────
-    lines += [
-        "[Events]",
-        "{",
-        "  0 = E \"section Intro\"",
-        "}",
-        "",
-    ]
+    # ── [Events] practice sections + lyrics (sorted by tick) ─────────────────
+    events: list[tuple[int, str]] = []
+
+    section_ticks = _generate_practice_sections(bpm_events, interval_s=30.0)
+    for i, tick in enumerate(section_ticks):
+        label = "Intro" if i == 0 else f"Section_{i}"
+        events.append((tick, f'"section {label}"'))
+
+    if lyrics:
+        for phrase in lyrics:
+            tick_start = _seconds_to_tick(phrase["time_s"], bpm_events)
+            tick_end = _seconds_to_tick(phrase["end_s"], bpm_events)
+            text = phrase["text"].replace('"', '\\"')
+            events.append((tick_start, '"phrase_start"'))
+            events.append((tick_start, f'"lyric {text}"'))
+            events.append((tick_end, '"phrase_end"'))
+        print(f"[export] Added {len(lyrics)} lyric phrases")
+
+    lines += ["[Events]", "{"]
+    for tick, payload in sorted(events, key=lambda x: x[0]):
+        lines.append(f"  {tick} = E {payload}")
+    lines += ["}", ""]
 
     # ── Instrument tracks ─────────────────────────────────────────────────────
     for label, midi_path in midi_files.items():
@@ -124,15 +141,15 @@ def export_chart(
         for tick, fret, length in notes:
             lines.append(f"  {tick} = N {fret} {length}")
 
-        # Add a basic star-power phrase at 25% and 75% of song
+        # Star power every ~8 measures
         all_ticks = [t for t, _, _ in notes]
         if all_ticks:
-            mid = (all_ticks[0] + all_ticks[-1]) // 2
-            quarter = (all_ticks[0] + mid) // 2
-            three_q = (mid + all_ticks[-1]) // 2
-            sp_len = CHART_RESOLUTION * 4  # 1 measure
-            lines.append(f"  {quarter} = S 2 {sp_len}")
-            lines.append(f"  {three_q} = S 2 {sp_len}")
+            sp_interval = CHART_RESOLUTION * 4 * 8  # 8 measures
+            sp_len = CHART_RESOLUTION * 4            # 1 measure
+            tick = all_ticks[0] + sp_interval
+            while tick + sp_len < all_ticks[-1]:
+                lines.append(f"  {tick} = S 2 {sp_len}")
+                tick += sp_interval
 
         lines += ["}", ""]
 
@@ -218,3 +235,28 @@ def _seconds_to_tick(
     tick += elapsed * (prev_bpm / 60.0) * resolution
 
     return max(0, int(round(tick)))
+
+
+def _generate_practice_sections(
+    bpm_events: list[dict],
+    interval_s: float = 30.0,
+) -> list[int]:
+    """
+    Generate practice section ticks at regular time intervals.
+    Always includes tick 0 (Intro). Additional sections every *interval_s* seconds.
+    """
+    ticks = [0]
+    if not bpm_events:
+        return ticks
+
+    # Estimate max song time from last BPM event + generous buffer
+    last_event_time = bpm_events[-1]["time_s"] if bpm_events else 0
+    max_time = last_event_time + 120.0  # extend 2 min past last BPM event
+    t = interval_s
+    while t < max_time:
+        tick = _seconds_to_tick(t, bpm_events)
+        if tick > 0:
+            ticks.append(tick)
+        t += interval_s
+
+    return ticks

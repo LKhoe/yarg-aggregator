@@ -5,9 +5,7 @@ using the detected BPM map from Phase 1b.
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from typing import Sequence
 
 import numpy as np
 import pretty_midi
@@ -50,8 +48,6 @@ def quantize_midi(
     # Copy all tempo / time-sig changes from original
     src = pretty_midi.PrettyMIDI(str(midi_path))
 
-    grid_step_s = _median_beat_len(beat_times) / snap
-
     for inst in src.instruments:
         new_inst = pretty_midi.Instrument(
             program=inst.program,
@@ -65,9 +61,11 @@ def quantize_midi(
             snapped_start = _snap_time(note.start, beat_times, snap)
             snapped_end = _snap_time(note.end, beat_times, snap)
 
-            # If the note snapped to zero length, give it exactly one grid step
+            # If the note snapped to zero length, give it one grid step
+            # using the local beat interval at the note's position
             if snapped_end <= snapped_start:
-                snapped_end = snapped_start + grid_step_s
+                local_step = _local_beat_step(snapped_start, beat_times, snap)
+                snapped_end = snapped_start + local_step
 
             # De-duplicate: skip notes that snapped to the same slot
             key = (snapped_start, note.pitch)
@@ -101,8 +99,14 @@ def quantize_midi(
     return out_path
 
 
-def _median_beat_len(beat_times: np.ndarray) -> float:
-    return float(np.median(np.diff(beat_times)))
+def _local_beat_step(t: float, beat_times: np.ndarray, snap: int) -> float:
+    """Return the grid step size (seconds) for the beat containing time *t*."""
+    if len(beat_times) < 2:
+        return 0.5 / snap  # fallback: 120 BPM
+    idx = int(np.searchsorted(beat_times, t, side="right")) - 1
+    idx = max(0, min(idx, len(beat_times) - 2))
+    beat_len = float(beat_times[idx + 1] - beat_times[idx])
+    return beat_len / snap
 
 
 def _snap_time(t: float, beat_times: np.ndarray, snap: int) -> float:

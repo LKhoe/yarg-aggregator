@@ -2,6 +2,7 @@
 Phase 2b — Drum Transcription
 Uses librosa onset detection on the drum stem to produce a MIDI drum track.
 Each onset is classified into a Rock Band pad using frequency-band energy.
+Includes cross-band NMS to deduplicate ghost hits from overlapping bands.
 """
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ import librosa
 import numpy as np
 import pretty_midi
 
-from .config import MIDI_DIR, DRUM_NOTE_TO_PAD
+from .config import MIDI_DIR, DRUM_BANDS, DRUM_NMS_WINDOW_S, DRUM_NMS_ALLOW_COMBOS
 
 
 # GM MIDI drum note numbers for each RB pad
@@ -31,9 +32,9 @@ def transcribe_drums(drum_stem_path: Path) -> Path:
     Writes a GM-compatible MIDI file.
 
     Strategy:
-    - Split the drum stem into 5 frequency bands.
-    - Detect onsets per band.
-    - Map band → Rock Band pad.
+    - Split the drum stem into frequency bands (defined in config.DRUM_BANDS).
+    - Detect onsets per band with per-band delta sensitivity.
+    - Apply cross-band NMS to remove ghost hits from overlapping bands.
     - Write each onset as a short MIDI note.
 
     Returns:
@@ -51,40 +52,90 @@ def transcribe_drums(drum_stem_path: Path) -> Path:
     print(f"[drums] Loading drum stem: {drum_stem_path.name}")
     y, sr = librosa.load(str(drum_stem_path), sr=None, mono=True)
 
-    # Define band → RB pad mappings
-    bands = [
-        # (label, low_hz, high_hz, rb_pad)
-        ("kick",    20,   120,  0),
-        ("snare",  120,   500,  1),
-        ("hihat",  500,  4000,  2),
-        ("tom_lo", 120,   350,  3),
-        ("crash", 4000, 16000,  4),
-    ]
+    # Collect all onsets across bands: list of (time_s, pad, onset_strength)
+    all_onsets: list[tuple[float, int, float]] = []
+
+    for band in DRUM_BANDS:
+        label = band["label"]
+        lo = band["lo"]
+        hi = band["hi"]
+        pad = band["pad"]
+        delta = band["delta"]
+
+        onsets, strengths = _detect_band_onsets(y, sr, lo_hz=lo, hi_hz=hi, delta=delta)
+        for t, s in zip(onsets, strengths):
+            all_onsets.append((float(t), pad, float(s)))
+        print(f"[drums]   {label:8s}: {len(onsets):4d} onsets (delta={delta})")
+
+    # Sort by time
+    all_onsets.sort(key=lambda x: x[0])
+
+    # Cross-band NMS: deduplicate hits from different pads within DRUM_NMS_WINDOW_S
+    filtered = _cross_band_nms(all_onsets)
 
     pm = pretty_midi.PrettyMIDI(initial_tempo=120.0)
     drum_inst = pretty_midi.Instrument(program=0, is_drum=True, name="Drums")
 
-    total_onsets = 0
-    for label, lo, hi, rb_pad in bands:
-        onsets = _detect_band_onsets(y, sr, lo_hz=lo, hi_hz=hi)
-        gm_note = PAD_TO_GM_NOTE[rb_pad]
-        for t in onsets:
-            note = pretty_midi.Note(
-                velocity=100,
-                pitch=gm_note,
-                start=float(t),
-                end=float(t) + 0.05,   # 50ms note — enough to register
-            )
-            drum_inst.notes.append(note)
-        total_onsets += len(onsets)
-        print(f"[drums]   {label:8s}: {len(onsets):4d} onsets")
+    for t, pad, _ in filtered:
+        gm_note = PAD_TO_GM_NOTE[pad]
+        note = pretty_midi.Note(
+            velocity=100,
+            pitch=gm_note,
+            start=t,
+            end=t + 0.05,   # 50ms note — enough to register
+        )
+        drum_inst.notes.append(note)
 
     drum_inst.notes.sort(key=lambda n: n.start)
     pm.instruments.append(drum_inst)
     pm.write(str(midi_path))
-    print(f"[drums] Total {total_onsets} drum hits → {midi_path.name}")
+    print(f"[drums] {len(filtered)} drum hits after NMS → {midi_path.name}")
 
     return midi_path
+
+
+def _cross_band_nms(
+    onsets: list[tuple[float, int, float]],
+) -> list[tuple[float, int, float]]:
+    """
+    Non-maximum suppression across bands.
+    If two different pads fire within DRUM_NMS_WINDOW_S, keep only the one
+    with higher onset strength — unless the pad combo is in the allow list.
+    """
+    if not onsets:
+        return []
+
+    # Mark which onsets to keep
+    keep = [True] * len(onsets)
+
+    for i in range(len(onsets)):
+        if not keep[i]:
+            continue
+        t_i, pad_i, s_i = onsets[i]
+
+        for j in range(i + 1, len(onsets)):
+            t_j, pad_j, s_j = onsets[j]
+
+            # Past the NMS window — no need to check further (list is sorted)
+            if t_j - t_i > DRUM_NMS_WINDOW_S:
+                break
+
+            # Same pad — not a cross-band conflict
+            if pad_i == pad_j:
+                continue
+
+            # Allowed combo — don't suppress
+            if frozenset({pad_i, pad_j}) in DRUM_NMS_ALLOW_COMBOS:
+                continue
+
+            # Suppress the weaker one
+            if s_i >= s_j:
+                keep[j] = False
+            else:
+                keep[i] = False
+                break  # i is suppressed, stop comparing from i
+
+    return [o for o, k in zip(onsets, keep) if k]
 
 
 def _detect_band_onsets(
@@ -98,9 +149,9 @@ def _detect_band_onsets(
     post_avg: int = 10,
     delta: float = 0.04,
     wait: int = 5,
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray]:
     """
-    Band-pass the signal, compute spectral flux, return onset times in seconds.
+    Band-pass the signal, compute spectral flux, return onset times and strengths.
     """
     # Band-pass filter using librosa's STFT
     D = librosa.stft(y)
@@ -127,4 +178,7 @@ def _detect_band_onsets(
         wait=wait,
     )
 
-    return librosa.frames_to_time(onset_frames, sr=sr)
+    onset_times = librosa.frames_to_time(onset_frames, sr=sr)
+    onset_strengths = onset_env[onset_frames] if len(onset_frames) > 0 else np.array([])
+
+    return onset_times, onset_strengths

@@ -45,7 +45,9 @@ python run_pipeline.py <audio_file> [options]
 | `--skip-bass` | Skip bass transcription |
 | `--skip-drums` | Skip drum transcription |
 | `--skip-vocals` | Skip vocal pitch extraction |
+| `--skip-lyrics` | Skip lyrics acquisition (use full-stem CREPE) |
 | `--skip-difficulties` | Skip auto-difficulty generation (EasyChartGenerator) |
+| `--lyrics "path.lrc"` | Path to synced LRC lyrics file (skip online fetch) |
 | `--snap 16` | Quantization grid: 4/8/16/32 (default: 16) |
 | `--bpm-multiplier 2.0` | Fix songs charted at half-tempo (ECG also auto-detects via snare patterns) |
 | `--doublekick 150` | Auto-mark double kick on drums below this ms threshold |
@@ -70,6 +72,13 @@ python run_pipeline.py song.mp3 --doublekick 150
 
 # Skip auto-difficulty generation (Expert only)
 python run_pipeline.py song.mp3 --skip-difficulties
+
+# Provide synced lyrics for better vocal transcription
+python run_pipeline.py song.mp3 --name "My Song" --artist "My Band" \
+  --lyrics input/lyrics_synced.lrc
+
+# Skip lyrics (fall back to full-stem CREPE, original behavior)
+python run_pipeline.py song.mp3 --name "My Song" --artist "My Band" --skip-lyrics
 ```
 
 ---
@@ -88,10 +97,18 @@ Phase 1a: Stem Separation (Demucs htdemucs_6s)
 Phase 1b: Beat & BPM Detection (librosa)
           → output/midi/<song>_beats.json
     │
+    ▼
+Phase 1c: Lyrics Acquisition (syncedlyrics / WhisperX fallback)
+          → output/midi/<song>_lyrics.json
+          Fallback chain: user LRC → online fetch → WhisperX → none
+          Validates timing via energy cross-correlation with vocal stem
+    │
     ├─▶ Phase 2a: Guitar transcription (Basic Pitch)
     ├─▶ Phase 2b: Bass transcription   (Basic Pitch)
     ├─▶ Phase 2c: Drum transcription   (librosa onset detection)
     └─▶ Phase 2d: Vocal extraction     (torchcrepe CREPE)
+                  When lyrics available: phrase-sliced CREPE (fewer false positives)
+                  When no lyrics: full-stem CREPE (original behavior)
           → output/midi/*_raw.mid
     │
     ▼
@@ -102,6 +119,7 @@ Phase 3b: Lane mapping (pitch → 5 fret lanes, drum GM notes → RB pads)
     │
     ▼
 Phase 4: Export Expert .chart (Clone Hero / YARG format)
+          Includes lyric events in [Events] section when lyrics available
           → output/chart/<Song Name>.chart  [Expert only]
     │
     ▼
@@ -138,6 +156,7 @@ output/
 │       └── other.wav
 ├── midi/
 │   ├── <song>_beats.json
+│   ├── <song>_lyrics.json          ← cached synced lyrics (if acquired)
 │   ├── <song>_guitar_raw.mid
 │   ├── <song>_guitar_quantized.mid
 │   ├── <song>_guitar_lanes.mid
@@ -157,6 +176,7 @@ output/
 | Drum detection | ~70-80% hit rate | Significant cleanup |
 | Guitar/bass MIDI | ~50-60% | Major cleanup + lane remapping |
 | Vocal melody | ~80% (clean vocals) | Syllable boundaries + lyrics |
+| Vocal melody (with lyrics) | ~90% (fewer false positives) | Minor cleanup |
 | Difficulty reduction | 0% | 100% manual per difficulty |
 
 The pipeline provides a **skeleton** — not a finished chart.
@@ -172,5 +192,7 @@ Always do manual review in the chart editor before publishing.
 | [librosa](https://librosa.org/) | Beat/BPM detection |
 | [Basic Pitch](https://github.com/spotify/basic-pitch) | Melodic pitch detection |
 | [torchcrepe](https://github.com/maxrmorrison/torchcrepe) | Vocal pitch detection |
+| [syncedlyrics](https://github.com/rtcq/syncedlyrics) | Online synced lyrics fetch |
+| [WhisperX](https://github.com/m-bain/whisperX) | AI lyrics fallback (optional) |
 | [pretty_midi](https://github.com/craffel/pretty-midi) | MIDI processing |
 | [EasyChartGenerator](https://github.com/eerovil/EasyChartGenerator) | Auto Hard/Medium/Easy difficulty generation |

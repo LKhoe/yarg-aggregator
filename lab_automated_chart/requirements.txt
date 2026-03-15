@@ -16,6 +16,12 @@ pretty_midi
 # Audio I/O
 soundfile
 
+# Synced lyrics (online fetch)
+syncedlyrics
+
 # Compat (pkg_resources needed by madmom / resampy)
 setuptools<72
 cython
+
+# Optional: AI lyrics fallback (install manually)
+whisperx

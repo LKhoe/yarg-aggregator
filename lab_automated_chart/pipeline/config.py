@@ -4,15 +4,24 @@ All paths and tunable parameters live here.
 """
 from pathlib import Path
 
+import torch
+
 # ── Output directories ───────────────────────────────────────────────────────
 LAB_DIR = Path(__file__).parent.parent
 STEMS_DIR = LAB_DIR / "output" / "stems"
 MIDI_DIR = LAB_DIR / "output" / "midi"
 CHART_DIR = LAB_DIR / "output" / "chart"
 
+# ── Device auto-detection ─────────────────────────────────────────────────────
+if torch.cuda.is_available():
+    DEVICE = "cuda"
+elif torch.backends.mps.is_available():
+    DEVICE = "mps"
+else:
+    DEVICE = "cpu"
+
 # ── Stem separation (Demucs) ─────────────────────────────────────────────────
 DEMUCS_MODEL = "htdemucs_6s"          # 6-stem: drums/bass/guitar/piano/vocals/other
-DEMUCS_DEVICE = "cpu"                 # "cuda" if GPU available
 
 # ── Beat detection (librosa) ─────────────────────────────────────────────────
 BEAT_TRIM_SILENCE = True              # trim leading silence before detection
@@ -25,11 +34,12 @@ BASIC_PITCH_MIN_FREQ = 40.0          # Hz — ignore below (cleans drum bleed)
 BASIC_PITCH_MAX_FREQ = 2000.0        # Hz
 
 # ── Vocal pitch detection (torchcrepe) ───────────────────────────────────────
-CREPE_MODEL = "tiny"                 # "tiny" / "small" / "medium" / "large" / "full"
-CREPE_CONFIDENCE_THRESHOLD = 0.75   # only keep frames with confidence above this
-CREPE_NOTE_MIN_DURATION = 0.08      # seconds — merge gaps shorter than this
+CREPE_MODEL = "full"                 # "tiny" or "full" (torchcrepe only supports these two)
+CREPE_CONFIDENCE_THRESHOLD = 0.35   # frame-level voicing threshold (low = more frames kept)
+CREPE_NOTE_MIN_DURATION = 0.045     # seconds — discard notes shorter than this (ref min=0.045)
 CREPE_FMIN = 60.0                   # Hz  (C2 — lowest vocal note authored)
 CREPE_FMAX = 1000.0                 # Hz  (B4 ≈ 988 Hz — highest vocal note authored)
+CREPE_ONSET_DELTA = 0.15            # onset detection sensitivity for syllable splitting
 
 # ── MIDI / quantization ───────────────────────────────────────────────────────
 MIDI_RESOLUTION = 480               # ticks per quarter note (standard)
@@ -66,6 +76,35 @@ DRUM_NOTE_TO_PAD = {
     45: 3, 50: 3,           # Low/high tom → Blue
     41: 4, 39: 1,           # Low floor → Green, hand clap → Red
 }
+
+# ── Drum band definitions ────────────────────────────────────────────────────
+# Per-band onset sensitivity (delta) and reduced frequency overlaps.
+DRUM_BANDS = [
+    {"label": "kick",  "lo": 20,   "hi": 120,   "pad": 0, "delta": 0.06},
+    {"label": "snare", "lo": 150,  "hi": 500,   "pad": 1, "delta": 0.04},
+    {"label": "hihat", "lo": 500,  "hi": 4000,  "pad": 2, "delta": 0.03},
+    {"label": "tom",   "lo": 200,  "hi": 400,   "pad": 3, "delta": 0.05},
+    {"label": "crash", "lo": 4000, "hi": 16000, "pad": 4, "delta": 0.04},
+]
+
+# Cross-band NMS: max time gap (seconds) for deduplication across pads.
+DRUM_NMS_WINDOW_S = 0.030  # 30ms
+
+# Pad combos that are allowed to fire simultaneously (no NMS between them).
+DRUM_NMS_ALLOW_COMBOS = {
+    frozenset({0, 2}),  # kick + hihat
+    frozenset({1, 2}),  # snare + hihat
+    frozenset({0, 4}),  # kick + crash
+    frozenset({1, 4}),  # snare + crash
+}
+
+# ── Lyrics acquisition ───────────────────────────────────────────────────────
+LYRICS_MAX_OFFSET_S = 5.0                # cross-correlation search range
+LYRICS_OFFSET_THRESHOLD_S = 0.2          # apply correction if offset > this
+LYRICS_PHRASE_PAD_BEFORE_S = 0.2         # audio padding before phrase for CREPE
+LYRICS_PHRASE_PAD_AFTER_S = 0.1          # audio padding after phrase
+LYRICS_MIN_PHRASE_ENERGY = 0.01          # RMS threshold for dropping silent phrases
+WHISPERX_MODEL_SIZE = "base"             # Whisper model size for fallback
 
 # ── .chart serialization ─────────────────────────────────────────────────────
 CHART_RESOLUTION = 192              # ticks-per-beat used in .chart format

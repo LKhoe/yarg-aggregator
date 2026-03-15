@@ -5,17 +5,23 @@ Uses Demucs (htdemucs_6s) to split an audio file into:
 """
 from __future__ import annotations
 
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-from .config import DEMUCS_MODEL, DEMUCS_DEVICE, STEMS_DIR
+from .config import DEMUCS_MODEL, DEVICE, STEMS_DIR
 
 
 STEM_NAMES = ["drums", "bass", "guitar", "piano", "vocals", "other"]
 
 
-def separate_stems(audio_path: Path, output_dir: Path | None = None) -> dict[str, Path]:
+def separate_stems(
+    audio_path: Path,
+    output_dir: Path | None = None,
+    dest_dir: Path | None = None,
+) -> dict[str, Path]:
     """
     Run Demucs on *audio_path* and return a mapping of stem_name → wav_path.
 
@@ -40,16 +46,13 @@ def separate_stems(audio_path: Path, output_dir: Path | None = None) -> dict[str
     if expected_stem_dir.exists() and any(expected_stem_dir.iterdir()):
         print(f"[stems] Found existing stems in {expected_stem_dir}, skipping Demucs.")
     else:
-        print(f"[stems] Running Demucs ({DEMUCS_MODEL}) on {audio_path.name} ...")
-        cmd = [
-            sys.executable, "-m", "demucs",
-            "--two-stems", "vocals",   # fast fallback; override below for 6s
-        ]
-        # Use 6-stem model
+        # htdemucs_6s uses conv layers with >65536 channels, unsupported on MPS
+        demucs_device = "cpu" if DEVICE == "mps" else DEVICE
+        print(f"[stems] Running Demucs ({DEMUCS_MODEL}) on {audio_path.name} (device={demucs_device}) ...")
         cmd = [
             sys.executable, "-m", "demucs",
             "-n", DEMUCS_MODEL,
-            "--device", DEMUCS_DEVICE,
+            "--device", demucs_device,
             "-o", str(output_dir),
             str(audio_path),
         ]
@@ -76,6 +79,18 @@ def separate_stems(audio_path: Path, output_dir: Path | None = None) -> dict[str
             f"No stems found in {expected_stem_dir}. "
             "Check that Demucs ran successfully."
         )
+
+    # Copy stems flat into dest_dir if requested
+    if dest_dir is not None:
+        dest_dir = Path(dest_dir)
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        flat: dict[str, Path] = {}
+        for name, src in stems.items():
+            dst = dest_dir / src.name
+            if not dst.exists():
+                shutil.copy2(src, dst)
+            flat[name] = dst
+        stems = flat
 
     print(f"[stems] Available stems: {list(stems.keys())}")
     return stems
