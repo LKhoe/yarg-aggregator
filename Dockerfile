@@ -15,6 +15,10 @@ COPY . .
 # Generate drizzle migrations before build
 RUN npm run db:generate
 
+# Build args for NEXT_PUBLIC_ vars (must be available at build time)
+ARG NEXT_PUBLIC_APP_URL
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+
 # Build the application
 # Note: Ensure "output: 'standalone'" is set in next.config.js/ts
 RUN npm run build

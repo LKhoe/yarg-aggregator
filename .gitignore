@@ -49,3 +49,4 @@ next-env.d.ts
 /lab_automated_chart/.venv
 /lab_automated_chart/output
 /lab_automated_chart/input
+/lab_automated_chart/examples
