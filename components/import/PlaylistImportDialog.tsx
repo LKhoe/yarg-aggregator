@@ -234,6 +234,11 @@ export function PlaylistImportDialog({
           const data = await res.json();
           if (data.error === "reauth_required") {
             toast.error(t("import.reauthRequired"));
+            setAccounts((prev) =>
+              prev.map((a) =>
+                a.provider === provider ? { ...a, hasScopes: false } : a,
+              ),
+            );
             setStep(1);
             return;
           }
