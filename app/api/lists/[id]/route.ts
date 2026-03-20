@@ -34,6 +34,7 @@ export async function GET(
           album: item.song.album?.name ?? null,
           albumImageUrl: item.song.albumImageUrl,
           downloadUrls: item.song.downloadUrls,
+          vocalParts: item.song.vocalParts ?? null,
           instruments: {
             drums: item.song.diffDrums ?? null,
             bass: item.song.diffBass ?? null,

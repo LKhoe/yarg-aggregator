@@ -30,19 +30,13 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Install pg_isready for entrypoint health check
-RUN apk add --no-cache postgresql-client
-
-# Install tsx globally for running TypeScript setup scripts
-RUN npm install -g tsx
-
 # Don't run as root
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Install migration dependencies before copying app files for better layer caching
+# Install only the runtime deps needed for migrations (pg + drizzle-orm)
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
-RUN npm install pg postgres drizzle-orm drizzle-kit
+RUN npm install --no-save pg drizzle-orm
 
 # Copy only the necessary files for standalone mode
 COPY --from=builder /app/public ./public
@@ -57,9 +51,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # Copy database migration files
-# Note: drizzle.config.ts specifies out: './lib/db/migrations'
-COPY --from=builder --chown=nextjs:nodejs /app/drizzle.config.ts ./
-COPY --from=builder --chown=nextjs:nodejs /app/lib/db ./lib/db
+COPY --from=builder --chown=nextjs:nodejs /app/lib/db/migrations ./lib/db/migrations
+COPY --from=builder --chown=nextjs:nodejs /app/lib/db/setup ./lib/db/setup
+
+# Copy migration/setup scripts (plain .mjs — no tsx needed)
+COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 
 # Copy and setup entrypoint script
 COPY --chown=nextjs:nodejs docker-entrypoint.sh /usr/local/bin/

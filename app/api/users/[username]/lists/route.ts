@@ -49,6 +49,7 @@ export async function GET(
           albumImageUrl: item.song.albumImageUrl,
           addedAt: item.addedAt,
           downloadUrls: item.song.downloadUrls,
+          vocalParts: item.song.vocalParts ?? null,
           instruments: {
             guitar: item.song.diffGuitar ?? null,
             bass: item.song.diffBass ?? null,

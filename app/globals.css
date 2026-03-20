@@ -69,7 +69,7 @@
     --secondary: oklch(0.77 0 0);
     --secondary-foreground: oklch(0.205 0 0);
     --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
+    --muted-foreground: oklch(0.45 0 0);
     --accent: oklch(0.87 0 0);
     --accent-foreground: oklch(0.205 0 0);
     --destructive: oklch(0.577 0.245 27.325);
@@ -186,6 +186,65 @@
     }
 }
 
+@keyframes fade-slide-up {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes orb-float-1 {
+    0%, 100% {
+        transform: translate(0, 0) scale(1);
+    }
+    33% {
+        transform: translate(30px, -20px) scale(1.05);
+    }
+    66% {
+        transform: translate(-20px, 15px) scale(0.95);
+    }
+}
+
+@keyframes orb-float-2 {
+    0%, 100% {
+        transform: translate(0, 0) scale(1);
+    }
+    25% {
+        transform: translate(-25px, 20px) scale(1.08);
+    }
+    50% {
+        transform: translate(15px, -15px) scale(0.92);
+    }
+    75% {
+        transform: translate(-10px, -25px) scale(1.03);
+    }
+}
+
+@keyframes orb-float-3 {
+    0%, 100% {
+        transform: translate(0, 0) scale(1);
+    }
+    40% {
+        transform: translate(20px, 25px) scale(0.95);
+    }
+    70% {
+        transform: translate(-15px, -10px) scale(1.06);
+    }
+}
+
 .active-filter {
     box-shadow: 0 0 8px 2px oklch(from var(--primary) l c h / 40%);
     border-color: oklch(from var(--primary) l c h / 50%);
@@ -216,6 +275,75 @@
             )
             border-box !important;
     animation: glow-rotate 3s linear infinite;
+}
+
+/* === Ambient shadows === */
+:root {
+    --shadow-ambient: 0 2px 12px -2px oklch(0.5 0 0 / 0.08);
+    --shadow-ambient-lg: 0 4px 20px -4px oklch(0.5 0 0 / 0.12);
+}
+.dark {
+    --shadow-ambient: 0 2px 12px -2px oklch(0.55 0.2 280 / 0.15);
+    --shadow-ambient-lg: 0 4px 20px -4px oklch(0.55 0.2 280 / 0.25);
+}
+
+/* === Heading tracking === */
+h1, h2, h3, h4, [data-slot="card-title"] {
+    letter-spacing: -0.025em;
+}
+
+/* === Noise texture overlay === */
+.noise-overlay::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    pointer-events: none;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 256px 256px;
+}
+@media (prefers-color-scheme: light) {
+    .noise-overlay::before {
+        opacity: 0.02;
+    }
+}
+
+/* === Shimmer skeleton === */
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+.animate-shimmer {
+    background: linear-gradient(
+        90deg,
+        var(--muted) 0%,
+        oklch(from var(--muted) calc(l + 0.08) c h) 50%,
+        var(--muted) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* === Gradient fade border === */
+.border-gradient-h {
+    border-image: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent) 1;
+}
+
+/* === Table header separator === */
+.table-header-separator::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 5%;
+    right: 5%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent);
 }
 
 .gradient-border {

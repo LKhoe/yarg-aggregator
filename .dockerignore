@@ -8,3 +8,16 @@ coverage
 
 # automated chart lab
 lab_automated_chart
+
+# IDE / editor
+.vscode
+.idea
+*.swp
+*.swo
+
+# docs & config not needed in image
+README.md
+CLAUDE.md
+LICENSE
+.eslintrc*
+.prettierrc*

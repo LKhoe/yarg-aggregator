@@ -169,16 +169,19 @@ export default function SongDetail({
             {INSTRUMENTS.map((inst) => {
               const diff = song.instruments[inst];
               if (diff === null) return null;
+              const iconName = inst === "vocals" && song.vocalParts && song.vocalParts > 1 ? "harmony" : inst;
               return (
                 <div key={inst} className="flex items-center gap-1.5 text-xs">
                   <DifficultyMedal
                     level={diff}
                     size="sm"
-                    icon={<InstrumentIcon instrument={inst} />}
+                    icon={<InstrumentIcon instrument={iconName} />}
                   />
                   <div className="flex flex-col">
                     <span className="capitalize font-medium">
-                      {t(`table.instrumentsObj.${inst}`)}
+                      {inst === "vocals" && song.vocalParts && song.vocalParts > 1
+                        ? t(`table.instrumentsObj.harmony`, { defaultMessage: "Harmony" })
+                        : t(`table.instrumentsObj.${inst}`)}
                     </span>
                     <span className="text-muted-foreground">{diff}/7</span>
                   </div>

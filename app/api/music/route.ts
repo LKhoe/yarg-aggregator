@@ -40,10 +40,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find all music documents by their IDs in parallel
-    const musicPromises = limitedIds.map((id) => MusicService.findById(id));
-    const musicResults = await Promise.all(musicPromises);
-    const musicData = musicResults.filter((music) => music !== null);
+    // Find all music documents by their IDs in a single query
+    const musicData = await MusicService.findByIds(limitedIds);
 
     return NextResponse.json(musicData);
   } catch (error) {

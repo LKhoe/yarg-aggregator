@@ -53,6 +53,7 @@ import Link from "next/link";
 import { AlbumImage } from "@/components/ui/album-image";
 import type { ProviderMusic } from "@/types";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { Reveal } from "@/components/ui/reveal";
 
 const SongDetail = dynamic(() => import("@/components/song/SongDetail"), {
   ssr: false,
@@ -106,6 +107,7 @@ function toProviderMusic(
     coverUrl: song.albumImageUrl ?? "",
     downloadUrls: song.downloadUrls,
     instruments: song.instruments,
+    vocalParts: null,
     genre: null,
     year: null,
     charter: null,
@@ -531,13 +533,13 @@ function ListDetailContent({ params }: { params: Promise<{ id: string }> }) {
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {list.items.map((item) => {
+                  {list.items.map((item, index) => {
                     const hasDownload = item.song.downloadUrls.length > 0;
                     const isInstalled = installedSongIds.has(item.song.id);
 
                     return (
+                      <Reveal key={item.id} delay={index * 0.05}>
                       <div
-                        key={item.id}
                         className="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
                         onClick={() =>
                           setSelectedSong(
@@ -594,6 +596,7 @@ function ListDetailContent({ params }: { params: Promise<{ id: string }> }) {
                           </Button>
                         </div>
                       </div>
+                      </Reveal>
                     );
                   })}
                 </div>

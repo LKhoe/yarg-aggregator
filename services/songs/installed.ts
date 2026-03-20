@@ -110,6 +110,7 @@ export function songEntryToProviderMusic(entry: SongEntry): ProviderMusic {
     coverUrl: "", // Cache doesn't contain cover URLs
     downloadUrls: [], // Installed songs don't have download URLs
     sourceUpdatedAt: null,
+    vocalParts: parts.HarmonyVocals.Intensity >= 0 ? 2 : parts.LeadVocals.Intensity >= 0 ? 1 : null,
     instruments: {
       guitar: getGuitarDiff(),
       bass: getBassDiff(),
@@ -368,6 +369,7 @@ export function serializedEntryToProviderMusic(
     coverUrl: "",
     downloadUrls: [],
     sourceUpdatedAt: null,
+    vocalParts: parts.HarmonyVocals.Intensity >= 0 ? 2 : parts.LeadVocals.Intensity >= 0 ? 1 : null,
     instruments: {
       guitar: getGuitarDiff(),
       bass: getBassDiff(),

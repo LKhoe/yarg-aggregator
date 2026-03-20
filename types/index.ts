@@ -26,6 +26,7 @@ export interface ProviderMusic {
     keys: number | null;
     vocals: number | null;
   };
+  vocalParts: number | null;
   album: string | null;
   genre: string | null;
   year: number | null;

@@ -36,6 +36,20 @@
       "when": 1772235744291,
       "tag": "0004_blushing_ben_urich",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1773962783319,
+      "tag": "0005_parched_grandmaster",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1774004840354,
+      "tag": "0006_old_unicorn",
+      "breakpoints": true
     }
   ]
 }

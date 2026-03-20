@@ -1,0 +1,1 @@
+CREATE INDEX "download_url_song_source_idx" ON "download_url" USING btree ("song_id","source");

@@ -60,6 +60,7 @@ export interface RhythmVerseSongEntry {
     diff_vocals: string | null;
     diff_keys: string | null;
     diff_prokeys: string | null;
+    vocal_parts: string | null;
     charter?: string;
     album_art: string | null;
     record_updated: string; // timestamp
@@ -85,6 +86,7 @@ export interface RhythmVerseSongEntry {
     diff_vocals?: number | null;
     diff_keys?: number | null;
     diff_prokeys?: number | null;
+    vocal_parts_authored?: string | null;
   };
 }
 
@@ -117,6 +119,9 @@ export function parseRhythmverseData(
       parseDifficulty(data.diff_keys);
     const vocals =
       parseDifficulty(data.diff_vocals) ?? parseDifficulty(file.diff_vocals);
+    const vocalParts =
+      parseDifficulty(data.vocal_parts) ??
+      parseDifficulty(file.vocal_parts_authored);
 
     return {
       name,
@@ -128,6 +133,7 @@ export function parseRhythmverseData(
       year: file.file_year || null,
       genre,
       charter,
+      vocalParts,
       instruments: {
         drums,
         bass,

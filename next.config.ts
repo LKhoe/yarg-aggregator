@@ -6,7 +6,13 @@ const withNextIntl = createNextIntlPlugin("./i18n.ts");
 const nextConfig: NextConfig = {
   output: "standalone",
   experimental: {
-    optimizePackageImports: ["lucide-react"],
+    optimizePackageImports: [
+      "lucide-react",
+      "@radix-ui/react-select",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-popover",
+      "@radix-ui/react-tooltip",
+    ],
   },
   generateBuildId: async () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -26,21 +32,36 @@ const nextConfig: NextConfig = {
       {
         source: "/sw.js",
         headers: [
-          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
-          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
-          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'" },
+          {
+            key: "Content-Type",
+            value: "application/javascript; charset=utf-8",
+          },
+          {
+            key: "Cache-Control",
+            value: "no-cache, no-store, must-revalidate",
+          },
+          {
+            key: "Content-Security-Policy",
+            value: "default-src 'self'; script-src 'self'",
+          },
         ],
       },
       {
         source: "/api/genres",
         headers: [
-          { key: "Cache-Control", value: "public, max-age=3600, stale-while-revalidate=86400" },
+          {
+            key: "Cache-Control",
+            value: "public, max-age=3600, stale-while-revalidate=86400",
+          },
         ],
       },
       {
         source: "/api/music",
         headers: [
-          { key: "Cache-Control", value: "public, max-age=30, stale-while-revalidate=120" },
+          {
+            key: "Cache-Control",
+            value: "public, max-age=30, stale-while-revalidate=120",
+          },
         ],
       },
     ];

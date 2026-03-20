@@ -217,6 +217,7 @@ export const song = pgTable(
     diffDrums: integer("diff_drums"),
     diffKeys: integer("diff_keys"),
     diffVocals: integer("diff_vocals"),
+    vocalParts: integer("vocal_parts"),
     searchVector: text("search_vector"), // For full-text search
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -249,6 +250,7 @@ export const downloadUrl = pgTable(
   (table) => [
     index("download_url_song_id_idx").on(table.songId),
     index("download_url_source_idx").on(table.source),
+    index("download_url_song_source_idx").on(table.songId, table.source),
   ],
 );
 

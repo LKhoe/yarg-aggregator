@@ -9,7 +9,7 @@ import {
   songList,
   songListItem,
 } from "@/lib/db/schema";
-import { eq, and, desc, asc, sql, or } from "drizzle-orm";
+import { eq, and, desc, asc, sql, or, inArray } from "drizzle-orm";
 import type { ProviderMusic, SearchParams, PaginatedResponse } from "@/types";
 
 export class MusicService {
@@ -25,6 +25,7 @@ export class MusicService {
         diffDrums: song.diffDrums,
         diffKeys: song.diffKeys,
         diffVocals: song.diffVocals,
+        vocalParts: song.vocalParts,
         albumImageUrl: song.albumImageUrl,
         previewUrl: song.previewUrl,
         artist: artist.name,
@@ -55,6 +56,7 @@ export class MusicService {
         song.diffDrums,
         song.diffKeys,
         song.diffVocals,
+        song.vocalParts,
         song.albumImageUrl,
         song.previewUrl,
         artist.name,
@@ -64,6 +66,40 @@ export class MusicService {
       .limit(1);
 
     return data[0] ? this.convertToProviderMusic(data[0]) : null;
+  }
+
+  static async findByIds(ids: string[]): Promise<ProviderMusic[]> {
+    if (ids.length === 0) return [];
+
+    const data = await db
+      .select({
+        id: song.id,
+        title: song.title,
+        year: song.year,
+        charter: song.charter,
+        diffGuitar: song.diffGuitar,
+        diffBass: song.diffBass,
+        diffDrums: song.diffDrums,
+        diffKeys: song.diffKeys,
+        diffVocals: song.diffVocals,
+        vocalParts: song.vocalParts,
+        albumImageUrl: song.albumImageUrl,
+        previewUrl: song.previewUrl,
+        artist: artist.name,
+        album: album.name,
+        genre: genre.name,
+        downloadUrls: sql<{ url: string; source: string }[]>`
+          (SELECT COALESCE(json_agg(jsonb_build_object('url', du.url, 'source', du.source)), '[]')
+           FROM download_url du WHERE du.song_id = ${song.id})
+        `,
+      })
+      .from(song)
+      .leftJoin(artist, eq(song.artistId, artist.id))
+      .leftJoin(album, eq(song.albumId, album.id))
+      .leftJoin(genre, eq(song.genreId, genre.id))
+      .where(inArray(song.id, ids));
+
+    return data.map((record) => this.convertToProviderMusic(record));
   }
 
   static async search(
@@ -146,7 +182,9 @@ export class MusicService {
     }
 
     if (source) {
-      conditions.push(eq(downloadUrl.source, source));
+      conditions.push(
+        sql`EXISTS (SELECT 1 FROM download_url du WHERE du.song_id = ${song.id} AND du.source = ${source})`,
+      );
     }
 
     if (instruments.length > 0) {
@@ -245,6 +283,7 @@ export class MusicService {
         diffDrums: song.diffDrums,
         diffKeys: song.diffKeys,
         diffVocals: song.diffVocals,
+        vocalParts: song.vocalParts,
         albumImageUrl: song.albumImageUrl,
         previewUrl: song.previewUrl,
         createdAt: song.createdAt,
@@ -252,22 +291,17 @@ export class MusicService {
         album: album.name,
         genre: genre.name,
         downloadUrls: sql<{ url: string; source: string }[]>`
-          COALESCE(
-            json_agg(
-              DISTINCT jsonb_build_object('url', ${downloadUrl.url}, 'source', ${downloadUrl.source})
-            ) FILTER (WHERE ${downloadUrl.url} IS NOT NULL),
-            '[]'
-          )
+          (SELECT COALESCE(json_agg(jsonb_build_object('url', du.url, 'source', du.source)), '[]')
+           FROM download_url du WHERE du.song_id = ${song.id})
         `,
-        installed: sql<boolean>`BOOL_OR(${installationSong.id} IS NOT NULL)`,
-        favorited: sql<boolean>`BOOL_OR(${songListItem.id} IS NOT NULL)`,
+        installed: sql<boolean>`${installationSong.id} IS NOT NULL`,
+        favorited: sql<boolean>`${songListItem.id} IS NOT NULL`,
         ...(relevanceScore ? { relevanceScore } : {}),
       })
       .from(song)
       .leftJoin(artist, eq(song.artistId, artist.id))
       .leftJoin(album, eq(song.albumId, album.id))
       .leftJoin(genre, eq(song.genreId, genre.id))
-      .leftJoin(downloadUrl, eq(song.id, downloadUrl.songId))
       .leftJoin(installationSong, installationJoinCondition)
       .leftJoin(songList, favoritesListJoinCondition)
       .leftJoin(songListItem, favoritesItemJoinCondition);
@@ -277,29 +311,10 @@ export class MusicService {
       ? and(baseFinalWhereClause, sql`${installationSong.id} IS NOT NULL`)
       : baseFinalWhereClause;
 
-    const groupByClause = [
-      song.id,
-      song.title,
-      song.year,
-      song.charter,
-      song.diffGuitar,
-      song.diffBass,
-      song.diffDrums,
-      song.diffKeys,
-      song.diffVocals,
-      song.albumImageUrl,
-      song.previewUrl,
-      song.createdAt,
-      artist.name,
-      album.name,
-      genre.name,
-    ];
-
     const filteredQuery = finalWhereClause
       ? baseDataQuery.where(finalWhereClause)
       : baseDataQuery;
     const data = await filteredQuery
-      .groupBy(...groupByClause)
       .orderBy(orderByPrimary, asc(song.id))
       .limit(limit + 1);
 
@@ -318,12 +333,11 @@ export class MusicService {
       count = typeof cursorData.total === "number" ? cursorData.total : 0;
     } else {
       const countBaseQuery = db
-        .select({ count: sql<number>`count(DISTINCT ${song.id})` })
+        .select({ count: sql<number>`count(${song.id})` })
         .from(song)
         .leftJoin(artist, eq(song.artistId, artist.id))
         .leftJoin(album, eq(song.albumId, album.id))
-        .leftJoin(genre, eq(song.genreId, genre.id))
-        .leftJoin(downloadUrl, eq(song.id, downloadUrl.songId));
+        .leftJoin(genre, eq(song.genreId, genre.id));
 
       const finalCountQuery = whereClause
         ? countBaseQuery.where(whereClause)
@@ -385,6 +399,7 @@ export class MusicService {
         diffDrums: song.diffDrums,
         diffKeys: song.diffKeys,
         diffVocals: song.diffVocals,
+        vocalParts: song.vocalParts,
         albumImageUrl: song.albumImageUrl,
         previewUrl: song.previewUrl,
         artist: artist.name,
@@ -415,6 +430,7 @@ export class MusicService {
         song.diffDrums,
         song.diffKeys,
         song.diffVocals,
+        song.vocalParts,
         song.albumImageUrl,
         song.previewUrl,
         artist.name,
@@ -504,6 +520,7 @@ export class MusicService {
     genre?: string;
     year?: number;
     charter?: string;
+    vocalParts?: number;
   }): Promise<ProviderMusic> {
     return await db.transaction(async (tx) => {
       // Find or create artist
@@ -570,6 +587,7 @@ export class MusicService {
           diffDrums: songData.instruments.drums,
           diffKeys: songData.instruments.keys,
           diffVocals: songData.instruments.vocals,
+          vocalParts: songData.vocalParts,
         })
         .returning();
 
@@ -591,6 +609,7 @@ export class MusicService {
         diffDrums: songRecord.diffDrums,
         diffKeys: songRecord.diffKeys,
         diffVocals: songRecord.diffVocals,
+        vocalParts: songRecord.vocalParts,
         albumImageUrl: songRecord.albumImageUrl,
         previewUrl: songRecord.previewUrl,
         artist: artistRecord.name,
@@ -614,6 +633,7 @@ export class MusicService {
     diffGuitar?: number | null;
     diffKeys?: number | null;
     diffVocals?: number | null;
+    vocalParts?: number | null;
     genre?: string | null;
     year?: number | null;
     charter?: string | null;
@@ -628,6 +648,7 @@ export class MusicService {
       coverUrl: record.albumImageUrl || "",
       downloadUrls: record.downloadUrls || [],
       sourceUpdatedAt: null,
+      vocalParts: record.vocalParts ?? null,
       instruments: {
         drums: record.diffDrums ?? null,
         bass: record.diffBass ?? null,

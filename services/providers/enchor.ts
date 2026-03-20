@@ -80,6 +80,7 @@ export function parseEnchorData(songs: EnchorSong[]): ProviderMusic[] {
       year: parsedYear,
       genre: song.genre || null,
       charter: song.charter || null,
+      vocalParts: null,
       instruments: {
         drums: song.diff_drums !== -1 ? song.diff_drums : null,
         bass: song.diff_bass !== -1 ? song.diff_bass : null,

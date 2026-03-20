@@ -198,6 +198,7 @@ async function saveSongsInBatches(
         charter: songData.charter,
         previewUrl: null,
         albumImageUrl: songData.coverUrl,
+        vocalParts: songData.vocalParts ?? null,
         ...diffs,
         ...(songData.sourceUpdatedAt
           ? { createdAt: songData.sourceUpdatedAt }
@@ -308,6 +309,10 @@ async function saveSongsInBatches(
     }
     if (songData.coverUrl && !existing.albumImageUrl) {
       updateData.albumImageUrl = songData.coverUrl;
+      shouldUpdateSong = true;
+    }
+    if (songData.vocalParts && !existing.vocalParts) {
+      updateData.vocalParts = songData.vocalParts;
       shouldUpdateSong = true;
     }
 

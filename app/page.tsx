@@ -35,6 +35,8 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { AnimatePresence, motion } from "motion/react";
+import { FadeIn } from "@/components/ui/fade-in";
 
 export default function HomePage() {
   const [totalSongs, setTotalSongs] = useState(0);
@@ -61,7 +63,7 @@ export default function HomePage() {
 
   return (
     <InstallationProvider>
-      <div className="min-h-screen bg-linear-to-br from-background via-background to-primary/10">
+      <div className="min-h-screen noise-overlay" style={{ background: "radial-gradient(ellipse 80% 60% at 50% -10%, oklch(0.18 0.04 280), var(--background))" }}>
         <BackgroundOrbs />
 
         <Header />
@@ -78,14 +80,26 @@ export default function HomePage() {
             </div>
 
             <aside className="hidden lg:block space-y-4 lg:space-y-6 sticky top-20 self-start max-h-[calc(100vh-2rem)] overflow-hidden">
-              {selectedSong && (
-                <SongDetail
-                  song={selectedSong}
-                  onClose={() => setSelectedSong(null)}
-                  onApplyFilters={setExternalFilter}
-                />
-              )}
-              <UsersCard />
+              <AnimatePresence mode="wait">
+                {selectedSong && (
+                  <motion.div
+                    key={selectedSong.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.25, ease: "easeOut" }}
+                  >
+                    <SongDetail
+                      song={selectedSong}
+                      onClose={() => setSelectedSong(null)}
+                      onApplyFilters={setExternalFilter}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <FadeIn>
+                <UsersCard />
+              </FadeIn>
             </aside>
           </div>
         </main>

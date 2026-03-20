@@ -64,6 +64,7 @@ import InstallationSelector, {
 import { useSession } from "@/lib/auth-client";
 import { useUserLists } from "@/hooks/use-user-lists";
 import { SongActions } from "@/components/data-table/SongActions";
+import { AnimatePresence, motion } from "motion/react";
 
 interface MusicTableProps {
   onTotalChange: (total: number) => void;
@@ -141,6 +142,7 @@ interface MusicRowProps {
   lists: Array<{ id: string; name: string }>;
   onAddToList: (listId: string, songId: string) => Promise<unknown>;
   onSongSelect?: (song: ProviderMusic) => void;
+  animationDelay?: number;
 }
 
 const MusicRow = memo(function MusicRow({
@@ -150,14 +152,24 @@ const MusicRow = memo(function MusicRow({
   lists,
   onAddToList,
   onSongSelect,
+  animationDelay,
 }: MusicRowProps) {
   return (
     <TableRow
-      className={`cursor-pointer ${music.installed ? "bg-green-500/5 hover:bg-green-500/10" : ""}`}
+      className={`group/row cursor-pointer transition-[background-color,box-shadow] duration-200 hover:shadow-[inset_3px_0_0_0_var(--primary),0_2px_8px_-2px_oklch(0.65_0.25_280/0.15)] hover:bg-primary/[0.04] ${music.installed ? "bg-green-500/5 hover:bg-green-500/10" : ""}`}
       onClick={() => onSongSelect?.(music)}
+      style={
+        animationDelay !== undefined
+          ? {
+              animation: "fade-slide-up 0.3s ease-out forwards",
+              animationDelay: `${animationDelay}ms`,
+              opacity: 0,
+            }
+          : undefined
+      }
     >
       <TableCell className="hidden sm:table-cell">
-        <div className="relative h-8 w-8 sm:h-12 sm:w-12 rounded">
+        <div className="relative h-8 w-8 sm:h-12 sm:w-12 rounded transition-transform duration-200 group-hover/row:scale-110">
           {music.coverUrl ? (
             <AlbumImage src={music.coverUrl} alt={music.name} size={48} responsiveSize={48} />
           ) : (
@@ -169,7 +181,7 @@ const MusicRow = memo(function MusicRow({
       </TableCell>
       <TableCell className="font-medium">
         <div className="flex items-start gap-2 sm:gap-3">
-          <div className="relative h-8 w-8 rounded shrink-0 sm:hidden">
+          <div className="relative h-8 w-8 rounded shrink-0 sm:hidden transition-transform duration-200 group-hover/row:scale-110">
             {music.coverUrl ? (
               <AlbumImage src={music.coverUrl} alt={music.name} size={32} />
             ) : (
@@ -179,7 +191,7 @@ const MusicRow = memo(function MusicRow({
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <div className={`max-w-25 sm:max-w-50 truncate text-xs sm:text-sm flex items-center gap-1 ${music.installed ? "text-green-600 dark:text-green-400 font-medium" : ""}`}>
+            <div className={`max-w-25 sm:max-w-50 truncate text-xs sm:text-sm flex items-center gap-1 transition-colors duration-200 group-hover/row:text-primary ${music.installed ? "text-green-600 dark:text-green-400 font-medium" : ""}`}>
               {music.installed && <CheckCircle className="h-3 w-3 shrink-0" />}
               {music.name}
             </div>
@@ -200,14 +212,16 @@ const MusicRow = memo(function MusicRow({
           {INSTRUMENTS.map((inst: string) => {
             const diff = music.instruments[inst as keyof typeof music.instruments];
             if (diff === null) return null;
+            const iconName = inst === "vocals" && music.vocalParts && music.vocalParts > 1 ? "harmony" : inst;
+            const label = inst === "vocals" && music.vocalParts && music.vocalParts > 1 ? "Harmony" : inst.charAt(0).toUpperCase() + inst.slice(1);
             return (
               <div key={inst} className="flex items-center gap-1" title={inst}>
                 <Tooltip>
                   <TooltipTrigger>
-                    <DifficultyMedal level={diff} size="sm" icon={<InstrumentIcon instrument={inst} />} />
+                    <DifficultyMedal level={diff} size="sm" icon={<InstrumentIcon instrument={iconName} />} />
                   </TooltipTrigger>
                   <TooltipContent>
-                    {inst.charAt(0).toUpperCase() + inst.slice(1)} ({diff} / 7)
+                    {label} ({diff} / 7)
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -274,6 +288,7 @@ export default function MusicTable({
   const [hasMore, setHasMore] = useState(true);
   const isMounted = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
+  const batchStartIndex = useRef(0);
 
   // Get selected installation from context
   const { selectedInstallationId } = useInstallation();
@@ -380,11 +395,15 @@ export default function MusicTable({
           if (isMounted.current) {
             if (isLoadMore) {
               // Append data for infinite scroll
-              setData((prev) => [...prev, ...result.data]);
+              setData((prev) => {
+                batchStartIndex.current = prev.length;
+                return [...prev, ...result.data];
+              });
               setNextCursor(result.nextCursor);
               setHasMore(result.hasMore);
             } else {
               // Replace data for initial load
+              batchStartIndex.current = 0;
               setData(result.data);
               setNextCursor(result.nextCursor);
               setHasMore(result.hasMore);
@@ -565,9 +584,9 @@ export default function MusicTable({
 
   return (
     <div className="space-y-4">
-      {/* Search and Filters */}
-      <div className="flex flex-col gap-3">
-        {/* Search input - exclusive row */}
+      {/* Search and Filters — Unified Toolbar */}
+      <div className="rounded-xl bg-card/30 backdrop-blur-sm border border-border/30 p-3 space-y-3 shadow-[inset_0_1px_0_0_oklch(1_0_0/0.05)]">
+        {/* Search input */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -579,64 +598,98 @@ export default function MusicTable({
         </div>
 
         {/* Active exact-match filter badges */}
-        {(artist || albumFilter || charter) && (
-          <div className="flex flex-wrap gap-1.5">
-            {artist && (
-              <Badge
-                variant="secondary"
-                className="text-xs gap-1 pr-1 active-filter-badge"
-              >
-                {artist}
-                <button
-                  onClick={() => {
-                    setArtist("");
-                    handleFilterChange();
-                  }}
-                  className="ml-1 hover:opacity-70"
-                  aria-label="Clear artist filter"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            )}
-            {albumFilter && (
-              <Badge
-                variant="secondary"
-                className="text-xs gap-1 pr-1 active-filter-badge"
-              >
-                {albumFilter}
-                <button
-                  onClick={() => {
-                    setAlbumFilter("");
-                    handleFilterChange();
-                  }}
-                  className="ml-1 hover:opacity-70"
-                  aria-label="Clear album filter"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            )}
-            {charter && (
-              <Badge
-                variant="secondary"
-                className="text-xs gap-1 pr-1 active-filter-badge"
-              >
-                {charter}
-                <button
-                  onClick={() => {
-                    setCharter("");
-                    handleFilterChange();
-                  }}
-                  className="ml-1 hover:opacity-70"
-                  aria-label="Clear charter filter"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            )}
-          </div>
-        )}
+        <AnimatePresence>
+          {(artist || albumFilter || charter) && (
+            <motion.div
+              className="flex flex-wrap gap-1.5"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <AnimatePresence>
+                {artist && (
+                  <motion.span
+                    key="artist"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Badge
+                      variant="secondary"
+                      className="text-xs gap-1 pr-1 active-filter-badge"
+                    >
+                      {artist}
+                      <button
+                        onClick={() => {
+                          setArtist("");
+                          handleFilterChange();
+                        }}
+                        className="ml-1 hover:opacity-70"
+                        aria-label="Clear artist filter"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  </motion.span>
+                )}
+                {albumFilter && (
+                  <motion.span
+                    key="album"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Badge
+                      variant="secondary"
+                      className="text-xs gap-1 pr-1 active-filter-badge"
+                    >
+                      {albumFilter}
+                      <button
+                        onClick={() => {
+                          setAlbumFilter("");
+                          handleFilterChange();
+                        }}
+                        className="ml-1 hover:opacity-70"
+                        aria-label="Clear album filter"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  </motion.span>
+                )}
+                {charter && (
+                  <motion.span
+                    key="charter"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Badge
+                      variant="secondary"
+                      className="text-xs gap-1 pr-1 active-filter-badge"
+                    >
+                      {charter}
+                      <button
+                        onClick={() => {
+                          setCharter("");
+                          handleFilterChange();
+                        }}
+                        className="ml-1 hover:opacity-70"
+                        aria-label="Clear charter filter"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Other filters - second row */}
         <div className="flex flex-col sm:flex-row gap-2">
@@ -728,38 +781,38 @@ export default function MusicTable({
             </Select>
           </div>
         </div>
-      </div>
 
-      {/* Installation Selector */}
-      <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/30 border">
-        <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {t("table.showInstalled")}
-        </span>
-        <InstallationSelector compact />
-        {selectedInstallationId && (
-          <>
-            <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-              <CheckCircle className="h-3 w-3" />
-              {t("table.installedHighlighted")}
-            </span>
-            <div className="flex items-center gap-2 ml-auto">
-              <Checkbox
-                id="show-only-installed"
-                checked={showOnlyInstalled}
-                onCheckedChange={(checked) => {
-                  setShowOnlyInstalled(checked === true);
-                  handleFilterChange();
-                }}
-              />
-              <label
-                htmlFor="show-only-installed"
-                className="text-sm font-medium leading-none cursor-pointer"
-              >
-                {t("table.showOnlyInstalled")}
-              </label>
-            </div>
-          </>
-        )}
+        {/* Installation Selector */}
+        <div className="flex items-center gap-2 pt-2 border-t border-border/20">
+          <span className="text-sm text-muted-foreground whitespace-nowrap">
+            {t("table.showInstalled")}
+          </span>
+          <InstallationSelector compact />
+          {selectedInstallationId && (
+            <>
+              <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                <CheckCircle className="h-3 w-3" />
+                {t("table.installedHighlighted")}
+              </span>
+              <div className="flex items-center gap-2 ml-auto">
+                <Checkbox
+                  id="show-only-installed"
+                  checked={showOnlyInstalled}
+                  onCheckedChange={(checked) => {
+                    setShowOnlyInstalled(checked === true);
+                    handleFilterChange();
+                  }}
+                />
+                <label
+                  htmlFor="show-only-installed"
+                  className="text-sm font-medium leading-none cursor-pointer"
+                >
+                  {t("table.showOnlyInstalled")}
+                </label>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Table */}
@@ -811,16 +864,16 @@ export default function MusicTable({
               <LoadingSkeleton />
             ) : data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-32 text-center">
-                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <Music className="h-8 w-8" />
-                    <p className="text-sm">{t("table.noSongsFound")}</p>
+                <TableCell colSpan={6} className="py-16 text-center">
+                  <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                    <Music className="h-12 w-12 opacity-40" />
+                    <p className="text-sm font-medium">{t("table.noSongsFound")}</p>
                     <p className="text-xs">{t("table.tryDifferentSearch")}</p>
                   </div>
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((music) => (
+              data.map((music, index) => (
                 <MusicRow
                   key={music.id}
                   music={music}
@@ -829,6 +882,11 @@ export default function MusicTable({
                   lists={nonFavoriteLists}
                   onAddToList={addSongToList}
                   onSongSelect={onSongSelect}
+                  animationDelay={
+                    index >= batchStartIndex.current
+                      ? Math.min((index - batchStartIndex.current) * 30, 300)
+                      : undefined
+                  }
                 />
               ))
             )}

@@ -266,6 +266,7 @@ export async function insertNewSongs(
       charter: songData.charter,
       previewUrl: null,
       albumImageUrl: songData.coverUrl,
+      vocalParts: songData.vocalParts ?? null,
       ...diffs,
       ...(songData.sourceUpdatedAt
         ? { createdAt: songData.sourceUpdatedAt }
@@ -388,6 +389,10 @@ export async function updateExistingSongs(
     }
     if (songData.coverUrl && !existing.albumImageUrl) {
       updateData.albumImageUrl = songData.coverUrl;
+      shouldUpdateSong = true;
+    }
+    if (songData.vocalParts && !existing.vocalParts) {
+      updateData.vocalParts = songData.vocalParts;
       shouldUpdateSong = true;
     }
 

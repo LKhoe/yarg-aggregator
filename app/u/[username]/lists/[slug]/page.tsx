@@ -85,6 +85,7 @@ function toProviderMusic(song: PublicSong): ProviderMusic {
       keys: null,
       vocals: null,
     },
+    vocalParts: null,
     genre: null,
     year: null,
     charter: null,
