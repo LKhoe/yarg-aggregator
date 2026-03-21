@@ -25,6 +25,8 @@ export default function Footer() {
           <a href="https://github.com/LKhoe/yarg-aggregator" target="_blank" rel="noopener noreferrer" className="hover:opacity-100 hover:underline transition-opacity">
             GitHub
           </a>
+          <span aria-hidden="true">·</span>
+          <span>v{process.env.NEXT_PUBLIC_APP_VERSION}</span>
         </div>
       </div>
     </footer>

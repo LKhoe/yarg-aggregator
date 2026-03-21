@@ -15,6 +15,11 @@ lab_automated_chart
 *.swp
 *.swo
 
+# Docker
+Dockerfile
+docker-compose*.yml
+deploy.sh
+
 # docs & config not needed in image
 README.md
 CLAUDE.md

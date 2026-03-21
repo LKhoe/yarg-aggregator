@@ -3,8 +3,14 @@ import createNextIntlPlugin from "next-intl/plugin";
 
 const withNextIntl = createNextIntlPlugin("./i18n.ts");
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { version } = require("./package.json");
+
 const nextConfig: NextConfig = {
   output: "standalone",
+  env: {
+    NEXT_PUBLIC_APP_VERSION: version,
+  },
   experimental: {
     optimizePackageImports: [
       "lucide-react",
@@ -14,11 +20,7 @@ const nextConfig: NextConfig = {
       "@radix-ui/react-tooltip",
     ],
   },
-  generateBuildId: async () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { version } = require("./package.json");
-    return version;
-  },
+  generateBuildId: async () => version,
   webpack: (config) => {
     // Resolve .ts files when importing with .js extension (ESM convention used by batch-extractor)
     config.resolve.extensionAlias = {

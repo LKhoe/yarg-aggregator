@@ -23,8 +23,8 @@ if [[ "${1:-}" == "--rollback" ]]; then
     set -euo pipefail
     cd ${REMOTE_DIR}
     # Restart with the previous image (docker compose keeps the last image)
-    docker compose stop yarg-aggregator
-    docker compose up -d --no-build yarg-aggregator
+    docker compose -f docker-compose.yml stop yarg-aggregator
+    docker compose -f docker-compose.yml up -d --no-build yarg-aggregator
   "
   echo "==> Rollback complete."
   exit 0
@@ -62,8 +62,8 @@ ssh -p "${PI_PORT}" "${PI_USER}@${PI_HOST}" "
   git pull origin main
 
   # Build and restart only the app container — DB and Redis stay up
-  docker compose build yarg-aggregator
-  docker compose up -d --no-deps yarg-aggregator
+  docker compose -f docker-compose.yml build yarg-aggregator
+  docker compose -f docker-compose.yml up -d --no-deps yarg-aggregator
 
   # Wait for health check
   echo '==> Waiting for app to become healthy...'
