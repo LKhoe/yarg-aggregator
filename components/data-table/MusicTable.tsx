@@ -145,122 +145,168 @@ interface MusicRowProps {
   animationDelay?: number;
 }
 
-const MusicRow = memo(function MusicRow({
-  music,
-  isAuthenticated,
-  toggleFavorite,
-  lists,
-  onAddToList,
-  onSongSelect,
-  animationDelay,
-}: MusicRowProps) {
-  return (
-    <TableRow
-      className={`group/row cursor-pointer transition-[background-color,box-shadow] duration-200 hover:shadow-[inset_3px_0_0_0_var(--primary),0_2px_8px_-2px_oklch(0.65_0.25_280/0.15)] hover:bg-primary/[0.04] ${music.installed ? "bg-green-500/5 hover:bg-green-500/10" : ""}`}
-      onClick={() => onSongSelect?.(music)}
-      style={
-        animationDelay !== undefined
-          ? {
-              animation: "fade-slide-up 0.3s ease-out forwards",
-              animationDelay: `${animationDelay}ms`,
-              opacity: 0,
-            }
-          : undefined
-      }
-    >
-      <TableCell className="hidden sm:table-cell">
-        <div className="relative h-8 w-8 sm:h-12 sm:w-12 rounded transition-transform duration-200 group-hover/row:scale-110">
-          {music.coverUrl ? (
-            <AlbumImage src={music.coverUrl} alt={music.name} size={48} responsiveSize={48} />
-          ) : (
-            <div className="h-8 w-8 sm:h-12 sm:w-12 rounded bg-muted flex items-center justify-center">
-              <Music className="h-4 w-4 sm:h-6 sm:w-6 text-muted-foreground" />
-            </div>
-          )}
-        </div>
-      </TableCell>
-      <TableCell className="font-medium">
-        <div className="flex items-start gap-2 sm:gap-3">
-          <div className="relative h-8 w-8 rounded shrink-0 sm:hidden transition-transform duration-200 group-hover/row:scale-110">
+const MusicRow = memo(
+  function MusicRow({
+    music,
+    isAuthenticated,
+    toggleFavorite,
+    lists,
+    onAddToList,
+    onSongSelect,
+    animationDelay,
+  }: MusicRowProps) {
+    return (
+      <TableRow
+        className={`group/row cursor-pointer transition-[background-color,box-shadow] duration-200 hover:shadow-[inset_3px_0_0_0_var(--primary),0_2px_8px_-2px_oklch(0.65_0.25_280/0.15)] hover:bg-primary/4 ${music.installed ? "bg-green-500/5 hover:bg-green-500/10" : ""}`}
+        onClick={() => onSongSelect?.(music)}
+        style={
+          animationDelay !== undefined
+            ? {
+                animation: "fade-slide-up 0.3s ease-out forwards",
+                animationDelay: `${animationDelay}ms`,
+                opacity: 0,
+              }
+            : undefined
+        }
+      >
+        <TableCell className="hidden sm:table-cell">
+          <div className="relative h-8 w-8 sm:h-12 sm:w-12 rounded transition-transform duration-200 group-hover/row:scale-110">
             {music.coverUrl ? (
-              <AlbumImage src={music.coverUrl} alt={music.name} size={32} />
+              <AlbumImage
+                src={music.coverUrl}
+                alt={music.name}
+                size={48}
+                responsiveSize={48}
+              />
             ) : (
-              <div className="h-8 w-8 rounded bg-muted flex items-center justify-center">
-                <Music className="h-4 w-4 text-muted-foreground" />
+              <div className="h-8 w-8 sm:h-12 sm:w-12 rounded bg-muted flex items-center justify-center">
+                <Music className="h-4 w-4 sm:h-6 sm:w-6 text-muted-foreground" />
               </div>
             )}
           </div>
-          <div className="min-w-0 flex-1">
-            <div className={`max-w-25 sm:max-w-50 truncate text-xs sm:text-sm flex items-center gap-1 transition-colors duration-200 group-hover/row:text-primary ${music.installed ? "text-green-600 dark:text-green-400 font-medium" : ""}`}>
-              {music.installed && <CheckCircle className="h-3 w-3 shrink-0" />}
-              {music.name}
+        </TableCell>
+        <TableCell className="font-medium">
+          <div className="flex items-start gap-2 sm:gap-3">
+            <div className="relative h-8 w-8 rounded shrink-0 sm:hidden transition-transform duration-200 group-hover/row:scale-110">
+              {music.coverUrl ? (
+                <AlbumImage src={music.coverUrl} alt={music.name} size={32} />
+              ) : (
+                <div className="h-8 w-8 rounded bg-muted flex items-center justify-center">
+                  <Music className="h-4 w-4 text-muted-foreground" />
+                </div>
+              )}
             </div>
-            <div className={`max-w-25 sm:max-w-50 truncate text-xs sm:text-sm sm:hidden ${music.installed ? "text-green-600/80 dark:text-green-400/80" : "text-muted-foreground"}`}>
-              {music.artist}
+            <div className="min-w-0 flex-1">
+              <div
+                className={`max-w-25 sm:max-w-50 truncate text-xs sm:text-sm flex items-center gap-1 transition-colors duration-200 group-hover/row:text-primary ${music.installed ? "text-green-600 dark:text-green-400 font-medium" : ""}`}
+              >
+                {music.installed && (
+                  <CheckCircle className="h-3 w-3 shrink-0" />
+                )}
+                {music.name}
+              </div>
+              <div
+                className={`max-w-25 sm:max-w-50 truncate text-xs sm:text-sm sm:hidden ${music.installed ? "text-green-600/80 dark:text-green-400/80" : "text-muted-foreground"}`}
+              >
+                {music.artist}
+              </div>
             </div>
           </div>
-        </div>
-      </TableCell>
-      <TableCell className={`max-w-15 sm:max-w-37.5 truncate text-xs sm:text-sm hidden sm:table-cell ${music.installed ? "text-green-600 dark:text-green-400" : ""}`}>
-        {music.artist}
-      </TableCell>
-      <TableCell className={`hidden md:table-cell max-w-15 sm:max-w-37.5 truncate text-xs sm:text-sm ${music.installed ? "text-green-600/80 dark:text-green-400/80" : ""}`}>
-        {music.album}
-      </TableCell>
-      <TableCell className="hidden lg:table-cell">
-        <div className="flex gap-1 sm:gap-2">
-          {INSTRUMENTS.map((inst: string) => {
-            const diff = music.instruments[inst as keyof typeof music.instruments];
-            if (diff === null) return null;
-            const iconName = inst === "vocals" && music.vocalParts && music.vocalParts > 1 ? "harmony" : inst;
-            const label = inst === "vocals" && music.vocalParts && music.vocalParts > 1 ? "Harmony" : inst.charAt(0).toUpperCase() + inst.slice(1);
-            return (
-              <div key={inst} className="flex items-center gap-1" title={inst}>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <DifficultyMedal level={diff} size="sm" icon={<InstrumentIcon instrument={iconName} />} />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {label} ({diff} / 7)
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            );
-          })}
-        </div>
-      </TableCell>
-      <TableCell>
-        <div className="flex items-center gap-0.5">
-          {isAuthenticated && music.id && (
-            <SongActions
-              songId={music.id}
-              isFavorited={!!music.favorited}
-              onToggleFavorite={toggleFavorite}
-              lists={lists}
-              onAddToList={onAddToList}
-            />
-          )}
-          {music.downloadUrls?.length ? (
-            <Button variant="ghost" size="icon" asChild className="h-8 w-8 sm:h-10 sm:w-10">
-              <a href={music.downloadUrls[0].url} target="_blank" rel="noopener noreferrer">
+        </TableCell>
+        <TableCell
+          className={`max-w-15 sm:max-w-37.5 truncate text-xs sm:text-sm hidden sm:table-cell ${music.installed ? "text-green-600 dark:text-green-400" : ""}`}
+        >
+          {music.artist}
+        </TableCell>
+        <TableCell
+          className={`hidden md:table-cell max-w-15 sm:max-w-37.5 truncate text-xs sm:text-sm ${music.installed ? "text-green-600/80 dark:text-green-400/80" : ""}`}
+        >
+          {music.album}
+        </TableCell>
+        <TableCell className="hidden lg:table-cell">
+          <div className="flex gap-1 sm:gap-2">
+            {INSTRUMENTS.map((inst: string) => {
+              const diff =
+                music.instruments[inst as keyof typeof music.instruments];
+              if (diff === null) return null;
+              const iconName =
+                inst === "vocals" && music.vocalParts && music.vocalParts > 1
+                  ? "harmony"
+                  : inst;
+              const label =
+                inst === "vocals" && music.vocalParts && music.vocalParts > 1
+                  ? "Harmony"
+                  : inst.charAt(0).toUpperCase() + inst.slice(1);
+              return (
+                <div
+                  key={inst}
+                  className="flex items-center gap-1"
+                  title={inst}
+                >
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <DifficultyMedal
+                        level={diff}
+                        size="sm"
+                        icon={<InstrumentIcon instrument={iconName} />}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {label} ({diff} / 7)
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              );
+            })}
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center gap-0.5">
+            {isAuthenticated && music.id && (
+              <SongActions
+                songId={music.id}
+                isFavorited={!!music.favorited}
+                onToggleFavorite={toggleFavorite}
+                lists={lists}
+                onAddToList={onAddToList}
+              />
+            )}
+            {music.downloadUrls?.length ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                asChild
+                className="h-8 w-8 sm:h-10 sm:w-10"
+              >
+                <a
+                  href={music.downloadUrls[0].url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Download className="h-3 w-3 sm:h-4 sm:w-4" />
+                </a>
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled
+                className="h-8 w-8 sm:h-10 sm:w-10"
+              >
                 <Download className="h-3 w-3 sm:h-4 sm:w-4" />
-              </a>
-            </Button>
-          ) : (
-            <Button variant="ghost" size="icon" disabled className="h-8 w-8 sm:h-10 sm:w-10">
-              <Download className="h-3 w-3 sm:h-4 sm:w-4" />
-            </Button>
-          )}
-        </div>
-      </TableCell>
-    </TableRow>
-  );
-}, (prev, next) =>
-  prev.music.id === next.music.id &&
-  prev.music.installed === next.music.installed &&
-  prev.music.favorited === next.music.favorited &&
-  prev.isAuthenticated === next.isAuthenticated &&
-  prev.lists === next.lists
+              </Button>
+            )}
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  },
+  (prev, next) =>
+    prev.music.id === next.music.id &&
+    prev.music.installed === next.music.installed &&
+    prev.music.favorited === next.music.favorited &&
+    prev.isAuthenticated === next.isAuthenticated &&
+    prev.lists === next.lists,
 );
 
 export default function MusicTable({
@@ -418,7 +464,8 @@ export default function MusicTable({
           );
         }
       } catch (error: unknown) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
+        if (error instanceof DOMException && error.name === "AbortError")
+          return;
         console.error("Error fetching music:", error);
       } finally {
         if (isMounted.current) {
@@ -816,7 +863,7 @@ export default function MusicTable({
       </div>
 
       {/* Table */}
-      <div className="rounded-md border overflow-x-auto">
+      <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -829,7 +876,12 @@ export default function MusicTable({
                   onClick={() => handleSort("name")}
                   className="p-0 hover:bg-transparent text-xs sm:text-sm"
                 >
-                  {t("table.song")} <SortIcon column="name" sortBy={sortBy} sortOrder={sortOrder} />
+                  {t("table.song")}{" "}
+                  <SortIcon
+                    column="name"
+                    sortBy={sortBy}
+                    sortOrder={sortOrder}
+                  />
                 </Button>
               </TableHead>
               <TableHead className="hidden sm:table-cell min-w-20">
@@ -838,7 +890,12 @@ export default function MusicTable({
                   onClick={() => handleSort("artist")}
                   className="p-0 hover:bg-transparent text-xs sm:text-sm"
                 >
-                  {t("table.artist")} <SortIcon column="artist" sortBy={sortBy} sortOrder={sortOrder} />
+                  {t("table.artist")}{" "}
+                  <SortIcon
+                    column="artist"
+                    sortBy={sortBy}
+                    sortOrder={sortOrder}
+                  />
                 </Button>
               </TableHead>
               <TableHead className="hidden md:table-cell min-w-20">
@@ -847,7 +904,12 @@ export default function MusicTable({
                   onClick={() => handleSort("album")}
                   className="p-0 hover:bg-transparent text-xs sm:text-sm"
                 >
-                  {t("table.album")} <SortIcon column="album" sortBy={sortBy} sortOrder={sortOrder} />
+                  {t("table.album")}{" "}
+                  <SortIcon
+                    column="album"
+                    sortBy={sortBy}
+                    sortOrder={sortOrder}
+                  />
                 </Button>
               </TableHead>
               <TableHead className="hidden lg:table-cell min-w-25">
@@ -867,7 +929,9 @@ export default function MusicTable({
                 <TableCell colSpan={6} className="py-16 text-center">
                   <div className="flex flex-col items-center gap-3 text-muted-foreground">
                     <Music className="h-12 w-12 opacity-40" />
-                    <p className="text-sm font-medium">{t("table.noSongsFound")}</p>
+                    <p className="text-sm font-medium">
+                      {t("table.noSongsFound")}
+                    </p>
                     <p className="text-xs">{t("table.tryDifferentSearch")}</p>
                   </div>
                 </TableCell>
