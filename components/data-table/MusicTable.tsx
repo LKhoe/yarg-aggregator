@@ -29,6 +29,7 @@ import {
   Music,
   CheckCircle,
   X,
+  ChevronDown,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -62,6 +63,7 @@ import InstallationSelector, {
   useInstallation,
 } from "@/components/installations/InstallationSelector";
 import { useSession } from "@/lib/auth-client";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { useUserLists } from "@/hooks/use-user-lists";
 import { SongActions } from "@/components/data-table/SongActions";
 import { AnimatePresence, motion } from "motion/react";
@@ -309,6 +311,124 @@ const MusicRow = memo(
     prev.lists === next.lists,
 );
 
+interface ExpandableContentProps {
+  artist: string;
+  albumFilter: string;
+  charter: string;
+  onClearArtist: () => void;
+  onClearAlbum: () => void;
+  onClearCharter: () => void;
+  showOnlyInstalled: boolean;
+  onShowOnlyInstalledChange: (v: boolean) => void;
+  selectedInstallationId: string | null | undefined;
+}
+
+function ExpandableContent({
+  artist,
+  albumFilter,
+  charter,
+  onClearArtist,
+  onClearAlbum,
+  onClearCharter,
+  showOnlyInstalled,
+  onShowOnlyInstalledChange,
+  selectedInstallationId,
+}: ExpandableContentProps) {
+  const { t } = useTranslations();
+  return (
+    <div className="space-y-3">
+      {/* Active exact-match filter badges */}
+      <AnimatePresence>
+        {(artist || albumFilter || charter) && (
+          <motion.div
+            className="flex flex-wrap gap-1.5"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <AnimatePresence>
+              {artist && (
+                <motion.span
+                  key="artist"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Badge variant="secondary" className="text-xs gap-1 pr-1 active-filter-badge">
+                    {artist}
+                    <button onClick={onClearArtist} className="ml-1 hover:opacity-70" aria-label="Clear artist filter">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                </motion.span>
+              )}
+              {albumFilter && (
+                <motion.span
+                  key="album"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Badge variant="secondary" className="text-xs gap-1 pr-1 active-filter-badge">
+                    {albumFilter}
+                    <button onClick={onClearAlbum} className="ml-1 hover:opacity-70" aria-label="Clear album filter">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                </motion.span>
+              )}
+              {charter && (
+                <motion.span
+                  key="charter"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Badge variant="secondary" className="text-xs gap-1 pr-1 active-filter-badge">
+                    {charter}
+                    <button onClick={onClearCharter} className="ml-1 hover:opacity-70" aria-label="Clear charter filter">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Installation section */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pt-2 border-t border-border/20">
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {t("table.showInstalled")}
+        </span>
+        <InstallationSelector compact />
+        {selectedInstallationId && (
+          <>
+            <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+              <CheckCircle className="h-3 w-3" />
+              {t("table.installedHighlighted")}
+            </span>
+            <label className="flex items-center gap-2 ml-auto cursor-pointer">
+              <Checkbox
+                checked={showOnlyInstalled}
+                onCheckedChange={(checked) => onShowOnlyInstalledChange(checked === true)}
+              />
+              <span className="text-sm font-medium leading-none">
+                {t("table.showOnlyInstalled")}
+              </span>
+            </label>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function MusicTable({
   onTotalChange,
   onSongSelect,
@@ -330,11 +450,14 @@ export default function MusicTable({
   const [albumFilter, setAlbumFilter] = useState<string>("");
   const [charter, setCharter] = useState<string>("");
   const [showOnlyInstalled, setShowOnlyInstalled] = useState<boolean>(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const isMounted = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const batchStartIndex = useRef(0);
+
+  const isTabletOrAbove = useMediaQuery("(min-width: 640px)");
 
   // Get selected installation from context
   const { selectedInstallationId } = useInstallation();
@@ -629,119 +752,36 @@ export default function MusicTable({
     };
   }, [loadMore, hasMore, loadingMore, loading, data.length]);
 
+  const activeFilterCount = [
+    !!debouncedQuery,
+    instruments.length > 0,
+    !!genre,
+    !!source,
+    !!artist,
+    !!albumFilter,
+    !!charter,
+    !!selectedInstallationId,
+  ].filter(Boolean).length;
+
   return (
     <div className="space-y-4">
-      {/* Search and Filters — Unified Toolbar */}
+      {/* Search and Filters — Toolbar */}
       <div className="rounded-xl bg-card/30 backdrop-blur-sm border border-border/30 p-3 space-y-3 shadow-[inset_0_1px_0_0_oklch(1_0_0/0.05)]">
-        {/* Search input */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder={t("table.searchPlaceholder")}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className={`pl-10 h-10 text-sm w-full ${query ? "active-filter" : ""}`}
-          />
-        </div>
+        {/* Always-visible row: search + filters + expand toggle (sm+) */}
+        <div className="flex flex-col lg:flex-row gap-2 lg:items-center">
+          {/* Search input */}
+          <div className="relative lg:flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder={t("table.searchPlaceholder")}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className={`pl-10 h-9 text-sm w-full ${query ? "active-filter" : ""}`}
+            />
+          </div>
 
-        {/* Active exact-match filter badges */}
-        <AnimatePresence>
-          {(artist || albumFilter || charter) && (
-            <motion.div
-              className="flex flex-wrap gap-1.5"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <AnimatePresence>
-                {artist && (
-                  <motion.span
-                    key="artist"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <Badge
-                      variant="secondary"
-                      className="text-xs gap-1 pr-1 active-filter-badge"
-                    >
-                      {artist}
-                      <button
-                        onClick={() => {
-                          setArtist("");
-                          handleFilterChange();
-                        }}
-                        className="ml-1 hover:opacity-70"
-                        aria-label="Clear artist filter"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  </motion.span>
-                )}
-                {albumFilter && (
-                  <motion.span
-                    key="album"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <Badge
-                      variant="secondary"
-                      className="text-xs gap-1 pr-1 active-filter-badge"
-                    >
-                      {albumFilter}
-                      <button
-                        onClick={() => {
-                          setAlbumFilter("");
-                          handleFilterChange();
-                        }}
-                        className="ml-1 hover:opacity-70"
-                        aria-label="Clear album filter"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  </motion.span>
-                )}
-                {charter && (
-                  <motion.span
-                    key="charter"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <Badge
-                      variant="secondary"
-                      className="text-xs gap-1 pr-1 active-filter-badge"
-                    >
-                      {charter}
-                      <button
-                        onClick={() => {
-                          setCharter("");
-                          handleFilterChange();
-                        }}
-                        className="ml-1 hover:opacity-70"
-                        aria-label="Clear charter filter"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Other filters - second row */}
-        <div className="flex flex-col sm:flex-row gap-2">
-          {/* Instruments filter - full width on mobile, auto on desktop */}
-          <div className="w-full sm:flex-1">
+          {/* Secondary filters + chevron (chevron hidden on mobile) */}
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
             <MultiSelect
               values={instruments}
               onValuesChange={(val) => {
@@ -750,7 +790,7 @@ export default function MusicTable({
               }}
             >
               <MultiSelectTrigger
-                className={`h-9 w-full text-sm ${instruments.length > 0 ? "active-filter" : ""}`}
+                className={`h-9 w-full sm:flex-1 lg:w-40 text-sm ${instruments.length > 0 ? "active-filter" : ""}`}
               >
                 <MultiSelectValue placeholder={t("table.allInstruments")} />
               </MultiSelectTrigger>
@@ -776,10 +816,7 @@ export default function MusicTable({
                 </MultiSelectGroup>
               </MultiSelectContent>
             </MultiSelect>
-          </div>
 
-          {/* Genre filter combobox */}
-          <div className="w-full sm:w-auto">
             <Combobox
               value={genre || null}
               onValueChange={(val) => {
@@ -791,7 +828,7 @@ export default function MusicTable({
               <ComboboxInput
                 placeholder={t("table.allGenres") || "All genres"}
                 showClear={!!genre}
-                className={`w-full sm:w-45 h-9 text-sm ${genre ? "active-filter" : ""}`}
+                className={`w-full sm:flex-1 lg:w-44 h-9 text-sm ${genre ? "active-filter" : ""}`}
               />
               <ComboboxContent>
                 <ComboboxEmpty>{t("table.noGenresFound")}</ComboboxEmpty>
@@ -804,10 +841,7 @@ export default function MusicTable({
                 </ComboboxList>
               </ComboboxContent>
             </Combobox>
-          </div>
 
-          {/* Source filter - full width on mobile, auto on desktop */}
-          <div className="w-full sm:w-auto">
             <Select
               value={source || "all"}
               onValueChange={(v) => {
@@ -816,7 +850,7 @@ export default function MusicTable({
               }}
             >
               <SelectTrigger
-                className={`w-full sm:w-37.5 h-9 ${source ? "active-filter" : ""}`}
+                className={`w-full sm:flex-1 lg:w-32 h-9 ${source ? "active-filter" : ""}`}
               >
                 <SelectValue placeholder={t("table.allSources")} />
               </SelectTrigger>
@@ -826,40 +860,68 @@ export default function MusicTable({
                 <SelectItem value="rhythmverse">Rhythmverse</SelectItem>
               </SelectContent>
             </Select>
+
+            {/* Expand/collapse — hidden on mobile */}
+            {isTabletOrAbove && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowFilters((v) => !v)}
+                className="h-9 w-9 shrink-0 relative"
+                aria-label={showFilters ? "Collapse filters" : "Expand filters"}
+              >
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform duration-200 ${showFilters ? "rotate-180" : ""}`}
+                />
+                {!showFilters && activeFilterCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center font-medium">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* Installation Selector */}
-        <div className="flex items-center gap-2 pt-2 border-t border-border/20">
-          <span className="text-sm text-muted-foreground whitespace-nowrap">
-            {t("table.showInstalled")}
-          </span>
-          <InstallationSelector compact />
-          {selectedInstallationId && (
-            <>
-              <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                <CheckCircle className="h-3 w-3" />
-                {t("table.installedHighlighted")}
-              </span>
-              <div className="flex items-center gap-2 ml-auto">
-                <Checkbox
-                  id="show-only-installed"
-                  checked={showOnlyInstalled}
-                  onCheckedChange={(checked) => {
-                    setShowOnlyInstalled(checked === true);
-                    handleFilterChange();
-                  }}
+        {/* Collapsible: badges + installation.
+            On mobile: always visible. On sm+: toggled with animation. */}
+        {isTabletOrAbove ? (
+          <AnimatePresence initial={false}>
+            {showFilters && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+                className="overflow-hidden"
+              >
+                <ExpandableContent
+                  artist={artist}
+                  albumFilter={albumFilter}
+                  charter={charter}
+                  onClearArtist={() => { setArtist(""); handleFilterChange(); }}
+                  onClearAlbum={() => { setAlbumFilter(""); handleFilterChange(); }}
+                  onClearCharter={() => { setCharter(""); handleFilterChange(); }}
+                  showOnlyInstalled={showOnlyInstalled}
+                  onShowOnlyInstalledChange={(v) => { setShowOnlyInstalled(v); handleFilterChange(); }}
+                  selectedInstallationId={selectedInstallationId}
                 />
-                <label
-                  htmlFor="show-only-installed"
-                  className="text-sm font-medium leading-none cursor-pointer"
-                >
-                  {t("table.showOnlyInstalled")}
-                </label>
-              </div>
-            </>
-          )}
-        </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        ) : (
+          <ExpandableContent
+            artist={artist}
+            albumFilter={albumFilter}
+            charter={charter}
+            onClearArtist={() => { setArtist(""); handleFilterChange(); }}
+            onClearAlbum={() => { setAlbumFilter(""); handleFilterChange(); }}
+            onClearCharter={() => { setCharter(""); handleFilterChange(); }}
+            showOnlyInstalled={showOnlyInstalled}
+            onShowOnlyInstalledChange={(v) => { setShowOnlyInstalled(v); handleFilterChange(); }}
+            selectedInstallationId={selectedInstallationId}
+          />
+        )}
       </div>
 
       {/* Table */}
