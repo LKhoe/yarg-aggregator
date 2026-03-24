@@ -1,11 +1,11 @@
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
 # Copy package files, then strip the version field so version bumps don't bust the npm ci cache
 COPY package.json package-lock.json ./
-RUN sed -i 's/"version": "[^"]*"/"version": "0.0.0"/' package.json
+RUN sed -i 's/"version": "[^"]*"/"version": "0.0.0"/' package.json package-lock.json
 
 # Install all dependencies (including dev for build)
 RUN npm ci

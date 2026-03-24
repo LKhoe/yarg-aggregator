@@ -29,6 +29,24 @@ services:
       # Google OAuth
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      # Spotify OAuth
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
+      # Apple
+      - APPLE_CLIENT_ID=${APPLE_CLIENT_ID}
+      - APPLE_TEAM_ID=${APPLE_TEAM_ID}
+      - APPLE_KEY_ID=${APPLE_KEY_ID}
+      - APPLE_PRIVATE_KEY=${APPLE_PRIVATE_KEY}
+      - APPLE_MUSIC_KEY_ID=${APPLE_MUSIC_KEY_ID}
+      - APPLE_MUSIC_PRIVATE_KEY=${APPLE_MUSIC_PRIVATE_KEY}
+      # Last.fm
+      - LASTFM_API_KEY=${LASTFM_API_KEY}
+      - LASTFM_API_SECRET=${LASTFM_API_SECRET}
+      # Music Platform APIs
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      - SOUNDCLOUD_CLIENT_ID=${SOUNDCLOUD_CLIENT_ID}
+      # OpenRouter
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy
