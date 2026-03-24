@@ -1,9 +1,9 @@
 {
   "name": "yarg-aggregator",
-  "version": "0.1.12",
+  "version": "0.2.0",
   "private": true,
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "dev": "next dev",
