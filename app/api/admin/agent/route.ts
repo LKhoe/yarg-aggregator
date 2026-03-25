@@ -26,7 +26,11 @@ You can help admins with:
 - Always use tools to fetch real data before answering questions about songs or stats
 - When recommending setlists, search for songs matching the criteria and present the results
 - Keep responses concise and useful for an admin context
-- Difficulty 0–2 = beginner, 3–4 = intermediate, 5–6 = expert`;
+- Difficulty 0–2 = beginner, 3–4 = intermediate, 5–6 = expert
+
+## Language
+- IMPORTANT: Always respond in the same language the user is writing in.
+- The user's preferred locale is provided below. Use this as a hint for your response language.`;
 
 const TOOLS = [
   {
@@ -221,11 +225,25 @@ async function executeTool(
   }
 }
 
+const LOCALE_NAMES: Record<string, string> = {
+  en: "English",
+  "pt-BR": "Brazilian Portuguese",
+  es: "Spanish",
+  fr: "French",
+  de: "German",
+  ja: "Japanese",
+  zh: "Chinese",
+};
+
 async function runAgentLoop(
   clientMessages: { role: "user" | "assistant"; content: string }[],
+  locale: string = "en",
 ): Promise<{ reply: string; toolCalls: ToolCallTrace[] }> {
+  const languageName = LOCALE_NAMES[locale] ?? LOCALE_NAMES.en;
+  const systemPrompt = `${SYSTEM_PROMPT}\n- User's preferred language: ${languageName} (${locale}). Respond in ${languageName}.`;
+
   const messages: OpenRouterMessage[] = [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: systemPrompt },
     ...clientMessages,
   ];
   const toolCalls: ToolCallTrace[] = [];
@@ -302,8 +320,9 @@ async function runAgentLoop(
 export const POST = withAuth(
   async (request: NextRequest) => {
     const body = await request.json();
-    const { messages } = body as {
+    const { messages, locale } = body as {
       messages: { role: "user" | "assistant"; content: string }[];
+      locale?: string;
     };
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -320,7 +339,7 @@ export const POST = withAuth(
       );
     }
 
-    const { reply, toolCalls } = await runAgentLoop(messages);
+    const { reply, toolCalls } = await runAgentLoop(messages, locale);
     return NextResponse.json({ reply, toolCalls });
   },
   { requiredRole: "admin" },

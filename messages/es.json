@@ -682,6 +682,13 @@
       },
       "thinking": "Pensando…",
       "poweredBy": "Desarrollado por OpenRouter",
+      "toolNames": {
+        "searchSongs": "Buscar Canciones",
+        "getSongDetails": "Detalles de Canción",
+        "getGenres": "Listar Géneros",
+        "getStats": "Obtener Estadísticas",
+        "getUserLists": "Listas del Usuario"
+      },
       "toolCalls": {
         "args": "Argumentos",
         "result": "Resultado",

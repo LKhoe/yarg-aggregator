@@ -38,6 +38,16 @@ import { LyricsPanel } from "./LyricsPanel";
 import { ExportDialog } from "./ExportDialog";
 import { ChartRuler } from "./ChartRuler";
 import { TimelineBar } from "./TimelineBar";
+import { ShortcutsPanel } from "./ShortcutsPanel";
+import { SectionNav } from "./SectionNav";
+import { ValidationPanel } from "./ValidationPanel";
+import { StatisticsPanel } from "./StatisticsPanel";
+import { AutoReduceDialog } from "./AutoReduceDialog";
+import { BpmDetectDialog } from "./BpmDetectDialog";
+import { GlobalView } from "./GlobalView";
+import { MetronomeScheduler } from "@/lib/chart/metronome";
+import { autoReduceDifficulty } from "@/lib/chart/auto-reduce";
+import { computeDensityHeatmap } from "@/lib/chart/statistics";
 import { Button } from "@/components/ui/button";
 import { Download, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -103,7 +113,9 @@ type EditAction =
   // Lyrics
   | { type: "SET_LYRICS"; lyrics: import("@/lib/chart/types").LyricEvent[] }
   // Copy/paste
-  | { type: "PASTE_NOTES"; track: TrackKey; notes: Note[] };
+  | { type: "PASTE_NOTES"; track: TrackKey; notes: Note[] }
+  // Auto-reduce / track replacement
+  | { type: "SET_TRACK"; trackKey: TrackKey; track: import("@/lib/chart/types").Track };
 
 function applyAction(chart: ChartData, action: EditAction): ChartData {
   switch (action.type) {
@@ -312,6 +324,13 @@ function applyAction(chart: ChartData, action: EditAction): ChartData {
       };
     }
 
+    case "SET_TRACK": {
+      return {
+        ...chart,
+        tracks: { ...chart.tracks, [action.trackKey]: action.track },
+      };
+    }
+
     default:
       return chart;
   }
@@ -416,6 +435,38 @@ export function ChartEditor() {
   const phraseTypeRef = useRef(phraseType);
   phraseTypeRef.current = phraseType;
 
+  // Keyboard shortcuts panel
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // Validation & Statistics panels
+  const [showValidation, setShowValidation] = useState(false);
+  const [showStatistics, setShowStatistics] = useState(false);
+
+  // Ghost notes (difficulty reference overlay)
+  const [ghostTrackKey, setGhostTrackKey] = useState<TrackKey | null>(null);
+
+  // Auto-reduce dialog
+  const [showAutoReduce, setShowAutoReduce] = useState(false);
+
+  // BPM detection dialog
+  const [showBpmDetect, setShowBpmDetect] = useState(false);
+
+  // Density overlay
+  const [densityOverlay, setDensityOverlay] = useState(false);
+
+  // Global view (minimap)
+  const [showGlobalView, setShowGlobalView] = useState(true);
+
+  // Practice loop
+  const [loopA, setLoopA] = useState<number | null>(null);
+  const [loopB, setLoopB] = useState<number | null>(null);
+  const loopARef = useRef<number | null>(null);
+  const loopBRef = useRef<number | null>(null);
+
+  // Metronome
+  const [metronomeEnabled, setMetronomeEnabled] = useState(false);
+  const metronomeRef = useRef<MetronomeScheduler | null>(null);
+
   // Clipboard for copy/paste
   const clipboardRef = useRef<Note[]>([]);
 
@@ -445,7 +496,14 @@ export function ChartEditor() {
   selectedTrackRef.current = selectedTrack;
   const currentTickRef = useRef(currentTick);
   currentTickRef.current = currentTick;
+  const metronomeEnabledRef = useRef(metronomeEnabled);
+  metronomeEnabledRef.current = metronomeEnabled;
+  loopARef.current = loopA;
+  loopBRef.current = loopB;
   const tickFrameRef = useRef(0);
+
+  // Seek callback ref for the animation loop (set after handleSeek is defined)
+  const handleSeekStableRef = useRef<((tick: number) => void) | null>(null);
 
   // Audio engine refs
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -557,6 +615,17 @@ export function ChartEditor() {
       const newTick =
         playbackStartTickRef.current +
         elapsed * speed * beatsPerSecond * resolution;
+
+      // Practice loop: seek back to loopA when passing loopB
+      const la = loopARef.current;
+      const lb = loopBRef.current;
+      if (la !== null && lb !== null && newTick > lb) {
+        queueMicrotask(() => {
+          handleSeekStableRef.current?.(la);
+        });
+        return;
+      }
+
       currentTickRef.current = newTick;           // always 60fps (no React)
       tickFrameRef.current++;
       if (tickFrameRef.current % 6 === 0) {
@@ -657,13 +726,15 @@ export function ChartEditor() {
       }
       sourceNodesRef.current.clear();
       gainNodesRef.current.clear();
+      metronomeRef.current?.stop();
       setIsPlaying(false);
     } else {
       const ctx = getAudioCtx();
       if (ctx.state === "suspended") ctx.resume();
 
-      const resolution = chartRef.current.metadata.resolution || 192;
-      const bpm = chartRef.current.syncTrack.bpmEvents[0]?.bpm ?? 120;
+      const currentChart = chartRef.current;
+      const resolution = currentChart.metadata.resolution || 192;
+      const bpm = currentChart.syncTrack.bpmEvents[0]?.bpm ?? 120;
       const startOffset =
         (currentTick / resolution / bpm) * 60;
 
@@ -678,7 +749,7 @@ export function ChartEditor() {
         gain.connect(ctx.destination);
         source.start(
           0,
-          Math.max(0, startOffset + chartRef.current.metadata.offset)
+          Math.max(0, startOffset + currentChart.metadata.offset)
         );
         sourceNodesRef.current.set(label, source);
         gainNodesRef.current.set(label, gain);
@@ -686,6 +757,15 @@ export function ChartEditor() {
 
       playbackStartTimeRef.current = ctx.currentTime;
       playbackStartTickRef.current = currentTick;
+
+      // Start metronome if enabled
+      if (metronomeEnabledRef.current) {
+        const tempoMap = buildTempoMap(currentChart);
+        const metro = new MetronomeScheduler(ctx, tempoMap, currentChart.syncTrack.timeSignatures, resolution);
+        metro.start(currentTick, speed);
+        metronomeRef.current = metro;
+      }
+
       setIsPlaying(true);
     }
   }, [isPlaying, currentTick]);
@@ -696,6 +776,7 @@ export function ChartEditor() {
     }
     sourceNodesRef.current.clear();
     gainNodesRef.current.clear();
+    metronomeRef.current?.stop();
     setIsPlaying(false);
     setCurrentTick(0);
   }, []);
@@ -709,6 +790,7 @@ export function ChartEditor() {
     }
     sourceNodesRef.current.clear();
     gainNodesRef.current.clear();
+    metronomeRef.current?.stop();
 
     setCurrentTick(tick);
 
@@ -739,7 +821,16 @@ export function ChartEditor() {
 
     playbackStartTimeRef.current = ctx.currentTime;
     playbackStartTickRef.current = tick;
+
+    // Restart metronome at new position
+    if (metronomeEnabledRef.current) {
+      const tempoMap = buildTempoMap(currentChart);
+      const metro = new MetronomeScheduler(ctx, tempoMap, currentChart.syncTrack.timeSignatures, resolution);
+      metro.start(tick, speed);
+      metronomeRef.current = metro;
+    }
   }, [isPlaying]);
+  handleSeekStableRef.current = handleSeek;
 
   // Live speed change
   useEffect(() => {
@@ -751,6 +842,7 @@ export function ChartEditor() {
     }
     playbackStartTickRef.current = currentTick;
     playbackStartTimeRef.current = ctx.currentTime;
+    metronomeRef.current?.setPlaybackSpeed(playbackSpeed);
   }, [playbackSpeed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keyboard shortcuts
@@ -765,6 +857,59 @@ export function ChartEditor() {
       if (e.code === "Space") {
         e.preventDefault();
         handlePlayPause();
+        return;
+      }
+
+      // ? key: show shortcuts panel
+      if (e.key === "?" || (e.shiftKey && e.key === "/")) {
+        e.preventDefault();
+        setShowShortcuts((v) => !v);
+        return;
+      }
+
+      // I key: set loop start (A)
+      if (e.key === "i" || e.key === "I") {
+        e.preventDefault();
+        setLoopA(Math.round(currentTickRef.current));
+        return;
+      }
+
+      // O key: set loop end (B)
+      if (e.key === "o" || e.key === "O") {
+        e.preventDefault();
+        setLoopB(Math.round(currentTickRef.current));
+        return;
+      }
+
+      // Escape: clear loop points
+      if (e.key === "Escape") {
+        if (loopARef.current !== null || loopBRef.current !== null) {
+          e.preventDefault();
+          setLoopA(null);
+          setLoopB(null);
+          return;
+        }
+      }
+
+      // [ / ] keys: jump to previous/next section
+      if (e.key === "[" || e.key === "]") {
+        e.preventDefault();
+        const sortedSections = [...(chartRef.current.sections ?? [])].sort((a, b) => a.tick - b.tick);
+        if (sortedSections.length === 0) return;
+        const tick = currentTickRef.current;
+        if (e.key === "[") {
+          // Jump to previous section
+          let target: number | null = null;
+          for (let i = sortedSections.length - 1; i >= 0; i--) {
+            if (sortedSections[i].tick < tick - 1) { target = sortedSections[i].tick; break; }
+          }
+          if (target !== null) handleSeek(target);
+        } else {
+          // Jump to next section
+          for (const section of sortedSections) {
+            if (section.tick > tick + 1) { handleSeek(section.tick); break; }
+          }
+        }
         return;
       }
 
@@ -790,6 +935,17 @@ export function ChartEditor() {
       }
 
       if (e.ctrlKey || e.metaKey) {
+        if (e.key === "a") {
+          // Select all notes in current track
+          if (track) {
+            e.preventDefault();
+            const currentTrack = chartRef.current.tracks[track];
+            if (currentTrack) {
+              setSelectedNoteIds(new Set(currentTrack.notes.map((n) => n.id)));
+            }
+          }
+          return;
+        }
         if (e.key === "z") {
           e.preventDefault();
           dispatch({ type: "UNDO" });
@@ -965,6 +1121,7 @@ export function ChartEditor() {
     return () => window.removeEventListener("keydown", handler);
   }, [
     handlePlayPause,
+    handleSeek,
     snapDivision,
   ]);
 
@@ -972,6 +1129,28 @@ export function ChartEditor() {
   const tempoMap   = useMemo(() => buildTempoMap(chart), [chart.syncTrack]);
   const bpm        = getBpmAtTick(currentTick, tempoMap);
   const totalTicks = useMemo(() => getChartDurationTicks(chart), [chart.tracks, chart.syncTrack]);
+  const resolution = chart.metadata.resolution || 192;
+  const viewportTicks = ((resolution * 960) / zoom) * renderDistance;
+
+  // First audio buffer (for BPM detection)
+  const firstAudioBuffer = useMemo<AudioBuffer | undefined>(() => {
+    if (stems.size === 0) return undefined;
+    return stems.values().next().value?.buffer;
+  }, [stems]);
+
+  // Density heatmap for overlay
+  const densityHeatmap = useMemo<Float32Array | undefined>(() => {
+    if (!densityOverlay || !selectedTrack) return undefined;
+    const track = chart.tracks[selectedTrack];
+    if (!track) return undefined;
+    return computeDensityHeatmap(track, chart.metadata.resolution || 192);
+  }, [densityOverlay, selectedTrack, chart.tracks, chart.metadata.resolution]);
+
+  // Ghost notes for difficulty reference
+  const ghostNotes = useMemo(() => {
+    if (!ghostTrackKey) return undefined;
+    return chart.tracks[ghostTrackKey]?.notes;
+  }, [ghostTrackKey, chart.tracks]);
 
   const isVocalsTrack = selectedTrack
     ? (parseTrackKey(selectedTrack)?.instrument === "Vocals")
@@ -1075,6 +1254,28 @@ export function ChartEditor() {
   const handleUndo = useCallback(() => dispatch({ type: "UNDO" }), []);
   const handleRedo = useCallback(() => dispatch({ type: "REDO" }), []);
 
+  // BPM detection apply
+  const handleBpmApply = useCallback((bpm: number) => {
+    dispatch({ type: "DO", action: { type: "ADD_BPM", tick: 0, bpm } });
+  }, []);
+
+  // Auto-reduce: generate lower difficulties from source
+  const handleAutoReduce = useCallback((sourceTrackKey: TrackKey, targetDifficulties: import("@/lib/chart/types").Difficulty[]) => {
+    const currentChart = chartRef.current;
+    const sourceTrack = currentChart.tracks[sourceTrackKey];
+    if (!sourceTrack) return;
+    const tm = buildTempoMap(currentChart);
+    const resolution = currentChart.metadata.resolution || 192;
+    const parsed = parseTrackKey(sourceTrackKey);
+    if (!parsed) return;
+
+    for (const diff of targetDifficulties) {
+      const reduced = autoReduceDifficulty(sourceTrack, diff, tm, resolution);
+      const targetKey = makeTrackKey(diff, parsed.instrument);
+      dispatch({ type: "DO", action: { type: "SET_TRACK", trackKey: targetKey, track: reduced } });
+    }
+  }, []);
+
   const sections = useMemo(() => chart.sections ?? [], [chart.sections]);
 
   const handleZoomIn = useCallback(() => setZoom((z) => Math.min(z * 1.25, 800)), []);
@@ -1110,6 +1311,15 @@ export function ChartEditor() {
           )}
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1"
+            onClick={() => setShowAutoReduce(true)}
+            disabled={!hasChart}
+          >
+            Auto-reduce
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -1160,13 +1370,45 @@ export function ChartEditor() {
             vizMode={vizMode}
             onVizModeChange={handleVizModeChange}
             spectrogramLoading={spectrogramLoading}
+            metronomeEnabled={metronomeEnabled}
+            onMetronomeToggle={() => setMetronomeEnabled((v) => !v)}
+            sections={sections}
+            tempoMap={tempoMap}
+            onSectionSeek={handleSeek}
+            onShowShortcuts={() => setShowShortcuts(true)}
+            loopA={loopA}
+            loopB={loopB}
+            onClearLoop={() => { setLoopA(null); setLoopB(null); }}
+            onShowBpmDetect={() => setShowBpmDetect(true)}
+            densityOverlay={densityOverlay}
+            onDensityToggle={() => setDensityOverlay((v) => !v)}
+            showGlobalView={showGlobalView}
+            onToggleGlobalView={() => setShowGlobalView((v) => !v)}
           />
 
           <TrackSelector
             chart={chart}
             selectedTrack={selectedTrack}
             onSelectTrack={handleSelectTrack}
+            ghostTrackKey={ghostTrackKey}
+            onGhostTrackChange={setGhostTrackKey}
           />
+
+          {/* Global minimap */}
+          {showGlobalView && (
+            <GlobalView
+              chart={chart}
+              trackKey={selectedTrack}
+              totalTicks={totalTicks}
+              currentTick={currentTick}
+              viewportTicks={viewportTicks}
+              tempoMap={tempoMap}
+              sections={sections}
+              onSeek={handleSeekToTick}
+              currentTickRef={currentTickRef}
+              isPlaying={isPlaying}
+            />
+          )}
 
           {/* Chart Ruler */}
           <ChartRuler
@@ -1214,6 +1456,7 @@ export function ChartEditor() {
                     waveform={activeWaveform}
                     vizMode={vizMode}
                     spectrogram={activeSpectrogram}
+                    ghostNotes={ghostNotes}
                   />
                 ) : (
                   <TrackLane
@@ -1240,6 +1483,8 @@ export function ChartEditor() {
                     waveform={activeWaveform}
                     vizMode={vizMode}
                     spectrogram={activeSpectrogram}
+                    ghostNotes={ghostNotes}
+                    densityHeatmap={densityHeatmap}
                   />
                 )
               ) : (
@@ -1249,8 +1494,8 @@ export function ChartEditor() {
               )}
             </div>
 
-            {/* Properties + Lyrics */}
-            <div className="flex flex-col overflow-y-auto border-l">
+            {/* Properties + Lyrics + Validation + Stats */}
+            <div className="flex flex-col overflow-y-auto border-l w-[260px] shrink-0">
               <PropertiesPanel
                 chart={chart}
                 trackKey={selectedTrack}
@@ -1269,6 +1514,46 @@ export function ChartEditor() {
                   onUpdateLyrics={handleUpdateLyrics}
                 />
               )}
+
+              {/* Validation panel toggle */}
+              <div className="border-t">
+                <button
+                  className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-medium hover:bg-muted/40 transition-colors"
+                  onClick={() => setShowValidation((v) => !v)}
+                >
+                  Validation
+                  <span className="text-muted-foreground">{showValidation ? "−" : "+"}</span>
+                </button>
+                {showValidation && (
+                  <ValidationPanel
+                    chart={chart}
+                    onSeek={handleSeekToTick}
+                    onSelectNotes={(trackKey, ids) => {
+                      setSelectedTrack(trackKey);
+                      setSelectedNoteIds(new Set(ids));
+                    }}
+                    onSelectTrack={(trackKey) => setSelectedTrack(trackKey)}
+                  />
+                )}
+              </div>
+
+              {/* Statistics panel toggle */}
+              <div className="border-t">
+                <button
+                  className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-medium hover:bg-muted/40 transition-colors"
+                  onClick={() => setShowStatistics((v) => !v)}
+                >
+                  Statistics
+                  <span className="text-muted-foreground">{showStatistics ? "−" : "+"}</span>
+                </button>
+                {showStatistics && (
+                  <StatisticsPanel
+                    chart={chart}
+                    trackKey={selectedTrack}
+                    tempoMap={tempoMap}
+                  />
+                )}
+              </div>
             </div>
           </div>
 
@@ -1360,6 +1645,23 @@ export function ChartEditor() {
         open={exportOpen}
         onOpenChange={setExportOpen}
         chart={chart}
+      />
+      <ShortcutsPanel
+        open={showShortcuts}
+        onOpenChange={setShowShortcuts}
+      />
+      <AutoReduceDialog
+        open={showAutoReduce}
+        onOpenChange={setShowAutoReduce}
+        chart={chart}
+        selectedTrack={selectedTrack}
+        onGenerate={handleAutoReduce}
+      />
+      <BpmDetectDialog
+        open={showBpmDetect}
+        onOpenChange={setShowBpmDetect}
+        audioBuffer={firstAudioBuffer}
+        onApply={handleBpmApply}
       />
     </div>
   );

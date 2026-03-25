@@ -2,6 +2,7 @@
 
 import { memo } from "react";
 import { Button } from "@/components/ui/button";
+import { Eye, EyeOff } from "lucide-react";
 import type { ChartData, Difficulty, Instrument, TrackKey } from "@/lib/chart/types";
 import {
   DIFFICULTY_ORDER,
@@ -14,12 +15,16 @@ export interface TrackSelectorProps {
   chart: ChartData;
   selectedTrack: TrackKey | null;
   onSelectTrack: (key: TrackKey) => void;
+  ghostTrackKey?: TrackKey | null;
+  onGhostTrackChange?: (key: TrackKey | null) => void;
 }
 
 export const TrackSelector = memo(function TrackSelector({
   chart,
   selectedTrack,
   onSelectTrack,
+  ghostTrackKey,
+  onGhostTrackChange,
 }: TrackSelectorProps) {
   // Find which instruments have at least one difficulty
   const availableInstruments = INSTRUMENT_ORDER.filter((inst) =>
@@ -88,6 +93,33 @@ export const TrackSelector = memo(function TrackSelector({
                 disabled={!exists}
                 onClick={() => onSelectTrack(key)}
               >
+                {diff}
+              </Button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Ghost notes: reference difficulty selector */}
+      {selectedInstrument && onGhostTrackChange && (
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-muted-foreground">Ghost:</span>
+          {DIFFICULTY_ORDER.map((diff) => {
+            const key = makeTrackKey(diff, selectedInstrument);
+            const exists = !!chart.tracks[key];
+            const isCurrent = selectedDifficulty === diff;
+            const isGhost = ghostTrackKey === key;
+            if (isCurrent || !exists) return null;
+            return (
+              <Button
+                key={diff}
+                variant={isGhost ? "secondary" : "ghost"}
+                size="sm"
+                className="text-[10px] h-5 px-1.5 gap-1"
+                onClick={() => onGhostTrackChange(isGhost ? null : key)}
+                title={isGhost ? `Hide ${diff} ghost` : `Show ${diff} as ghost`}
+              >
+                {isGhost ? <Eye className="h-2.5 w-2.5" /> : <EyeOff className="h-2.5 w-2.5" />}
                 {diff}
               </Button>
             );

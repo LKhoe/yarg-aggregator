@@ -24,8 +24,15 @@ import {
   Star,
   Activity,
   BarChart2,
+  Timer,
+  HelpCircle,
+  Flame,
+  MapPin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { Section } from "@/lib/chart/types";
+import type { TempoPoint } from "@/lib/chart/tempo-utils";
+import { SectionNav } from "./SectionNav";
 
 export interface ToolbarProps {
   isPlaying: boolean;
@@ -55,6 +62,27 @@ export interface ToolbarProps {
   vizMode: "waveform" | "spectrogram" | "none";
   onVizModeChange: (mode: "waveform" | "spectrogram" | "none") => void;
   spectrogramLoading?: boolean;
+  // Metronome
+  metronomeEnabled?: boolean;
+  onMetronomeToggle?: () => void;
+  // Section nav
+  sections?: Section[];
+  tempoMap?: TempoPoint[];
+  onSectionSeek?: (tick: number) => void;
+  // Loop
+  loopA?: number | null;
+  loopB?: number | null;
+  onClearLoop?: () => void;
+  // BPM detection
+  onShowBpmDetect?: () => void;
+  // Density overlay
+  densityOverlay?: boolean;
+  onDensityToggle?: () => void;
+  // Global view (minimap)
+  showGlobalView?: boolean;
+  onToggleGlobalView?: () => void;
+  // Help
+  onShowShortcuts?: () => void;
 }
 
 const SNAP_OPTIONS = [
@@ -116,6 +144,20 @@ export const Toolbar = memo(function Toolbar({
   vizMode,
   onVizModeChange,
   spectrogramLoading,
+  metronomeEnabled,
+  onMetronomeToggle,
+  sections,
+  tempoMap,
+  onSectionSeek,
+  loopA,
+  loopB,
+  onClearLoop,
+  onShowBpmDetect,
+  densityOverlay,
+  onDensityToggle,
+  showGlobalView,
+  onToggleGlobalView,
+  onShowShortcuts,
 }: ToolbarProps) {
   return (
     <div className="flex items-center gap-2 px-4 py-2 border-b bg-background/80 backdrop-blur-sm">
@@ -141,6 +183,16 @@ export const Toolbar = memo(function Toolbar({
             <Play className="h-4 w-4" />
           )}
         </Button>
+        {onMetronomeToggle && (
+          <Button
+            variant={metronomeEnabled ? "secondary" : "ghost"}
+            size="icon"
+            onClick={onMetronomeToggle}
+            title={metronomeEnabled ? "Disable metronome" : "Enable metronome"}
+          >
+            <Timer className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       <div className="w-px h-5 bg-border mx-1" />
@@ -210,6 +262,19 @@ export const Toolbar = memo(function Toolbar({
       )}
 
       <div className="w-px h-5 bg-border mx-1" />
+
+      {/* Section Nav */}
+      {sections && tempoMap && onSectionSeek && sections.length > 0 && (
+        <>
+          <SectionNav
+            sections={sections}
+            currentTick={currentTick}
+            tempoMap={tempoMap}
+            onSeek={onSectionSeek}
+          />
+          <div className="w-px h-5 bg-border mx-1" />
+        </>
+      )}
 
       {/* Zoom */}
       <div className="flex items-center gap-1">
@@ -342,11 +407,92 @@ export const Toolbar = memo(function Toolbar({
 
       <div className="w-px h-5 bg-border mx-1" />
 
+      {/* Density overlay toggle */}
+      {onDensityToggle && (
+        <>
+          <Button
+            variant={densityOverlay ? "secondary" : "ghost"}
+            size="sm"
+            className={cn("h-6 px-2 gap-1 text-xs", densityOverlay && "shadow-sm")}
+            onClick={onDensityToggle}
+            title="Toggle note density heatmap"
+          >
+            <Flame className="h-3 w-3" />
+            Density
+          </Button>
+          <div className="w-px h-5 bg-border mx-1" />
+        </>
+      )}
+
+      {/* Global view (minimap) toggle */}
+      {onToggleGlobalView && (
+        <>
+          <Button
+            variant={showGlobalView ? "secondary" : "ghost"}
+            size="sm"
+            className={cn("h-6 px-2 gap-1 text-xs", showGlobalView && "shadow-sm")}
+            onClick={onToggleGlobalView}
+            title="Toggle global minimap"
+          >
+            <MapPin className="h-3 w-3" />
+            Map
+          </Button>
+          <div className="w-px h-5 bg-border mx-1" />
+        </>
+      )}
+
+      {/* Loop indicator */}
+      {(loopA !== null || loopB !== null) && (
+        <>
+          <div className="flex items-center gap-1.5 text-xs font-mono">
+            <span className="text-green-400">A:{loopA != null ? Math.round(loopA) : "–"}</span>
+            <span className="text-red-400">B:{loopB != null ? Math.round(loopB) : "–"}</span>
+            {onClearLoop && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 px-1 text-[10px] text-muted-foreground"
+                onClick={onClearLoop}
+                title="Clear loop (Esc)"
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+          <div className="w-px h-5 bg-border mx-1" />
+        </>
+      )}
+
       {/* Status */}
       <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
         <span>Tick: {Math.round(currentTick)}</span>
-        <span>{Math.round(bpm)} BPM</span>
+        {onShowBpmDetect ? (
+          <button
+            onClick={onShowBpmDetect}
+            className="hover:text-foreground transition-colors"
+            title="BPM Detection"
+          >
+            {Math.round(bpm)} BPM
+          </button>
+        ) : (
+          <span>{Math.round(bpm)} BPM</span>
+        )}
       </div>
+
+      {/* Help button */}
+      {onShowShortcuts && (
+        <>
+          <div className="w-px h-5 bg-border mx-1" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onShowShortcuts}
+            title="Keyboard shortcuts (?)"
+          >
+            <HelpCircle className="h-4 w-4" />
+          </Button>
+        </>
+      )}
     </div>
   );
 });

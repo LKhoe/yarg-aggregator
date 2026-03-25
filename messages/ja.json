@@ -682,6 +682,13 @@
       },
       "thinking": "考え中…",
       "poweredBy": "OpenRouter搭載",
+      "toolNames": {
+        "searchSongs": "楽曲検索",
+        "getSongDetails": "楽曲詳細",
+        "getGenres": "ジャンル一覧",
+        "getStats": "統計取得",
+        "getUserLists": "ユーザーリスト"
+      },
       "toolCalls": {
         "args": "引数",
         "result": "結果",

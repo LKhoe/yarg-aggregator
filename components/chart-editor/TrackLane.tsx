@@ -37,6 +37,8 @@ export interface TrackLaneProps {
   onResizeNote?: (id: string, newLength: number) => void;
   onSeekToTick?: (tick: number) => void;
   lyrics?: LyricEvent[];
+  ghostNotes?: Note[];
+  densityHeatmap?: Float32Array;
 }
 
 // ── Perspective constants ──────────────────────────────────────────
@@ -244,6 +246,8 @@ export const TrackLane = memo(function TrackLane({
   onDeletePhrase,
   onResizeNote,
   lyrics,
+  ghostNotes,
+  densityHeatmap,
 }: TrackLaneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef    = useRef<HTMLCanvasElement>(null);
@@ -272,7 +276,7 @@ export const TrackLane = memo(function TrackLane({
     zoom, renderDistance, snapDivision,
     selectedNoteIds, onSelectNotes, onAddNote, onDeleteNotes, onMoveNotes,
     waveform, vizMode, spectrogram, editMode, phraseType, sections,
-    onAddPhrase, onDeletePhrase, onResizeNote, lyrics,
+    onAddPhrase, onDeletePhrase, onResizeNote, lyrics, ghostNotes, densityHeatmap,
     lassoRect: null as { x1: number; y1: number; x2: number; y2: number } | null,
     phraseDraw: null as { startTick: number; endTick: number } | null,
   });
@@ -281,7 +285,7 @@ export const TrackLane = memo(function TrackLane({
     zoom, renderDistance, snapDivision,
     selectedNoteIds, onSelectNotes, onAddNote, onDeleteNotes, onMoveNotes,
     waveform, vizMode, spectrogram, editMode, phraseType, sections,
-    onAddPhrase, onDeletePhrase, onResizeNote, lyrics,
+    onAddPhrase, onDeletePhrase, onResizeNote, lyrics, ghostNotes, densityHeatmap,
     lassoRect,
     phraseDraw,
   };
@@ -316,7 +320,7 @@ export const TrackLane = memo(function TrackLane({
 
     const { chart, trackKey, currentTickRef: ctRef, currentTick: propTick,
             zoom, renderDistance, selectedNoteIds, waveform, editMode, sections, lyrics,
-            lassoRect, phraseDraw } = propsRef.current;
+            ghostNotes, densityHeatmap, lassoRect, phraseDraw } = propsRef.current;
     const currentTick = ctRef?.current ?? propTick;
     const isDrums = trackKey.includes("Drums");
     const numCols = isDrums ? 4 : NUM_FRETS;
@@ -504,14 +508,42 @@ export const TrackLane = memo(function TrackLane({
       }
     }
 
+    // ── 6a2. Density heatmap overlay
+    if (densityHeatmap && densityHeatmap.length > 0) {
+      const measureTicks = resolution * 4;
+      ctx.save();
+      ctx.globalAlpha = 0.15;
+      for (let mi = 0; mi < densityHeatmap.length; mi++) {
+        const mStart = mi * measureTicks;
+        const mEnd = (mi + 1) * measureTicks;
+        const dtS = mStart - currentTick;
+        const dtE = mEnd - currentTick;
+        if (dtE < 0 || dtS > vt) continue;
+        const lS = laneAt(depthAt(Math.max(0, dtS), vt), W, H, numCols);
+        const lE = laneAt(depthAt(Math.min(vt, dtE), vt), W, H, numCols);
+        const d = densityHeatmap[mi]; // 0..1
+        // Green → Yellow → Red
+        const r = Math.round(d < 0.5 ? d * 2 * 255 : 255);
+        const g = Math.round(d < 0.5 ? 255 : (1 - (d - 0.5) * 2) * 255);
+        ctx.fillStyle = `rgb(${r},${g},0)`;
+        ctx.beginPath();
+        ctx.moveTo(lE.left, lE.y); ctx.lineTo(lE.right, lE.y);
+        ctx.lineTo(lS.right, lS.y); ctx.lineTo(lS.left, lS.y);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    }
+
     // ── 6b. Phrase highlights (all phrase types)
     if (track) {
       for (const phrase of track.phrases) {
         const dtS = phrase.tick - currentTick;
         const dtE = dtS + phrase.length;
         if (dtE < 0 || dtS > vt) continue;
-        const lS = laneAt(depthAt(Math.max(0, dtS), vt), W, H, numCols);
-        const lE = laneAt(depthAt(Math.min(vt, dtE), vt), W, H, numCols);
+        const clampedDtS = Math.max(0, dtS);
+        const clampedDtE = Math.min(vt, dtE);
+        const lS = laneAt(depthAt(clampedDtS, vt), W, H, numCols);
+        const lE = laneAt(depthAt(clampedDtE, vt), W, H, numCols);
 
         // Fill
         ctx.fillStyle = getPhraseColor(phrase.type);
@@ -520,16 +552,92 @@ export const TrackLane = memo(function TrackLane({
         ctx.lineTo(lS.right, lS.y); ctx.lineTo(lS.left, lS.y);
         ctx.closePath(); ctx.fill();
 
-        // In phrase mode: add border highlight
-        if (editMode === "phrase") {
-          ctx.strokeStyle = getPhraseBorderColor(phrase.type);
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(lE.left, lE.y); ctx.lineTo(lE.right, lE.y);
-          ctx.stroke();
+        const borderColor = getPhraseBorderColor(phrase.type);
+
+        // Boundary lines — always drawn
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = editMode === "phrase" ? 2.5 : 1.5;
+
+        // Start boundary (if visible)
+        if (dtS >= 0 && dtS <= vt) {
           ctx.beginPath();
           ctx.moveTo(lS.left, lS.y); ctx.lineTo(lS.right, lS.y);
           ctx.stroke();
+          // Triangular markers at start boundary edges
+          const triH = Math.max(4, lS.colW * 0.4);
+          ctx.fillStyle = borderColor;
+          ctx.beginPath();
+          ctx.moveTo(lS.left, lS.y);
+          ctx.lineTo(lS.left + triH, lS.y);
+          ctx.lineTo(lS.left, lS.y - triH);
+          ctx.closePath(); ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(lS.right, lS.y);
+          ctx.lineTo(lS.right - triH, lS.y);
+          ctx.lineTo(lS.right, lS.y - triH);
+          ctx.closePath(); ctx.fill();
+        }
+
+        // End boundary (if visible)
+        if (dtE >= 0 && dtE <= vt) {
+          ctx.beginPath();
+          ctx.moveTo(lE.left, lE.y); ctx.lineTo(lE.right, lE.y);
+          ctx.stroke();
+          // Triangular markers at end boundary edges
+          const triH = Math.max(4, lE.colW * 0.35);
+          ctx.fillStyle = borderColor;
+          ctx.beginPath();
+          ctx.moveTo(lE.left, lE.y);
+          ctx.lineTo(lE.left + triH, lE.y);
+          ctx.lineTo(lE.left, lE.y + triH);
+          ctx.closePath(); ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(lE.right, lE.y);
+          ctx.lineTo(lE.right - triH, lE.y);
+          ctx.lineTo(lE.right, lE.y + triH);
+          ctx.closePath(); ctx.fill();
+        }
+
+        // Duration label (in phrase edit mode, when enough vertical space)
+        if (editMode === "phrase") {
+          const midDt = (clampedDtS + clampedDtE) / 2;
+          const lM = laneAt(depthAt(midDt, vt), W, H, numCols);
+          const vertSpace = Math.abs(lS.y - lE.y);
+          if (vertSpace > 20) {
+            const beats = phrase.length / resolution;
+            const label = beats >= 1 ? `${beats.toFixed(beats % 1 === 0 ? 0 : 1)}b` : `${phrase.length}t`;
+            ctx.font = `${Math.max(9, Math.min(11, lM.colW * 0.3))}px monospace`;
+            ctx.fillStyle = borderColor;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(label, lM.cx, lM.y);
+          }
+
+          // Dashed guide lines extending from boundaries outside the lane
+          ctx.setLineDash([4, 4]);
+          ctx.strokeStyle = borderColor;
+          ctx.lineWidth = 1;
+          if (dtS >= 0 && dtS <= vt) {
+            ctx.beginPath();
+            ctx.moveTo(lS.left - 20, lS.y);
+            ctx.lineTo(lS.left, lS.y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(lS.right, lS.y);
+            ctx.lineTo(lS.right + 20, lS.y);
+            ctx.stroke();
+          }
+          if (dtE >= 0 && dtE <= vt) {
+            ctx.beginPath();
+            ctx.moveTo(lE.left - 20, lE.y);
+            ctx.lineTo(lE.left, lE.y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(lE.right, lE.y);
+            ctx.lineTo(lE.right + 20, lE.y);
+            ctx.stroke();
+          }
+          ctx.setLineDash([]);
         }
       }
     }
@@ -549,6 +657,35 @@ export const TrackLane = memo(function TrackLane({
         ctx.lineTo(lane.right, lane.y);
         ctx.stroke();
       }
+    }
+
+    // ── 6d. Ghost notes (transparent overlay from another difficulty)
+    if (ghostNotes && ghostNotes.length > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.2;
+      const ghostStart = lowerBound(ghostNotes, currentTick - noteThickTicks);
+      for (let gi = ghostStart; gi < ghostNotes.length; gi++) {
+        const gn = ghostNotes[gi];
+        if (gn.tick > currentTick + vt) break;
+        const dt = gn.tick - currentTick;
+        if (dt + noteThickTicks < 0 || dt > vt) continue;
+
+        const fi = isDrums ? gn.fret - 1 : gn.fret;
+        if (fi < 0 || fi >= numCols) continue;
+
+        const d = depthAt(Math.max(0, dt), vt);
+        const lane = laneAt(d, W, H, numCols);
+        const cx = lane.left + (fi + 0.5) * lane.colW;
+        const halfW = lane.colW * 0.35;
+        const halfH = halfW * 0.45;
+
+        // Draw as rounded rect with gray tone
+        ctx.fillStyle = "#888";
+        ctx.beginPath();
+        ctx.ellipse(cx, lane.y, halfW, halfH, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
     }
 
     // ── 7. Sustain tails

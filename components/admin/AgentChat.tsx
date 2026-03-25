@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Bot, User, ChevronDown, Loader2 } from "lucide-react";
+import { SendHorizonal, Bot, User, ChevronDown, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useTranslations } from "@/hooks/use-translations";
@@ -42,7 +42,9 @@ function MessageBubble({
         <summary className="flex items-center gap-2 px-3 py-2 cursor-pointer bg-muted/50 hover:bg-muted select-none list-none">
           <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180 shrink-0" />
           <span className="font-mono font-medium text-primary">
-            {trace.name}
+            {TOOL_NAME_KEYS[trace.name]
+              ? t(TOOL_NAME_KEYS[trace.name])
+              : trace.name}
           </span>
           <span className="text-muted-foreground truncate">
             {Object.keys(trace.args).length > 0
@@ -120,8 +122,16 @@ function MessageBubble({
   );
 }
 
+const TOOL_NAME_KEYS: Record<string, string> = {
+  search_songs: "agent.chat.toolNames.searchSongs",
+  get_song_details: "agent.chat.toolNames.getSongDetails",
+  get_genres: "agent.chat.toolNames.getGenres",
+  get_stats: "agent.chat.toolNames.getStats",
+  get_user_lists: "agent.chat.toolNames.getUserLists",
+};
+
 export function AgentChat() {
-  const { t } = useTranslations();
+  const { t, locale } = useTranslations();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -152,7 +162,7 @@ export function AgentChat() {
       const res = await fetch("/api/admin/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: apiMessages }),
+        body: JSON.stringify({ messages: apiMessages, locale }),
       });
 
       if (!res.ok) {
@@ -211,7 +221,7 @@ export function AgentChat() {
               {STARTER_PROMPTS.map((prompt) => (
                 <button
                   key={prompt}
-                  onClick={() => handleSend(prompt)}
+                  onClick={() => handleSend(t(prompt))}
                   className="text-left text-sm px-4 py-3 rounded-xl border border-border hover:border-primary/50 hover:bg-muted/50 transition-colors"
                 >
                   {t(prompt)}
@@ -261,7 +271,7 @@ export function AgentChat() {
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Send className="h-4 w-4" />
+              <SendHorizonal className="h-4 w-4" />
             )}
           </Button>
         </div>

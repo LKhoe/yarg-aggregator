@@ -60,6 +60,7 @@ export interface VocalsLaneProps {
   waveform?: WaveformData;
   vizMode?: "waveform" | "spectrogram" | "none";
   spectrogram?: SpectrogramData;
+  ghostNotes?: Note[];
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -147,6 +148,7 @@ export const VocalsLane = memo(function VocalsLane({
   waveform,
   vizMode = "waveform",
   spectrogram,
+  ghostNotes,
 }: VocalsLaneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef    = useRef<HTMLCanvasElement>(null);
@@ -165,13 +167,13 @@ export const VocalsLane = memo(function VocalsLane({
     chart, trackKey, currentTick, isPlaying, currentTickRef,
     zoom, renderDistance, snapDivision,
     selectedNoteIds, onSelectNotes, onAddNote, onDeleteNotes, onMoveNotes,
-    onResizeNote, onSeekToTick, lyrics, sections, waveform, vizMode, spectrogram,
+    onResizeNote, onSeekToTick, lyrics, sections, waveform, vizMode, spectrogram, ghostNotes,
   });
   propsRef.current = {
     chart, trackKey, currentTick, isPlaying, currentTickRef,
     zoom, renderDistance, snapDivision,
     selectedNoteIds, onSelectNotes, onAddNote, onDeleteNotes, onMoveNotes,
-    onResizeNote, onSeekToTick, lyrics, sections, waveform, vizMode, spectrogram,
+    onResizeNote, onSeekToTick, lyrics, sections, waveform, vizMode, spectrogram, ghostNotes,
   };
 
   // Resize canvas to fill container
@@ -199,7 +201,7 @@ export const VocalsLane = memo(function VocalsLane({
     const {
       chart, trackKey, currentTickRef: ctRef, currentTick: propTick,
       zoom, renderDistance,
-      selectedNoteIds, lyrics, sections, waveform, vizMode, spectrogram,
+      selectedNoteIds, lyrics, sections, waveform, vizMode, spectrogram, ghostNotes,
     } = propsRef.current;
     const currentTick = ctRef?.current ?? propTick;
 
@@ -366,6 +368,24 @@ export const VocalsLane = memo(function VocalsLane({
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
       ctx.fillText(section.name, x + 3, 2);
+    }
+
+    // ── 6b. Ghost notes (transparent overlay from another difficulty)
+    if (ghostNotes && ghostNotes.length > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      for (const gn of ghostNotes) {
+        const gx = tickToX(gn.tick);
+        const gw = Math.max(MIN_NOTE_W_PX, gn.length * pxPerTick);
+        if (gx + gw < PIANO_LABEL_W || gx > W) continue;
+        const gy = rowTop(gn.fret, rH);
+        const gh = rH - 2;
+        ctx.fillStyle = "#888";
+        ctx.beginPath();
+        ctx.roundRect(gx, gy + 1, gw, gh, 3);
+        ctx.fill();
+      }
+      ctx.restore();
     }
 
     // ── 7. Notes

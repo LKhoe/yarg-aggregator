@@ -682,6 +682,13 @@
       },
       "thinking": "思考中…",
       "poweredBy": "由OpenRouter驱动",
+      "toolNames": {
+        "searchSongs": "搜索歌曲",
+        "getSongDetails": "歌曲详情",
+        "getGenres": "流派列表",
+        "getStats": "获取统计",
+        "getUserLists": "用户列表"
+      },
       "toolCalls": {
         "args": "参数",
         "result": "结果",
