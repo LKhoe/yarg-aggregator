@@ -682,6 +682,8 @@
       },
       "thinking": "Pensando…",
       "poweredBy": "Desarrollado por OpenRouter",
+      "selectModel": "Seleccionar modelo",
+      "modelsLoading": "Cargando modelos…",
       "toolNames": {
         "searchSongs": "Buscar Canciones",
         "getSongDetails": "Detalles de Canción",

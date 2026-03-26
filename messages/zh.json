@@ -682,6 +682,8 @@
       },
       "thinking": "思考中…",
       "poweredBy": "由OpenRouter驱动",
+      "selectModel": "选择模型",
+      "modelsLoading": "加载模型中…",
       "toolNames": {
         "searchSongs": "搜索歌曲",
         "getSongDetails": "歌曲详情",

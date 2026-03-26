@@ -682,6 +682,8 @@
       },
       "thinking": "考え中…",
       "poweredBy": "OpenRouter搭載",
+      "selectModel": "モデルを選択",
+      "modelsLoading": "モデルを読み込み中…",
       "toolNames": {
         "searchSongs": "楽曲検索",
         "getSongDetails": "楽曲詳細",

@@ -682,6 +682,8 @@
       },
       "thinking": "Thinking…",
       "poweredBy": "Powered by OpenRouter",
+      "selectModel": "Select a model",
+      "modelsLoading": "Loading models…",
       "toolNames": {
         "searchSongs": "Search Songs",
         "getSongDetails": "Get Song Details",

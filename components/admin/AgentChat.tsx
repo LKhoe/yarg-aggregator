@@ -3,6 +3,13 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { SendHorizonal, Bot, User, ChevronDown, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -18,6 +25,12 @@ type ChatMessage = {
   role: "user" | "agent";
   content: string;
   toolCalls?: ToolCallTrace[];
+  model?: string;
+};
+
+type AgentModel = {
+  id: string;
+  name: string;
 };
 
 const STARTER_PROMPTS = [
@@ -117,6 +130,11 @@ function MessageBubble({
             </ReactMarkdown>
           )}
         </div>
+        {!isUser && message.model && (
+          <span className="text-[10px] text-muted-foreground font-mono">
+            {message.model}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -135,6 +153,9 @@ export function AgentChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [models, setModels] = useState<AgentModel[]>([]);
+  const [selectedModel, setSelectedModel] = useState("");
+  const [modelsLoading, setModelsLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -142,6 +163,26 @@ export function AgentChat() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    async function fetchModels() {
+      try {
+        const res = await fetch("/api/admin/agent/models");
+        if (res.ok) {
+          const data = await res.json();
+          setModels(data.models ?? []);
+          if (data.models?.length > 0) {
+            setSelectedModel(data.models[0].id);
+          }
+        }
+      } catch {
+        // silently fail — user can still type
+      } finally {
+        setModelsLoading(false);
+      }
+    }
+    fetchModels();
+  }, []);
 
   async function handleSend(text?: string) {
     const userText = (text ?? input).trim();
@@ -162,7 +203,11 @@ export function AgentChat() {
       const res = await fetch("/api/admin/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: apiMessages, locale }),
+        body: JSON.stringify({
+          messages: apiMessages,
+          locale,
+          model: selectedModel || undefined,
+        }),
       });
 
       if (!res.ok) {
@@ -172,10 +217,10 @@ export function AgentChat() {
         throw new Error(err.error ?? `HTTP ${res.status}`);
       }
 
-      const { reply, toolCalls } = await res.json();
+      const { reply, toolCalls, model } = await res.json();
       setMessages((prev) => [
         ...prev,
-        { role: "agent", content: reply, toolCalls },
+        { role: "agent", content: reply, toolCalls, model },
       ]);
     } catch (err) {
       setMessages((prev) => [
@@ -254,15 +299,39 @@ export function AgentChat() {
       {/* Input area */}
       <div className="border-t border-border pt-4">
         <div className="flex gap-2 items-end">
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={t("agent.chat.input.placeholder")}
-            className="resize-none min-h-10 max-h-40"
-            rows={1}
-            disabled={isLoading}
-          />
+          <div className="flex flex-col gap-2 flex-1">
+            <Select
+              value={selectedModel}
+              onValueChange={setSelectedModel}
+              disabled={modelsLoading || models.length === 0}
+            >
+              <SelectTrigger className="w-full h-8 text-xs">
+                <SelectValue
+                  placeholder={
+                    modelsLoading
+                      ? t("agent.chat.modelsLoading")
+                      : t("agent.chat.selectModel")
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {models.map((m) => (
+                  <SelectItem key={m.id} value={m.id} className="text-xs">
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={t("agent.chat.input.placeholder")}
+              className="resize-none min-h-10 max-h-40"
+              rows={1}
+              disabled={isLoading}
+            />
+          </div>
           <Button
             size="icon"
             onClick={() => handleSend()}
