@@ -697,6 +697,16 @@
         "noArgs": "keine Argumente"
       },
       "error": "Entschuldigung, etwas ist schief gelaufen: {error}"
+    },
+    "conversations": {
+      "newChat": "Neuer Chat",
+      "untitled": "Unbenannte Konversation",
+      "deleteTitle": "Konversation löschen",
+      "deleteDescription": "Dies wird diese Konversation und alle zugehörigen Nachrichten dauerhaft löschen.",
+      "cancel": "Abbrechen",
+      "delete": "Löschen",
+      "history": "Verlauf",
+      "noConversations": "Noch keine Konversationen"
     }
   }
 }

@@ -3,8 +3,16 @@ import { withAuth } from "@/lib/middleware/auth";
 import { MusicService } from "@/lib/services/music";
 import { ListService } from "@/lib/services/list";
 import { db } from "@/lib/db";
-import { genre, song, artist, album, userProfile } from "@/lib/db/schema";
-import { count, eq } from "drizzle-orm";
+import {
+  genre,
+  song,
+  artist,
+  album,
+  userProfile,
+  agentConversation,
+  agentMessage,
+} from "@/lib/db/schema";
+import { count, eq, asc } from "drizzle-orm";
 
 
 const SYSTEM_PROMPT = `You are an AI assistant for the YARG Content Aggregator, an admin tool for managing music charts for YARG (Yet Another Rhythm Game) — an open-source rhythm game similar to Rock Band and Guitar Hero.
@@ -315,7 +323,17 @@ async function runAgentLoop(
   ];
 
   const activeModel = model ?? FALLBACK_MODEL;
-  const result = await runWithModel(activeModel, [...baseMessages]);
+
+  let result;
+  try {
+    result = await runWithModel(activeModel, [...baseMessages]);
+  } catch (e) {
+    if (activeModel !== FALLBACK_MODEL && e instanceof Error && e.message.includes("404")) {
+      result = await runWithModel(FALLBACK_MODEL, [...baseMessages]);
+    } else {
+      throw e;
+    }
+  }
 
   if (result.malformed && activeModel !== FALLBACK_MODEL) {
     return runWithModel(FALLBACK_MODEL, [...baseMessages]);
@@ -460,18 +478,93 @@ async function runWithModel(
   };
 }
 
+async function generateTitle(
+  conversationId: string,
+  firstMessage: string,
+  locale: string,
+): Promise<void> {
+  const language = LOCALE_NAMES[locale] ?? LOCALE_NAMES.en;
+
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: FALLBACK_MODEL,
+        messages: [
+          {
+            role: "user",
+            content: `Generate a short title (max 50 characters) in ${language} for a conversation that starts with this message. Reply with ONLY the title, no quotes, no punctuation at the end.\n\n${firstMessage}`,
+          },
+        ],
+      }),
+    });
+
+    if (!res.ok) return;
+
+    const data = await res.json();
+    const title = data.choices?.[0]?.message?.content?.trim()?.slice(0, 50);
+    if (!title) return;
+
+    await db
+      .update(agentConversation)
+      .set({ title, updatedAt: new Date() })
+      .where(eq(agentConversation.id, conversationId));
+  } catch {
+    // fire-and-forget — don't fail the request
+  }
+}
+
+async function translateError(
+  error: string,
+  locale: string,
+): Promise<string> {
+  const language = LOCALE_NAMES[locale];
+  if (!language || locale === "en") return error;
+
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: FALLBACK_MODEL,
+        messages: [
+          {
+            role: "user",
+            content: `Translate the following error message to ${language}. Reply with ONLY the translated text, nothing else.\n\n${error}`,
+          },
+        ],
+      }),
+    });
+
+    if (!res.ok) return error;
+
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content?.trim() || error;
+  } catch {
+    return error;
+  }
+}
+
 export const POST = withAuth(
-  async (request: NextRequest) => {
+  async (request: NextRequest, { user }) => {
     const body = await request.json();
-    const { messages, locale, model } = body as {
-      messages: { role: "user" | "assistant"; content: string }[];
+    const { message, conversationId: existingConvId, locale, model } = body as {
+      message: string;
+      conversationId?: string;
       locale?: string;
       model?: string;
     };
 
-    if (!Array.isArray(messages) || messages.length === 0) {
+    if (!message?.trim()) {
       return NextResponse.json(
-        { error: "messages array is required" },
+        { error: "message is required" },
         { status: 400 },
       );
     }
@@ -483,12 +576,91 @@ export const POST = withAuth(
       );
     }
 
-    const result = await runAgentLoop(messages, locale, model);
-    return NextResponse.json({
-      reply: result.reply,
-      toolCalls: result.toolCalls,
-      model: result.model,
+    // Resolve or create conversation
+    let conversationId = existingConvId;
+    let isFirstMessage = false;
+
+    if (conversationId) {
+      // Verify ownership
+      const conv = await db
+        .select({ id: agentConversation.id })
+        .from(agentConversation)
+        .where(eq(agentConversation.id, conversationId))
+        .limit(1);
+
+      if (!conv[0]) {
+        return NextResponse.json(
+          { error: "Conversation not found" },
+          { status: 404 },
+        );
+      }
+    } else {
+      // Create new conversation
+      const [conv] = await db
+        .insert(agentConversation)
+        .values({ userId: user.id, model: model ?? FALLBACK_MODEL })
+        .returning({ id: agentConversation.id });
+      conversationId = conv.id;
+      isFirstMessage = true;
+    }
+
+    // Save the user message
+    await db.insert(agentMessage).values({
+      conversationId,
+      role: "user",
+      content: message.trim(),
     });
+
+    // Build message history from DB
+    const dbMessages = await db
+      .select({ role: agentMessage.role, content: agentMessage.content })
+      .from(agentMessage)
+      .where(eq(agentMessage.conversationId, conversationId))
+      .orderBy(asc(agentMessage.createdAt));
+
+    const chatMessages = dbMessages.map((m) => ({
+      role: m.role === "user" ? "user" as const : "assistant" as const,
+      content: m.content,
+    }));
+
+    try {
+      const result = await runAgentLoop(chatMessages, locale, model);
+
+      // Save the assistant message
+      await db.insert(agentMessage).values({
+        conversationId,
+        role: "assistant",
+        content: result.reply,
+        model: result.model,
+        toolCalls: result.toolCalls.length > 0
+          ? JSON.stringify(result.toolCalls)
+          : null,
+      });
+
+      // Update conversation metadata
+      await db
+        .update(agentConversation)
+        .set({ model: result.model, updatedAt: new Date() })
+        .where(eq(agentConversation.id, conversationId));
+
+      // Generate title for the first message (fire-and-forget)
+      if (isFirstMessage) {
+        generateTitle(conversationId, message.trim(), locale ?? "en").catch(
+          () => {},
+        );
+      }
+
+      return NextResponse.json({
+        reply: result.reply,
+        toolCalls: result.toolCalls,
+        model: result.model,
+        conversationId,
+      });
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : "Unknown error";
+      const translated = await translateError(errMsg, locale ?? "en");
+      return NextResponse.json({ error: translated }, { status: 502 });
+    }
   },
   { requiredRole: "admin" },
 );

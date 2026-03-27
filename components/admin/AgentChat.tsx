@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -31,6 +31,11 @@ type ChatMessage = {
 type AgentModel = {
   id: string;
   name: string;
+};
+
+type AgentChatProps = {
+  conversationId: string | null;
+  onConversationCreated: (id: string) => void;
 };
 
 const STARTER_PROMPTS = [
@@ -148,15 +153,24 @@ const TOOL_NAME_KEYS: Record<string, string> = {
   get_user_lists: "agent.chat.toolNames.getUserLists",
 };
 
-export function AgentChat() {
+export function AgentChat({
+  conversationId,
+  onConversationCreated,
+}: AgentChatProps) {
   const { t, locale } = useTranslations();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [models, setModels] = useState<AgentModel[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [modelsLoading, setModelsLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const convIdRef = useRef(conversationId);
+
+  useEffect(() => {
+    convIdRef.current = conversationId;
+  }, [conversationId]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -184,27 +198,56 @@ export function AgentChat() {
     fetchModels();
   }, []);
 
+  // Load messages when conversationId changes
+  const loadConversation = useCallback(async (id: string | null) => {
+    if (!id) {
+      setMessages([]);
+      return;
+    }
+
+    setMessagesLoading(true);
+    try {
+      const res = await fetch(`/api/admin/agent/conversations/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(
+          (data.messages ?? []).map(
+            (m: { role: string; content: string; toolCalls?: ToolCallTrace[]; model?: string }) => ({
+              role: m.role === "user" ? "user" : "agent",
+              content: m.content,
+              toolCalls: m.toolCalls,
+              model: m.model,
+            }),
+          ),
+        );
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setMessagesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadConversation(conversationId);
+  }, [conversationId, loadConversation]);
+
   async function handleSend(text?: string) {
     const userText = (text ?? input).trim();
     if (!userText || isLoading) return;
 
     const userMessage: ChatMessage = { role: "user", content: userText };
-    const nextMessages = [...messages, userMessage];
-    setMessages(nextMessages);
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
 
     try {
-      const apiMessages = nextMessages.map((m) => ({
-        role: m.role === "agent" ? "assistant" : "user",
-        content: m.content,
-      }));
-
       const res = await fetch("/api/admin/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: apiMessages,
+          message: userText,
+          conversationId: convIdRef.current,
           locale,
           model: selectedModel || undefined,
         }),
@@ -217,10 +260,22 @@ export function AgentChat() {
         throw new Error(err.error ?? `HTTP ${res.status}`);
       }
 
-      const { reply, toolCalls, model } = await res.json();
+      const data = await res.json();
+
+      // If this was a new conversation, notify parent
+      if (!convIdRef.current && data.conversationId) {
+        convIdRef.current = data.conversationId;
+        onConversationCreated(data.conversationId);
+      }
+
       setMessages((prev) => [
         ...prev,
-        { role: "agent", content: reply, toolCalls, model },
+        {
+          role: "agent",
+          content: data.reply,
+          toolCalls: data.toolCalls,
+          model: data.model,
+        },
       ]);
     } catch (err) {
       setMessages((prev) => [
@@ -251,7 +306,11 @@ export function AgentChat() {
         ref={scrollRef}
         className="flex-1 overflow-y-auto space-y-5 py-4 pr-1"
       >
-        {messages.length === 0 ? (
+        {messagesLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-6 text-center">
             <div className="flex items-center justify-center h-16 w-16 rounded-2xl bg-primary/10">
               <Bot className="h-8 w-8 text-primary" />
@@ -333,7 +392,7 @@ export function AgentChat() {
             />
           </div>
           <Button
-            size="icon"
+            size="icon-lg"
             onClick={() => handleSend()}
             disabled={isLoading || !input.trim()}
           >

@@ -13,6 +13,10 @@ import { randomUUID } from "crypto";
 // Enums
 export const sourceEnum = pgEnum("source", ["enchor", "rhythmverse"]);
 export const roleEnum = pgEnum("role", ["user", "moderator", "admin"]);
+export const chatMessageRoleEnum = pgEnum("chat_message_role", [
+  "user",
+  "assistant",
+]);
 
 // Better Auth tables
 export const user = pgTable("user", {
@@ -300,6 +304,48 @@ export const installationSong = pgTable(
   ],
 );
 
+// Agent conversations
+export const agentConversation = pgTable(
+  "agent_conversation",
+  {
+    id: text("id")
+      .primaryKey()
+      .$default(() => randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    title: text("title"),
+    model: text("model"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("agent_conversation_user_id_idx").on(table.userId),
+    index("agent_conversation_updated_at_idx").on(table.updatedAt.desc()),
+  ],
+);
+
+export const agentMessage = pgTable(
+  "agent_message",
+  {
+    id: text("id")
+      .primaryKey()
+      .$default(() => randomUUID()),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => agentConversation.id, { onDelete: "cascade" }),
+    role: chatMessageRoleEnum("role").notNull(),
+    content: text("content").notNull(),
+    model: text("model"),
+    toolCalls: text("tool_calls"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("agent_message_conversation_id_idx").on(table.conversationId),
+    index("agent_message_created_at_idx").on(table.createdAt.asc()),
+  ],
+);
+
 // Relations
 export const userRelations = relations(user, ({ one, many }) => ({
   accounts: many(account),
@@ -307,6 +353,7 @@ export const userRelations = relations(user, ({ one, many }) => ({
   profile: one(userProfile),
   trustedDevices: many(trustedDevice),
   songLists: many(songList),
+  agentConversations: many(agentConversation),
 }));
 
 export const userProfileRelations = relations(userProfile, ({ one }) => ({
@@ -411,6 +458,24 @@ export const downloadUrlRelations = relations(downloadUrl, ({ one }) => ({
   }),
 }));
 
+export const agentConversationRelations = relations(
+  agentConversation,
+  ({ one, many }) => ({
+    user: one(user, {
+      fields: [agentConversation.userId],
+      references: [user.id],
+    }),
+    messages: many(agentMessage),
+  }),
+);
+
+export const agentMessageRelations = relations(agentMessage, ({ one }) => ({
+  conversation: one(agentConversation, {
+    fields: [agentMessage.conversationId],
+    references: [agentConversation.id],
+  }),
+}));
+
 // Types for use in the application
 export type Artist = typeof artist.$inferSelect;
 export type NewArtist = typeof artist.$inferInsert;
@@ -440,4 +505,8 @@ export type SongList = typeof songList.$inferSelect;
 export type NewSongList = typeof songList.$inferInsert;
 export type SongListItem = typeof songListItem.$inferSelect;
 export type NewSongListItem = typeof songListItem.$inferInsert;
+export type AgentConversation = typeof agentConversation.$inferSelect;
+export type NewAgentConversation = typeof agentConversation.$inferInsert;
+export type AgentMessage = typeof agentMessage.$inferSelect;
+export type NewAgentMessage = typeof agentMessage.$inferInsert;
 export type Role = (typeof roleEnum.enumValues)[number];

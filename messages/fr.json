@@ -697,6 +697,16 @@
         "noArgs": "aucun argument"
       },
       "error": "Désolé, quelque chose s'est mal passé : {error}"
+    },
+    "conversations": {
+      "newChat": "Nouvelle discussion",
+      "untitled": "Conversation sans titre",
+      "deleteTitle": "Supprimer la conversation",
+      "deleteDescription": "Cela supprimera définitivement cette conversation et tous ses messages.",
+      "cancel": "Annuler",
+      "delete": "Supprimer",
+      "history": "Historique",
+      "noConversations": "Aucune conversation pour le moment"
     }
   }
 }

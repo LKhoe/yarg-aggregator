@@ -697,6 +697,16 @@
         "noArgs": "no args"
       },
       "error": "Sorry, something went wrong: {error}"
+    },
+    "conversations": {
+      "newChat": "New chat",
+      "untitled": "Untitled conversation",
+      "deleteTitle": "Delete conversation",
+      "deleteDescription": "This will permanently delete this conversation and all its messages.",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "history": "History",
+      "noConversations": "No conversations yet"
     }
   }
 }

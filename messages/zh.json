@@ -697,6 +697,16 @@
         "noArgs": "无参数"
       },
       "error": "抱歉，出了点问题：{error}"
+    },
+    "conversations": {
+      "newChat": "新对话",
+      "untitled": "无标题对话",
+      "deleteTitle": "删除对话",
+      "deleteDescription": "这将永久删除此对话及其所有消息。",
+      "cancel": "取消",
+      "delete": "删除",
+      "history": "历史记录",
+      "noConversations": "暂无对话"
     }
   }
 }

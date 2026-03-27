@@ -50,6 +50,13 @@
       "when": 1774004840354,
       "tag": "0006_old_unicorn",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1774580006278,
+      "tag": "0007_shocking_fenris",
+      "breakpoints": true
     }
   ]
 }

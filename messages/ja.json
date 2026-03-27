@@ -697,6 +697,16 @@
         "noArgs": "引数なし"
       },
       "error": "申し訳ありません、何かがうまくいきませんでした：{error}"
+    },
+    "conversations": {
+      "newChat": "新しいチャット",
+      "untitled": "無題の会話",
+      "deleteTitle": "会話を削除",
+      "deleteDescription": "この会話とすべてのメッセージが完全に削除されます。",
+      "cancel": "キャンセル",
+      "delete": "削除",
+      "history": "履歴",
+      "noConversations": "まだ会話はありません"
     }
   }
 }

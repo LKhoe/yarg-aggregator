@@ -697,6 +697,16 @@
         "noArgs": "sin argumentos"
       },
       "error": "Lo siento, algo salió mal: {error}"
+    },
+    "conversations": {
+      "newChat": "Nuevo chat",
+      "untitled": "Conversación sin título",
+      "deleteTitle": "Eliminar conversación",
+      "deleteDescription": "Esto eliminará permanentemente esta conversación y todos sus mensajes.",
+      "cancel": "Cancelar",
+      "delete": "Eliminar",
+      "history": "Historial",
+      "noConversations": "Aún no hay conversaciones"
     }
   }
 }
