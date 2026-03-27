@@ -54,14 +54,11 @@ export function SignupForm() {
         }
       } else {
         // Check if email verification is required
-        try {
-          const configResponse = await fetch("/api/auth/config");
-          const config = await configResponse.json();
-
-          if (config.requireEmailVerification) {
-            toast.success(t("auth.signup.checkEmail"));
-            router.push("/verify-email");
-          } else {
+        if (process.env.NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION === "true") {
+          toast.success(t("auth.signup.checkEmail"));
+          router.push("/verify-email");
+        } else {
+          try {
             // Try to sign in the user immediately
             const signInResult = await signIn.email({
               email,
@@ -78,12 +75,10 @@ export function SignupForm() {
               toast.success(t("auth.signup.success"));
               router.push("/");
             }
+          } catch {
+            toast.success(t("auth.signup.success"));
+            router.push("/login");
           }
-        } catch (configError) {
-          // Fallback: if we can't check config, assume verification is not required
-          console.error("Error checking auth config:", configError);
-          toast.success(t("auth.signup.success"));
-          router.push("/login");
         }
       }
     } catch {

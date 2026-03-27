@@ -54,6 +54,18 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      if (
+        typeof lastfmUsername !== "string" ||
+        lastfmUsername.length < 2 ||
+        lastfmUsername.length > 15 ||
+        !/^[a-zA-Z0-9_-]+$/.test(lastfmUsername)
+      ) {
+        return NextResponse.json(
+          { error: "Invalid lastfmUsername" },
+          { status: 400 },
+        );
+      }
+
       const apiKey = process.env.LASTFM_API_KEY;
       if (!apiKey) {
         return NextResponse.json(

@@ -12,7 +12,9 @@ import {
   agentConversation,
   agentMessage,
 } from "@/lib/db/schema";
-import { count, eq, asc } from "drizzle-orm";
+import { count, eq, and, asc } from "drizzle-orm";
+import { agentRateLimit } from "@/lib/services/rate-limit";
+import { isValidLocale } from "@/lib/validation";
 
 
 const SYSTEM_PROMPT = `You are an AI assistant for the YARG Content Aggregator, an admin tool for managing music charts for YARG (Yet Another Rhythm Game) — an open-source rhythm game similar to Rock Band and Guitar Hero.
@@ -314,8 +316,9 @@ async function runAgentLoop(
   locale: string = "en",
   model?: string,
 ): Promise<{ reply: string; toolCalls: ToolCallTrace[]; model: string }> {
-  const languageName = LOCALE_NAMES[locale] ?? LOCALE_NAMES.en;
-  const systemPrompt = `${SYSTEM_PROMPT}\n- User's preferred language: ${languageName} (${locale}). Respond in ${languageName}.`;
+  const safeLocale = isValidLocale(locale) ? locale : "en";
+  const languageName = LOCALE_NAMES[safeLocale];
+  const systemPrompt = `${SYSTEM_PROMPT}\n- User's preferred language: ${languageName} (${safeLocale}). Respond in ${languageName}.`;
 
   const baseMessages: Message[] = [
     { role: "system", content: systemPrompt },
@@ -555,12 +558,13 @@ async function translateError(
 export const POST = withAuth(
   async (request: NextRequest, { user }) => {
     const body = await request.json();
-    const { message, conversationId: existingConvId, locale, model } = body as {
+    const { message, conversationId: existingConvId, locale: rawLocale, model } = body as {
       message: string;
       conversationId?: string;
       locale?: string;
       model?: string;
     };
+    const locale = isValidLocale(rawLocale) ? rawLocale : "en";
 
     if (!message?.trim()) {
       return NextResponse.json(
@@ -576,16 +580,33 @@ export const POST = withAuth(
       );
     }
 
+    // Rate limit per user
+    const rl = await agentRateLimit(user.id);
+    if (rl.blocked) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before sending more messages." },
+        {
+          status: 429,
+          headers: rl.retryAfter ? { "Retry-After": String(rl.retryAfter) } : undefined,
+        },
+      );
+    }
+
     // Resolve or create conversation
     let conversationId = existingConvId;
     let isFirstMessage = false;
 
     if (conversationId) {
-      // Verify ownership
+      // Verify conversation exists and belongs to this user
       const conv = await db
         .select({ id: agentConversation.id })
         .from(agentConversation)
-        .where(eq(agentConversation.id, conversationId))
+        .where(
+          and(
+            eq(agentConversation.id, conversationId),
+            eq(agentConversation.userId, user.id),
+          ),
+        )
         .limit(1);
 
       if (!conv[0]) {

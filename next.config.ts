@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   env: {
     NEXT_PUBLIC_APP_VERSION: version,
+    NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION: process.env.REQUIRE_EMAIL_VERIFICATION ?? "false",
   },
   experimental: {
     optimizePackageImports: [
@@ -62,7 +63,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: "Cache-Control",
-            value: "public, max-age=30, stale-while-revalidate=120",
+            value: "private, max-age=30, stale-while-revalidate=120",
           },
         ],
       },

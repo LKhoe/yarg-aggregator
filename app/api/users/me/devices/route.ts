@@ -36,11 +36,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const safeBrowser = typeof browser === "string" ? browser.slice(0, 200) : undefined;
+    const safeOs = typeof os === "string" ? os.slice(0, 100) : undefined;
+
     const device = await DeviceService.trustDevice(
       authUser.id,
       fingerprint,
-      browser,
-      os,
+      safeBrowser,
+      safeOs,
     );
 
     return NextResponse.json({

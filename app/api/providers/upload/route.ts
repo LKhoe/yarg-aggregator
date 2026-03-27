@@ -36,20 +36,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid source" }, { status: 400 });
     }
 
-    // MIME type check
-    const ALLOWED_MIME_TYPES = [
-      "application/zip",
-      "application/x-zip-compressed",
-      "application/x-zip",
-      "application/octet-stream",
-    ];
-    if (file.type && !ALLOWED_MIME_TYPES.includes(file.type)) {
-      return NextResponse.json(
-        { error: "Invalid file type. Only ZIP files are allowed." },
-        { status: 400 },
-      );
-    }
-
     // File size limit: 100MB
     const MAX_FILE_SIZE = 100 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
@@ -62,6 +48,20 @@ export async function POST(request: NextRequest) {
     // Convert File to Buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+
+    // Validate ZIP magic bytes (PK\x03\x04) — not client-supplied MIME type
+    if (
+      buffer.length < 4 ||
+      buffer[0] !== 0x50 ||
+      buffer[1] !== 0x4b ||
+      buffer[2] !== 0x03 ||
+      buffer[3] !== 0x04
+    ) {
+      return NextResponse.json(
+        { error: "Invalid file type. Only ZIP files are allowed." },
+        { status: 400 },
+      );
+    }
 
     // Initialize zip
     let zip: AdmZip;

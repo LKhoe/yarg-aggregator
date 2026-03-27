@@ -499,6 +499,7 @@ export class ListService {
     installationId?: string | null,
   ): Promise<IntersectionSong[]> {
     if (listIds.length === 0) return [];
+    if (listIds.length > 100) throw new Error("Too many list IDs");
 
     const items = await db
       .select({ songId: songListItem.songId })

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/middleware/auth";
 import {
   processSerializedInstalledSongs,
   type InstallationInfo,
@@ -17,44 +18,59 @@ export interface ImportInstalledSongsResponse {
   error?: string;
 }
 
-export async function POST(
-  request: NextRequest,
-): Promise<NextResponse<ImportInstalledSongsResponse>> {
-  try {
-    const body = (await request.json()) as ImportInstalledSongsRequest;
+const MAX_SONGS_PER_REQUEST = 10000;
 
-    if (!body.installation || !body.installation.name) {
+export const POST = withAuth(
+  async (
+    request: NextRequest,
+  ): Promise<NextResponse<ImportInstalledSongsResponse>> => {
+    try {
+      const body = (await request.json()) as ImportInstalledSongsRequest;
+
+      if (!body.installation || !body.installation.name) {
+        return NextResponse.json(
+          { success: false, error: "Installation name is required" },
+          { status: 400 },
+        );
+      }
+
+      if (!Array.isArray(body.songs)) {
+        return NextResponse.json(
+          { success: false, error: "Songs must be an array" },
+          { status: 400 },
+        );
+      }
+
+      if (body.songs.length > MAX_SONGS_PER_REQUEST) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Too many songs. Maximum ${MAX_SONGS_PER_REQUEST} per request.`,
+          },
+          { status: 400 },
+        );
+      }
+
+      const stats = await processSerializedInstalledSongs(
+        body.installation,
+        body.songs,
+      );
+
+      return NextResponse.json({
+        success: true,
+        stats,
+      });
+    } catch (error) {
+      console.error("Error importing installed songs:", error);
       return NextResponse.json(
-        { success: false, error: "Installation name is required" },
-        { status: 400 },
+        {
+          success: false,
+          error:
+            error instanceof Error ? error.message : "Unknown error occurred",
+        },
+        { status: 500 },
       );
     }
-
-    if (!Array.isArray(body.songs)) {
-      return NextResponse.json(
-        { success: false, error: "Songs must be an array" },
-        { status: 400 },
-      );
-    }
-
-    const stats = await processSerializedInstalledSongs(
-      body.installation,
-      body.songs,
-    );
-
-    return NextResponse.json({
-      success: true,
-      stats,
-    });
-  } catch (error) {
-    console.error("Error importing installed songs:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error:
-          error instanceof Error ? error.message : "Unknown error occurred",
-      },
-      { status: 500 },
-    );
-  }
-}
+  },
+  { requiredRole: "user" },
+);

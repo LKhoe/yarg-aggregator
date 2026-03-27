@@ -1,4 +1,9 @@
-const CACHE_NAME = 'yarg-aggregator-v1';
+// Read version from own script URL (?v=X.Y.Z) injected at registration time.
+// This ensures the cache name changes with every deployment, so the activate
+// handler below will delete the previous version's stale cache automatically.
+const swUrl = new URL(self.location.href);
+const APP_VERSION = swUrl.searchParams.get('v') || 'v1';
+const CACHE_NAME = `yarg-aggregator-${APP_VERSION}`;
 
 const STATIC_ASSETS = [
   '/',
@@ -9,7 +14,7 @@ const STATIC_ASSETS = [
   '/icons/apple-touch-icon.png',
 ];
 
-// Install: cache static assets
+// Install: cache static assets and take over immediately
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
@@ -17,7 +22,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate: remove old caches
+// Activate: remove all caches that don't match the current version
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>

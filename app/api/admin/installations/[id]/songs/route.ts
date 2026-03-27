@@ -3,6 +3,7 @@ import { getAuthenticatedUser, hasPermission } from "@/lib/middleware/auth";
 import { db } from "@/lib/db";
 import { installationSong, installation } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import { MAX_ARRAY_INPUT } from "@/lib/validation";
 
 export async function POST(
   request: NextRequest,
@@ -41,6 +42,13 @@ export async function POST(
     if (songIds.length === 0) {
       return NextResponse.json(
         { error: "songId or songIds is required" },
+        { status: 400 },
+      );
+    }
+
+    if (songIds.length > MAX_ARRAY_INPUT) {
+      return NextResponse.json(
+        { error: `Too many songs. Maximum ${MAX_ARRAY_INPUT} per request.` },
         { status: 400 },
       );
     }

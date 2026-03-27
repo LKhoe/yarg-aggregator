@@ -168,6 +168,9 @@ export async function GET(request: NextRequest) {
   if (!authUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (!hasPermission(authUser.profile.role, "moderator")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   try {
     // Get all providers from database

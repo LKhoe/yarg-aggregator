@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/middleware/auth";
 import { UserService } from "@/lib/services/user";
+import { isValidHttpsUrl, isValidLocale } from "@/lib/validation";
 
 export async function GET(request: NextRequest) {
   const authUser = await getAuthenticatedUser(request);
@@ -40,6 +41,26 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
     const { displayName, avatarUrl, preferredLanguage } = body;
+
+    // Validate avatarUrl if provided
+    if (avatarUrl !== undefined && avatarUrl !== null) {
+      if (!isValidHttpsUrl(avatarUrl)) {
+        return NextResponse.json(
+          { error: "avatarUrl must be a valid HTTPS URL" },
+          { status: 400 },
+        );
+      }
+    }
+
+    // Validate preferredLanguage if provided
+    if (preferredLanguage !== undefined && preferredLanguage !== null) {
+      if (!isValidLocale(preferredLanguage)) {
+        return NextResponse.json(
+          { error: "Invalid language" },
+          { status: 400 },
+        );
+      }
+    }
 
     // Validate displayName if provided
     if (displayName !== undefined) {

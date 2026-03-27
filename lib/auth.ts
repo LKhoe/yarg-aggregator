@@ -2,7 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@/lib/db";
 import { userProfile, songList } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { createSign } from "crypto";
 import { lastfmPlugin } from "@ley0x/better-auth-lastfm";
 
@@ -45,7 +45,7 @@ export const auth = betterAuth({
 
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: false,
+    requireEmailVerification: process.env.REQUIRE_EMAIL_VERIFICATION === "true",
   },
 
   socialProviders: {
@@ -117,19 +117,16 @@ export const auth = betterAuth({
             suffix++;
           }
 
-          // First user gets admin role, everyone else gets user
-          const existingProfiles = await db
-            .select({ id: userProfile.userId })
-            .from(userProfile)
-            .limit(1);
-          const role = existingProfiles.length === 0 ? "admin" : "user";
-
-          await db.insert(userProfile).values({
-            userId: user.id,
-            displayName,
-            avatarUrl: user.image,
-            role,
-          });
+          // First user gets admin role — use atomic SQL to avoid race condition
+          await db.execute(sql`
+            INSERT INTO user_profile (user_id, display_name, avatar_url, role)
+            VALUES (
+              ${user.id},
+              ${displayName},
+              ${user.image ?? null},
+              CASE WHEN (SELECT COUNT(*) FROM user_profile) = 0 THEN 'admin' ELSE 'user' END
+            )
+          `);
 
           // Create default favorites list
           await db.insert(songList).values({

@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/middleware/auth";
 import { getAllInstallations } from "@/services/songs/installed";
 
-export async function GET() {
+export const GET = withAuth(async (_request: NextRequest) => {
   try {
     const installations = await getAllInstallations();
     return NextResponse.json({ installations });
@@ -15,4 +16,4 @@ export async function GET() {
       { status: 500 },
     );
   }
-}
+});

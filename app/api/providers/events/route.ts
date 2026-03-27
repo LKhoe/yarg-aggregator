@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { downloadUrl } from "@/lib/db/schema";
 import { countDistinct } from "drizzle-orm";
 import { NextRequest } from "next/server";
-import { getAuthenticatedUser } from "@/lib/middleware/auth";
+import { getAuthenticatedUser, hasPermission } from "@/lib/middleware/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +12,9 @@ export async function GET(request: NextRequest) {
   const authUser = await getAuthenticatedUser(request);
   if (!authUser) {
     return new Response("Unauthorized", { status: 401 });
+  }
+  if (!hasPermission(authUser.profile.role, "moderator")) {
+    return new Response("Forbidden", { status: 403 });
   }
 
   const encoder = new TextEncoder();

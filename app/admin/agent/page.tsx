@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AgentChat } from "@/components/admin/AgentChat";
 import { ConversationList } from "@/components/admin/ConversationList";
-import { ArrowLeft, Bot, PanelLeftOpen } from "lucide-react";
+import { ArrowLeft, Bot, PanelLeftOpen, PanelLeftClose } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +21,7 @@ function AgentContent() {
   >(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -57,7 +58,7 @@ function AgentContent() {
   return (
     <div className="flex h-[calc(100vh-8rem)] max-w-6xl mx-auto gap-0">
       {/* Desktop sidebar */}
-      <div className="hidden md:flex w-72 shrink-0 border-r border-border">
+      <div className={`w-72 shrink-0 border-r border-border ${sidebarOpen ? "hidden md:flex" : "hidden"}`}>
         {sidebar}
       </div>
 
@@ -82,6 +83,19 @@ function AgentContent() {
               <div className="pt-4 h-full">{sidebar}</div>
             </DrawerContent>
           </Drawer>
+
+          {/* Desktop sidebar toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden md:inline-flex"
+            onClick={() => setSidebarOpen((o) => !o)}
+          >
+            {sidebarOpen
+              ? <PanelLeftClose className="h-4 w-4" />
+              : <PanelLeftOpen className="h-4 w-4" />
+            }
+          </Button>
 
           <Button variant="ghost" size="icon" asChild>
             <Link href="/admin">

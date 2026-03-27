@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authRateLimit } from "@/lib/services/rate-limit";
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
+  // Rate limit auth sign-in endpoints to prevent brute force
+  if (
+    request.method === "POST" &&
+    request.nextUrl.pathname.startsWith("/api/auth/sign-in")
+  ) {
+    const rl = await authRateLimit(request);
+    if (rl.blocked) {
+      return NextResponse.json(
+        { error: "Too many login attempts. Please try again later." },
+        {
+          status: 429,
+          headers: rl.retryAfter ? { "Retry-After": String(rl.retryAfter) } : undefined,
+        },
+      );
+    }
+  }
+
   const response = NextResponse.next();
 
   // Security headers

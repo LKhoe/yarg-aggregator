@@ -25,10 +25,15 @@ export default function Header() {
               height={40}
             />
           </div>
-          <div className="hidden sm:block">
-            <h1 className="text-lg sm:text-xl font-bold tracking-[-0.03em] bg-linear-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-              {t("app.name")}
-            </h1>
+          <div>
+            <div className="flex items-baseline gap-2">
+              <h1 className="hidden sm:block text-lg sm:text-xl font-bold tracking-[-0.03em] bg-linear-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+                {t("app.name")}
+              </h1>
+              <span className="text-xs text-muted-foreground/60 font-mono">
+                v{process.env.NEXT_PUBLIC_APP_VERSION}
+              </span>
+            </div>
             <p className="text-xs text-muted-foreground hidden lg:block">
               {t("app.subtitle")}
             </p>

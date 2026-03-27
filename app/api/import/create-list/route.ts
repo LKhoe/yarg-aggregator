@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/middleware/auth";
 import { ListService } from "@/lib/services/list";
+import { MAX_ARRAY_INPUT } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
   const authUser = await getAuthenticatedUser(request);
@@ -14,6 +15,13 @@ export async function POST(request: NextRequest) {
 
     if (!songIds || !Array.isArray(songIds) || songIds.length === 0) {
       return NextResponse.json({ error: "No songs to import" }, { status: 400 });
+    }
+
+    if (songIds.length > MAX_ARRAY_INPUT) {
+      return NextResponse.json(
+        { error: `Too many songs. Maximum ${MAX_ARRAY_INPUT} per request.` },
+        { status: 400 },
+      );
     }
 
     let listId: string;

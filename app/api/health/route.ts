@@ -10,6 +10,6 @@ export async function GET() {
 
     return NextResponse.json({ status: "ok" });
   } catch {
-    return NextResponse.json({ status: "error", message: "Database unreachable" }, { status: 503 });
+    return NextResponse.json({ status: "error" }, { status: 503 });
   }
 }

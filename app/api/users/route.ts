@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { userProfile } from "@/lib/db/schema";
 import { ilike, asc, sql } from "drizzle-orm";
+import { getAuthenticatedUser } from "@/lib/middleware/auth";
 
 export async function GET(request: NextRequest) {
+  const authUser = await getAuthenticatedUser(request);
+  if (!authUser) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const q = searchParams.get("q") || "";

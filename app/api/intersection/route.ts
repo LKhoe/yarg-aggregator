@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/middleware/auth";
 import { ListService } from "@/lib/services/list";
+import { MAX_LIST_IDS } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
   const authUser = await getAuthenticatedUser(request);
@@ -17,6 +18,13 @@ export async function POST(request: NextRequest) {
 
     if (allListIds.length === 0) {
       return NextResponse.json({ error: "At least one list is required" }, { status: 400 });
+    }
+
+    if (allListIds.length > MAX_LIST_IDS) {
+      return NextResponse.json(
+        { error: `Too many lists. Maximum ${MAX_LIST_IDS} per request.` },
+        { status: 400 },
+      );
     }
 
     if (typeof minCount !== "number" || minCount < 1) {
