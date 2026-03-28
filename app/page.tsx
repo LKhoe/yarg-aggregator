@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useTranslations } from "@/hooks/use-translations";
 import dynamic from "next/dynamic";
 import type { ProviderMusic } from "@/types";
+import type { SongSelectEvent } from "@/components/data-table/MusicTable";
 
 // Dynamically import heavy components
 const MusicTable = dynamic(() => import("@/components/data-table/MusicTable"), {
@@ -37,6 +38,10 @@ import {
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { AnimatePresence, motion } from "motion/react";
 import { FadeIn } from "@/components/ui/fade-in";
+import {
+  FlyingGhost,
+  type FlyingGhostOrigin,
+} from "@/components/effects/FlyingGhost";
 
 export default function HomePage() {
   const [totalSongs, setTotalSongs] = useState(0);
@@ -47,8 +52,22 @@ export default function HomePage() {
     album?: string;
     charter?: string;
   } | null>(null);
+  const [ghostOrigin, setGhostOrigin] = useState<FlyingGhostOrigin | null>(
+    null,
+  );
   const { t, loading } = useTranslations();
   const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const asideRef = useRef<HTMLElement>(null);
+
+  const handleSongSelect = useCallback(
+    (event: SongSelectEvent) => {
+      if (isDesktop) {
+        setGhostOrigin(event.rect);
+      }
+      setSelectedSong(event.song);
+    },
+    [isDesktop],
+  );
 
   if (loading) {
     return (
@@ -63,7 +82,13 @@ export default function HomePage() {
 
   return (
     <InstallationProvider>
-      <div className="min-h-screen noise-overlay" style={{ background: "radial-gradient(ellipse 80% 60% at 50% -10%, oklch(0.18 0.04 280), var(--background))" }}>
+      <div
+        className="min-h-screen noise-overlay"
+        style={{
+          background:
+            "radial-gradient(ellipse 80% 60% at 50% -10%, oklch(0.18 0.04 280), var(--background))",
+        }}
+      >
         <BackgroundOrbs />
 
         <Header />
@@ -74,12 +99,15 @@ export default function HomePage() {
               <Hero totalSongs={totalSongs} />
               <MusicTable
                 onTotalChange={setTotalSongs}
-                onSongSelect={setSelectedSong}
+                onSongSelect={handleSongSelect}
                 externalFilter={externalFilter}
               />
             </div>
 
-            <aside className="hidden lg:block space-y-4 lg:space-y-6 sticky top-20 self-start max-h-[calc(100vh-2rem)] overflow-hidden">
+            <aside
+              ref={asideRef}
+              className="hidden lg:block space-y-4 lg:space-y-6 sticky top-20 self-start max-h-[calc(100vh-2rem)] overflow-hidden"
+            >
               <AnimatePresence mode="wait">
                 {selectedSong && (
                   <motion.div
@@ -125,6 +153,15 @@ export default function HomePage() {
               </div>
             </DrawerContent>
           </Drawer>
+        )}
+
+        {/* Flying ghost animation from row → card */}
+        {ghostOrigin && (
+          <FlyingGhost
+            origin={ghostOrigin}
+            targetRef={asideRef}
+            onComplete={() => setGhostOrigin(null)}
+          />
         )}
 
         <Toaster />

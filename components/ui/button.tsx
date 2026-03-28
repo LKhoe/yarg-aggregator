@@ -47,14 +47,53 @@ function Button({
     asChild?: boolean;
   }) {
   const Comp = asChild ? Slot : "button";
+  const ref = React.useRef<HTMLButtonElement>(null);
+
+  const handleClick = React.useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      const button = ref.current;
+      if (button && !asChild) {
+        const rect = button.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const maxDim = Math.max(rect.width, rect.height);
+        const rippleSize = maxDim * 2.5;
+
+        const ripple = document.createElement("span");
+        ripple.style.cssText = `
+          position: absolute;
+          left: ${x - rippleSize / 2}px;
+          top: ${y - rippleSize / 2}px;
+          width: ${rippleSize}px;
+          height: ${rippleSize}px;
+          border-radius: 50%;
+          background: currentColor;
+          opacity: 0;
+          transform: scale(0);
+          pointer-events: none;
+          animation: ripple-expand 0.6s ease-out forwards;
+        `;
+
+        button.appendChild(ripple);
+        ripple.addEventListener("animationend", () => ripple.remove());
+      }
+      props.onClick?.(e);
+    },
+    [asChild, props.onClick],
+  );
 
   return (
     <Comp
+      ref={ref}
       data-slot="button"
       data-variant={variant}
       data-size={size}
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(
+        "relative overflow-hidden",
+        buttonVariants({ variant, size, className }),
+      )}
       {...props}
+      onClick={handleClick}
     />
   );
 }

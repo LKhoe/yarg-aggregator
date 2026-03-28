@@ -4,6 +4,7 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { LanguageSwitcher } from "@/components/language/language-switcher";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { useTranslations } from "@/hooks/use-translations";
+import { GlitchText } from "@/components/effects/GlitchText";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -28,7 +29,7 @@ export default function Header() {
           <div>
             <div className="flex items-baseline gap-2">
               <h1 className="hidden sm:block text-lg sm:text-xl font-bold tracking-[-0.03em] bg-linear-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-                {t("app.name")}
+                <GlitchText>{t("app.name")}</GlitchText>
               </h1>
               <span className="text-xs text-muted-foreground/60 font-mono">
                 v{process.env.NEXT_PUBLIC_APP_VERSION}

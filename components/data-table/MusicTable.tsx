@@ -68,9 +68,14 @@ import { useUserLists } from "@/hooks/use-user-lists";
 import { SongActions } from "@/components/data-table/SongActions";
 import { AnimatePresence, motion } from "motion/react";
 
+export interface SongSelectEvent {
+  song: ProviderMusic;
+  rect: { top: number; left: number; width: number; height: number };
+}
+
 interface MusicTableProps {
   onTotalChange: (total: number) => void;
-  onSongSelect?: (song: ProviderMusic) => void;
+  onSongSelect?: (event: SongSelectEvent) => void;
   externalFilter?: {
     artist?: string;
     genre?: string;
@@ -143,7 +148,7 @@ interface MusicRowProps {
   toggleFavorite: (songId: string) => Promise<boolean>;
   lists: Array<{ id: string; name: string }>;
   onAddToList: (listId: string, songId: string) => Promise<unknown>;
-  onSongSelect?: (song: ProviderMusic) => void;
+  onSongSelect?: (event: SongSelectEvent) => void;
   animationDelay?: number;
 }
 
@@ -159,17 +164,22 @@ const MusicRow = memo(
   }: MusicRowProps) {
     return (
       <TableRow
-        className={`group/row cursor-pointer transition-[background-color,box-shadow] duration-200 hover:shadow-[inset_3px_0_0_0_var(--primary),0_2px_8px_-2px_oklch(0.65_0.25_280/0.15)] hover:bg-primary/4 ${music.installed ? "bg-green-500/5 hover:bg-green-500/10" : ""}`}
-        onClick={() => onSongSelect?.(music)}
-        style={
-          animationDelay !== undefined
-            ? {
-                animation: "fade-slide-up 0.3s ease-out forwards",
-                animationDelay: `${animationDelay}ms`,
-                opacity: 0,
-              }
-            : undefined
-        }
+        className={`group/row cursor-pointer row-pop transition-[background-color,box-shadow,transform] duration-200 hover:shadow-[inset_3px_0_0_0_var(--primary),0_2px_8px_-2px_oklch(0.65_0.25_280/0.15)] hover:bg-primary/4 ${music.installed ? "bg-green-500/5 hover:bg-green-500/10" : ""}`}
+        onClick={(e) => {
+          const row = e.currentTarget;
+          const rect = row.getBoundingClientRect();
+          onSongSelect?.({ song: music, rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height } });
+        }}
+        ref={(el) => {
+          if (el && animationDelay !== undefined) {
+            el.style.opacity = "0";
+            el.style.animation = `fade-slide-up 0.3s ease-out ${animationDelay}ms forwards`;
+            el.addEventListener("animationend", () => {
+              el.style.animation = "";
+              el.style.opacity = "";
+            }, { once: true });
+          }
+        }}
       >
         <TableCell className="hidden sm:table-cell">
           <div className="relative h-8 w-8 sm:h-12 sm:w-12 rounded transition-transform duration-200 group-hover/row:scale-110">

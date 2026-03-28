@@ -361,3 +361,287 @@ h1, h2, h3, h4, [data-slot="card-title"] {
             border-box !important;
     animation: glow-rotate 4s linear infinite;
 }
+
+/* ============================== */
+/* === VISUAL EFFECTS SYSTEM === */
+/* ============================== */
+
+/* === Audio Waveform Visualizer === */
+@keyframes waveform-bar {
+    0% {
+        height: 4px;
+        opacity: 0.4;
+    }
+    100% {
+        height: 28px;
+        opacity: 1;
+    }
+}
+
+/* === Glitch Text Effect === */
+@keyframes glitch-flicker {
+    0%, 92%, 100% {
+        opacity: 1;
+        transform: translate(0);
+        filter: none;
+    }
+    93% {
+        opacity: 1;
+        transform: translate(-2px, 1px);
+        filter: hue-rotate(90deg);
+        text-shadow:
+            2px 0 var(--accent),
+            -2px 0 var(--primary);
+    }
+    93.5% {
+        opacity: 1;
+        transform: translate(2px, -1px);
+        filter: hue-rotate(-90deg);
+        text-shadow:
+            -2px 0 var(--accent),
+            2px 0 oklch(0.65 0.25 25);
+    }
+    94% {
+        opacity: 0.8;
+        transform: translate(-1px, 2px) skewX(-2deg);
+        filter: none;
+        text-shadow:
+            3px 0 var(--accent),
+            -3px 0 var(--primary);
+    }
+    94.5% {
+        opacity: 1;
+        transform: translate(1px, -1px) skewX(1deg);
+        text-shadow: none;
+    }
+    95% {
+        opacity: 1;
+        transform: translate(0);
+        filter: none;
+        text-shadow: none;
+    }
+}
+
+.glitch-text {
+    position: relative;
+    animation: glitch-flicker 10s ease-in-out infinite;
+    display: inline-block;
+}
+
+/* Pseudo-elements for RGB split during glitch */
+.glitch-text::before,
+.glitch-text::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.glitch-text::before {
+    animation: glitch-split-red 10s ease-in-out infinite;
+    color: oklch(0.65 0.25 25);
+    z-index: -1;
+}
+
+.glitch-text::after {
+    animation: glitch-split-cyan 10s ease-in-out infinite;
+    color: var(--accent);
+    z-index: -1;
+}
+
+@keyframes glitch-split-red {
+    0%, 92%, 95%, 100% {
+        opacity: 0;
+        transform: translate(0);
+    }
+    93% {
+        opacity: 0.8;
+        transform: translate(3px, -1px);
+        clip-path: polygon(0 20%, 100% 20%, 100% 60%, 0 60%);
+    }
+    94% {
+        opacity: 0.6;
+        transform: translate(-2px, 1px);
+        clip-path: polygon(0 40%, 100% 40%, 100% 80%, 0 80%);
+    }
+}
+
+@keyframes glitch-split-cyan {
+    0%, 92%, 95%, 100% {
+        opacity: 0;
+        transform: translate(0);
+    }
+    93% {
+        opacity: 0.8;
+        transform: translate(-3px, 1px);
+        clip-path: polygon(0 50%, 100% 50%, 100% 90%, 0 90%);
+    }
+    94% {
+        opacity: 0.6;
+        transform: translate(2px, -1px);
+        clip-path: polygon(0 10%, 100% 10%, 100% 50%, 0 50%);
+    }
+}
+
+/* === Ripple Click Effect === */
+@keyframes ripple-expand {
+    0% {
+        transform: scale(0);
+        opacity: 0.35;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 0;
+    }
+}
+
+/* === Gradient Mesh Background === */
+.gradient-mesh-blob {
+    position: absolute;
+    border-radius: 50%;
+    will-change: transform;
+    opacity: 0;
+    /* Use radial-gradient to simulate blur instead of filter: blur() */
+}
+
+.dark .gradient-mesh-blob {
+    opacity: 1;
+}
+
+.gradient-mesh-blob-1 {
+    width: 50vw;
+    height: 50vw;
+    top: -15%;
+    left: -15%;
+    background: radial-gradient(circle, oklch(0.35 0.15 280 / 0.25) 0%, transparent 70%);
+    animation: mesh-morph-1 20s ease-in-out infinite;
+}
+
+.gradient-mesh-blob-2 {
+    width: 45vw;
+    height: 45vw;
+    top: 45%;
+    right: -10%;
+    background: radial-gradient(circle, oklch(0.35 0.12 200 / 0.2) 0%, transparent 70%);
+    animation: mesh-morph-2 25s ease-in-out infinite;
+}
+
+.gradient-mesh-blob-3 {
+    width: 40vw;
+    height: 40vw;
+    bottom: -10%;
+    left: 15%;
+    background: radial-gradient(circle, oklch(0.3 0.1 320 / 0.15) 0%, transparent 70%);
+    animation: mesh-morph-3 22s ease-in-out infinite;
+}
+
+.gradient-mesh-blob-4 {
+    width: 35vw;
+    height: 35vw;
+    top: 25%;
+    left: 35%;
+    background: radial-gradient(circle, oklch(0.4 0.18 260 / 0.12) 0%, transparent 70%);
+    animation: mesh-morph-4 18s ease-in-out infinite;
+}
+
+@keyframes mesh-morph-1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    25% { transform: translate(5vw, 3vw) scale(1.1); }
+    50% { transform: translate(2vw, 8vw) scale(0.95); }
+    75% { transform: translate(-3vw, 5vw) scale(1.05); }
+}
+
+@keyframes mesh-morph-2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    25% { transform: translate(-4vw, -5vw) scale(1.08); }
+    50% { transform: translate(-7vw, 2vw) scale(0.92); }
+    75% { transform: translate(3vw, -3vw) scale(1.05); }
+}
+
+@keyframes mesh-morph-3 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(6vw, -4vw) scale(1.1); }
+    66% { transform: translate(-3vw, -6vw) scale(0.9); }
+}
+
+@keyframes mesh-morph-4 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    30% { transform: translate(-5vw, 4vw) scale(1.15); }
+    60% { transform: translate(4vw, -3vw) scale(0.88); }
+}
+
+/* === Row Pop Effect (3D lift on hover) === */
+.row-pop {
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+                box-shadow 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+                background-color 0.2s;
+    transform: perspective(800px) rotateX(0deg) translateY(0) scale(1);
+    transform-origin: center bottom;
+    position: relative;
+    z-index: 0;
+    /* Stacked shadow layers: none at rest */
+    box-shadow: 0 0 0 0 transparent;
+}
+
+.row-pop:hover {
+    transform: perspective(800px) rotateX(-2deg) translateY(-6px) scale(1.015);
+    z-index: 10;
+    box-shadow:
+        0 2px 1px oklch(0 0 0 / 0.12),
+        0 12px 10px -4px oklch(0 0 0 / 0.1),
+        0 24px 20px -8px oklch(0 0 0 / 0.08);
+}
+
+.dark .row-pop:hover {
+    box-shadow:
+        0 2px 1px oklch(0 0 0 / 0.3),
+        0 12px 10px -4px oklch(0 0 0 / 0.25),
+        0 24px 20px -8px oklch(0 0 0 / 0.18);
+}
+
+/* === Staggered Reveal with Blur === */
+@keyframes reveal-blur {
+    from {
+        opacity: 0;
+        filter: blur(8px);
+        transform: translateY(16px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        filter: blur(0px);
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Light mode: reduce mesh blob opacity */
+:root .gradient-mesh-blob {
+    opacity: 0;
+}
+
+@media (prefers-color-scheme: light) {
+    .gradient-mesh-blob {
+        opacity: 0;
+    }
+}
+
+/* Light mode mesh blobs (more subtle) */
+:root:not(.dark) .gradient-mesh-blob-1 {
+    background: radial-gradient(circle, oklch(0.85 0.08 280 / 0.15) 0%, transparent 70%);
+    opacity: 0.5;
+}
+:root:not(.dark) .gradient-mesh-blob-2 {
+    background: radial-gradient(circle, oklch(0.85 0.06 200 / 0.12) 0%, transparent 70%);
+    opacity: 0.5;
+}
+:root:not(.dark) .gradient-mesh-blob-3 {
+    background: radial-gradient(circle, oklch(0.85 0.05 320 / 0.1) 0%, transparent 70%);
+    opacity: 0.5;
+}
+:root:not(.dark) .gradient-mesh-blob-4 {
+    background: radial-gradient(circle, oklch(0.88 0.07 260 / 0.08) 0%, transparent 70%);
+    opacity: 0.5;
+}
