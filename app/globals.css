@@ -612,13 +612,15 @@ h1, h2, h3, h4, [data-slot="card-title"] {
         0 24px 20px -8px oklch(0 0 0 / 0.18);
 }
 
-.row-pop:hover {
-    transform: perspective(800px) rotateX(-2deg) translateY(-6px) scale(1.015);
-    z-index: 10;
-}
+@media (min-width: 640px) {
+    .row-pop:hover {
+        transform: perspective(800px) rotateX(-2deg) translateY(-6px) scale(1.015);
+        z-index: 10;
+    }
 
-.row-pop:hover::after {
-    opacity: 1;
+    .row-pop:hover::after {
+        opacity: 1;
+    }
 }
 
 /* === Staggered Reveal with Blur === */
