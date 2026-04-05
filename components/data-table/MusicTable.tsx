@@ -243,7 +243,7 @@ const MusicRow = memo(
               if (diff === null) return null;
               const iconName =
                 inst === "vocals" && music.vocalParts && music.vocalParts > 1
-                  ? "harmony"
+                  ? music.vocalParts >= 3 ? "harmony_3" : "harmony_2"
                   : inst;
               const label =
                 inst === "vocals" && music.vocalParts && music.vocalParts > 1

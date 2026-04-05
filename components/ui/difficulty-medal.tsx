@@ -34,6 +34,7 @@ interface DifficultyMedalProps
   level: number;
   icon?: React.ReactNode;
   gapColor?: string;
+  badge?: React.ReactNode;
 }
 
 function DifficultyMedal({
@@ -42,6 +43,7 @@ function DifficultyMedal({
   level,
   icon,
   gapColor,
+  badge,
   ...props
 }: DifficultyMedalProps) {
   // Calculate rotation: 6 segments = 60deg per segment
@@ -87,6 +89,21 @@ function DifficultyMedal({
       >
         {icon}
       </div>
+
+      {badge && (
+        <div
+          className={cn(
+            "absolute z-20 flex items-center justify-center rounded-full bg-primary font-bold text-primary-foreground ring-2 ring-background",
+            size === "sm"
+              ? "-bottom-1 -right-1 h-3.5 w-3.5 text-[9px] ring-1"
+              : size === "lg"
+                ? "bottom-0 right-0 h-6 w-6 text-sm"
+                : "bottom-0 right-0 h-5 w-5 text-xs",
+          )}
+        >
+          {badge}
+        </div>
+      )}
     </div>
   );
 }

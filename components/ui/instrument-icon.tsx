@@ -16,7 +16,8 @@ export const InstrumentIcon = ({
     case "guitar":
     case "keys":
     case "vocals":
-    case "harmony":
+    case "harmony_2":
+    case "harmony_3":
       return (
         <img
           src={`/instruments/${instrument}.svg`}

@@ -169,7 +169,7 @@ export default function SongDetail({
             {INSTRUMENTS.map((inst) => {
               const diff = song.instruments[inst];
               if (diff === null) return null;
-              const iconName = inst === "vocals" && song.vocalParts && song.vocalParts > 1 ? "harmony" : inst;
+              const iconName = inst === "vocals" && song.vocalParts && song.vocalParts > 1 ? (song.vocalParts >= 3 ? "harmony_3" : "harmony_2") : inst;
               return (
                 <div key={inst} className="flex items-center gap-1.5 text-xs">
                   <DifficultyMedal
