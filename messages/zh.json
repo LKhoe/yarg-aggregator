@@ -86,7 +86,8 @@
       "bass": "贝斯",
       "drums": "鼓",
       "vocals": "人声",
-      "keys": "键盘"
+      "keys": "键盘",
+      "harmony": "和声"
     }
   },
   "cacheDeserializer": {
@@ -662,6 +663,7 @@
       "drums": "鼓",
       "keys": "键盘",
       "vocals": "人声",
+      "harmony": "和声",
       "noInstruments": "无乐器"
     }
   },

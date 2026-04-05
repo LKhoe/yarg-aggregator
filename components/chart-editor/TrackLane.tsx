@@ -28,7 +28,7 @@ export interface TrackLaneProps {
   vizMode?: "waveform" | "spectrogram" | "none";
   spectrogram?: SpectrogramData;
   // New phase 1 props
-  editMode?: "note" | "phrase";
+  editMode?: "note" | "phrase" | "eraser";
   phraseType?: Phrase["type"];
   sections?: Section[];
   onAddPhrase?: (tick: number, length: number) => void;
@@ -39,6 +39,10 @@ export interface TrackLaneProps {
   lyrics?: LyricEvent[];
   ghostNotes?: Note[];
   densityHeatmap?: Float32Array;
+  leftyFlip?: boolean;
+  onRightClickDrag?: (tick: number, fret: number, endTick: number) => void;
+  isDrumTrack?: boolean;
+  drumMode?: import("@/lib/chart/types").DrumMode;
 }
 
 // ── Perspective constants ──────────────────────────────────────────
@@ -248,16 +252,33 @@ export const TrackLane = memo(function TrackLane({
   lyrics,
   ghostNotes,
   densityHeatmap,
+  leftyFlip = false,
+  onRightClickDrag,
+  isDrumTrack,
+  drumMode = "4lane",
 }: TrackLaneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef    = useRef<HTMLCanvasElement>(null);
 
-  const isDrums = trackKey.includes("Drums");
-  const numCols = isDrums ? 4 : NUM_FRETS;
+  const isDrums = isDrumTrack ?? trackKey.includes("Drums");
+  const numCols = isDrums ? (drumMode === "5lane" ? 5 : 4) : NUM_FRETS;
+
+  // Right-click drag state for sustain creation
+  const rightDragRef = useRef({ active: false, startTick: 0, startFret: 0, currentTick: 0 });
 
   // Off-screen canvas + ImageData reused across frames for spectrogram rendering
   const spectrogramCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const spectrogramImgRef    = useRef<{ data: ImageData; w: number; h: number } | null>(null);
+
+  // Cached gradients and pre-allocated arrays to avoid per-frame allocations
+  const gradientCacheRef = useRef<{
+    hw: CanvasGradient | null;
+    vigL: CanvasGradient | null;
+    vigR: CanvasGradient | null;
+    W: number; H: number;
+  }>({ hw: null, vigL: null, vigR: null, W: 0, H: 0 });
+  // Pre-allocated waveform arrays (reused across frames)
+  const waveformBufRef = useRef<{ lx: number[]; rx: number[]; y: number[]; cap: number }>({ lx: [], rx: [], y: [], cap: 0 });
 
   // Drag (note move)
   const dragRef = useRef({ active: false, noteId: "", startTick: 0, startFret: 0 });
@@ -277,6 +298,7 @@ export const TrackLane = memo(function TrackLane({
     selectedNoteIds, onSelectNotes, onAddNote, onDeleteNotes, onMoveNotes,
     waveform, vizMode, spectrogram, editMode, phraseType, sections,
     onAddPhrase, onDeletePhrase, onResizeNote, lyrics, ghostNotes, densityHeatmap,
+    leftyFlip, numCols, isDrums,
     lassoRect: null as { x1: number; y1: number; x2: number; y2: number } | null,
     phraseDraw: null as { startTick: number; endTick: number } | null,
   });
@@ -286,6 +308,7 @@ export const TrackLane = memo(function TrackLane({
     selectedNoteIds, onSelectNotes, onAddNote, onDeleteNotes, onMoveNotes,
     waveform, vizMode, spectrogram, editMode, phraseType, sections,
     onAddPhrase, onDeletePhrase, onResizeNote, lyrics, ghostNotes, densityHeatmap,
+    leftyFlip, numCols, isDrums,
     lassoRect,
     phraseDraw,
   };
@@ -320,13 +343,17 @@ export const TrackLane = memo(function TrackLane({
 
     const { chart, trackKey, currentTickRef: ctRef, currentTick: propTick,
             zoom, renderDistance, selectedNoteIds, waveform, editMode, sections, lyrics,
-            ghostNotes, densityHeatmap, lassoRect, phraseDraw } = propsRef.current;
+            ghostNotes, densityHeatmap, lassoRect, phraseDraw, leftyFlip,
+            numCols: pNumCols, isDrums: pIsDrums } = propsRef.current;
     const currentTick = ctRef?.current ?? propTick;
-    const isDrums = trackKey.includes("Drums");
-    const numCols = isDrums ? 4 : NUM_FRETS;
+    const isDrums = pIsDrums;
+    const numCols = pNumCols;
     const track      = chart.tracks[trackKey];
     const resolution = chart.metadata.resolution || 192;
     const vt         = visibleTicksFromZoom(zoom, resolution, renderDistance);
+
+    // Lefty-flip helper: mirror the fret index
+    const flipFret = (fi: number) => leftyFlip ? (numCols - 1 - fi) : fi;
 
     // Visible note range via binary search (notes are sorted by tick)
     const visStart = track ? lowerBound(track.notes, currentTick - vt) : 0;
@@ -349,11 +376,25 @@ export const TrackLane = memo(function TrackLane({
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, W, H);
 
-    // ── 2. Highway surface
-    const hwGrad = ctx.createLinearGradient(0, hy, 0, sy);
-    hwGrad.addColorStop(0, "#08080f");
-    hwGrad.addColorStop(1, "#0e0e1c");
-    ctx.fillStyle = hwGrad;
+    // ── 2. Highway surface (cached gradients)
+    const gc = gradientCacheRef.current;
+    if (!gc.hw || gc.W !== W || gc.H !== H) {
+      gc.hw = ctx.createLinearGradient(0, hy, 0, sy);
+      gc.hw.addColorStop(0, "#08080f");
+      gc.hw.addColorStop(1, "#0e0e1c");
+      const vigLBase = laneStrike.left;
+      const vigLInner = laneStrike.left + laneStrike.width * 0.12;
+      gc.vigL = ctx.createLinearGradient(vigLBase, 0, vigLInner, 0);
+      gc.vigL.addColorStop(0, "rgba(0,0,0,0.5)");
+      gc.vigL.addColorStop(1, "rgba(0,0,0,0)");
+      const vigRBase = laneStrike.right;
+      const vigRInner = laneStrike.right - laneStrike.width * 0.12;
+      gc.vigR = ctx.createLinearGradient(vigRBase, 0, vigRInner, 0);
+      gc.vigR.addColorStop(0, "rgba(0,0,0,0.5)");
+      gc.vigR.addColorStop(1, "rgba(0,0,0,0)");
+      gc.W = W; gc.H = H;
+    }
+    ctx.fillStyle = gc.hw;
     ctx.beginPath();
     ctx.moveTo(vpX, hy);
     ctx.lineTo(laneStrike.right, sy);
@@ -361,23 +402,12 @@ export const TrackLane = memo(function TrackLane({
     ctx.closePath();
     ctx.fill();
 
-    // Vignette
-    for (const side of ["left", "right"] as const) {
-      const base  = side === "left" ? laneStrike.left : laneStrike.right;
-      const inner = side === "left"
-        ? laneStrike.left  + laneStrike.width * 0.12
-        : laneStrike.right - laneStrike.width * 0.12;
-      const g = ctx.createLinearGradient(base, 0, inner, 0);
-      g.addColorStop(0, "rgba(0,0,0,0.5)");
-      g.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.moveTo(vpX, hy);
-      ctx.lineTo(laneStrike.right, sy);
-      ctx.lineTo(laneStrike.left, sy);
-      ctx.closePath();
-      ctx.fill();
-    }
+    // Vignette (cached gradients)
+    const hwPath = () => { ctx.beginPath(); ctx.moveTo(vpX, hy); ctx.lineTo(laneStrike.right, sy); ctx.lineTo(laneStrike.left, sy); ctx.closePath(); };
+    ctx.fillStyle = gc.vigL!;
+    hwPath(); ctx.fill();
+    ctx.fillStyle = gc.vigR!;
+    hwPath(); ctx.fill();
 
     // ── 3. Lane edges
     ctx.strokeStyle = EDGE_COLOR;
@@ -480,30 +510,35 @@ export const TrackLane = memo(function TrackLane({
       }
 
     } else if (vizMode === "waveform" && waveform && waveform.peaks.length > 0) {
-      // ── Waveform: classic symmetric blue shape
+      // ── Waveform: classic symmetric blue shape (pre-allocated buffers)
       const tickStep = Math.max(waveform.ticksPerSample, Math.ceil(vt / 500));
-      const lxArr: number[] = [], rxArr: number[] = [], yArr: number[] = [];
+      const needed = Math.ceil((vt + tickStep) / tickStep) + 1;
+      const wb = waveformBufRef.current;
+      if (wb.cap < needed) {
+        wb.lx = new Array(needed); wb.rx = new Array(needed); wb.y = new Array(needed); wb.cap = needed;
+      }
+      let n = 0;
       for (let dt = 0; dt <= vt + tickStep; dt += tickStep) {
         const d    = depthAt(dt, vt);
         const lane = laneAt(d, W, H, numCols);
         const hw   = lane.width * 0.42 * getWaveformPeak(waveform, currentTick + dt);
-        lxArr.push(lane.cx - hw); rxArr.push(lane.cx + hw); yArr.push(lane.y);
+        wb.lx[n] = lane.cx - hw; wb.rx[n] = lane.cx + hw; wb.y[n] = lane.y;
+        n++;
       }
-      const n = yArr.length;
       if (n >= 2) {
         ctx.fillStyle = "rgba(80,200,255,0.10)";
         ctx.beginPath();
-        ctx.moveTo(lxArr[0], yArr[0]);
-        for (let i = 1; i < n; i++) ctx.lineTo(lxArr[i], yArr[i]);
-        for (let i = n - 1; i >= 0; i--) ctx.lineTo(rxArr[i], yArr[i]);
+        ctx.moveTo(wb.lx[0], wb.y[0]);
+        for (let i = 1; i < n; i++) ctx.lineTo(wb.lx[i], wb.y[i]);
+        for (let i = n - 1; i >= 0; i--) ctx.lineTo(wb.rx[i], wb.y[i]);
         ctx.closePath(); ctx.fill();
         ctx.strokeStyle = "rgba(100,220,255,0.35)";
         ctx.lineWidth   = 1;
-        ctx.beginPath(); ctx.moveTo(lxArr[0], yArr[0]);
-        for (let i = 1; i < n; i++) ctx.lineTo(lxArr[i], yArr[i]);
+        ctx.beginPath(); ctx.moveTo(wb.lx[0], wb.y[0]);
+        for (let i = 1; i < n; i++) ctx.lineTo(wb.lx[i], wb.y[i]);
         ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(rxArr[0], yArr[0]);
-        for (let i = 1; i < n; i++) ctx.lineTo(rxArr[i], yArr[i]);
+        ctx.beginPath(); ctx.moveTo(wb.rx[0], wb.y[0]);
+        for (let i = 1; i < n; i++) ctx.lineTo(wb.rx[i], wb.y[i]);
         ctx.stroke();
       }
     }
@@ -614,30 +649,21 @@ export const TrackLane = memo(function TrackLane({
           }
 
           // Dashed guide lines extending from boundaries outside the lane
+          ctx.save();
           ctx.setLineDash([4, 4]);
           ctx.strokeStyle = borderColor;
           ctx.lineWidth = 1;
+          ctx.beginPath();
           if (dtS >= 0 && dtS <= vt) {
-            ctx.beginPath();
-            ctx.moveTo(lS.left - 20, lS.y);
-            ctx.lineTo(lS.left, lS.y);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(lS.right, lS.y);
-            ctx.lineTo(lS.right + 20, lS.y);
-            ctx.stroke();
+            ctx.moveTo(lS.left - 20, lS.y); ctx.lineTo(lS.left, lS.y);
+            ctx.moveTo(lS.right, lS.y); ctx.lineTo(lS.right + 20, lS.y);
           }
           if (dtE >= 0 && dtE <= vt) {
-            ctx.beginPath();
-            ctx.moveTo(lE.left - 20, lE.y);
-            ctx.lineTo(lE.left, lE.y);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(lE.right, lE.y);
-            ctx.lineTo(lE.right + 20, lE.y);
-            ctx.stroke();
+            ctx.moveTo(lE.left - 20, lE.y); ctx.lineTo(lE.left, lE.y);
+            ctx.moveTo(lE.right, lE.y); ctx.lineTo(lE.right + 20, lE.y);
           }
-          ctx.setLineDash([]);
+          ctx.stroke();
+          ctx.restore();
         }
       }
     }
@@ -699,8 +725,9 @@ export const TrackLane = memo(function TrackLane({
         if (dtEnd < 0 || dt > vt) continue;
         if (isDrums && note.fret === 0) continue;
 
-        const fi = isDrums ? note.fret - 1 : note.fret;
-        if (fi < 0) continue;
+        const rawFi2 = isDrums ? note.fret - 1 : note.fret;
+        if (rawFi2 < 0) continue;
+        const fi = flipFret(rawFi2);
 
         const color      = noteColors[note.fret] ?? "#888";
         const isSelected = selectedNoteIds.has(note.id);
@@ -774,8 +801,9 @@ export const TrackLane = memo(function TrackLane({
           continue;
         }
 
-        const fi = isDrums ? note.fret - 1 : note.fret;
-        if (fi < 0 || fi >= numCols) continue;
+        const rawFi = isDrums ? note.fret - 1 : note.fret;
+        if (rawFi < 0 || rawFi >= numCols) continue;
+        const fi = flipFret(rawFi);
 
         // Trapezoid corners
         const dtF  = Math.max(0, dt);
@@ -875,7 +903,6 @@ export const TrackLane = memo(function TrackLane({
           const gemW  = fxFR - fxFL;
 
           if (note.flags.tap) {
-            // Draw a ring outline around the gem
             const radius = Math.max(3, gemW * 0.35);
             ctx.strokeStyle = "rgba(255,255,255,0.85)";
             ctx.lineWidth   = Math.max(1, dF * 2);
@@ -887,7 +914,6 @@ export const TrackLane = memo(function TrackLane({
           }
 
           if (note.flags.forceHopo) {
-            // Small upward triangle above gem
             const triSize = Math.max(4, gemW * 0.25);
             const triY    = yF - (yF - yB) * 0.1 - triSize;
             ctx.fillStyle   = "#fff";
@@ -901,11 +927,71 @@ export const TrackLane = memo(function TrackLane({
           }
 
           if (note.flags.forceStrum) {
-            // Small "S" indicator to the right of the gem
             const fontSize = Math.max(6, Math.round(gemW * 0.4));
             ctx.fillStyle = "#fbbf24";
             ctx.font      = `bold ${fontSize}px sans-serif`;
             ctx.fillText("S", fxFR + 1, yF - (yF - yB) * 0.3);
+          }
+
+          // Open note indicator: purple horizontal bar spanning full width
+          if (note.flags.open && !isDrums) {
+            const dO = depthAt(Math.max(0, dt), vt);
+            const lO = laneAt(dO, W, H, numCols);
+            ctx.save();
+            ctx.shadowColor = "#a855f7"; ctx.shadowBlur = 10 * dO;
+            ctx.fillStyle = "rgba(168,85,247,0.6)";
+            ctx.fillRect(lO.left, lO.y - 2, lO.width, 4);
+            ctx.restore();
+          }
+
+          // Cymbal indicator: diamond shape above note (drums)
+          if (note.flags.cymbal && isDrums) {
+            const diaSize = Math.max(3, gemW * 0.2);
+            const diaY = yB - diaSize * 1.2;
+            ctx.fillStyle = "#fde047";
+            ctx.beginPath();
+            ctx.moveTo(gemCx, diaY - diaSize);
+            ctx.lineTo(gemCx + diaSize, diaY);
+            ctx.lineTo(gemCx, diaY + diaSize);
+            ctx.lineTo(gemCx - diaSize, diaY);
+            ctx.closePath(); ctx.fill();
+          }
+
+          // Accent indicator: upward arrow (drums)
+          if (note.flags.accent && isDrums) {
+            const arrowSize = Math.max(3, gemW * 0.18);
+            const arrowY = yB - arrowSize * 0.5;
+            ctx.strokeStyle = "#ef4444";
+            ctx.lineWidth = Math.max(1.5, dF * 2);
+            ctx.beginPath();
+            ctx.moveTo(gemCx - arrowSize, arrowY + arrowSize);
+            ctx.lineTo(gemCx, arrowY);
+            ctx.lineTo(gemCx + arrowSize, arrowY + arrowSize);
+            ctx.stroke();
+          }
+
+          // Ghost indicator: parentheses around note (drums)
+          if (note.flags.ghost && isDrums) {
+            const fontSize = Math.max(8, Math.round(gemW * 0.5));
+            ctx.fillStyle = "rgba(255,255,255,0.5)";
+            ctx.font = `${fontSize}px sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            const cy = yF - (yF - yB) * 0.5;
+            ctx.fillText("(", fxFL - 2, cy);
+            ctx.fillText(")", fxFR + 2, cy);
+          }
+
+          // Double kick indicator: "2x" label (drums)
+          if (note.flags.doubleKick && isDrums && note.fret === 0) {
+            const dK = depthAt(Math.max(0, dt), vt);
+            const lK = laneAt(dK, W, H, numCols);
+            const fontSize = Math.max(7, Math.round(lK.colW * 0.3));
+            ctx.fillStyle = "#ef4444";
+            ctx.font = `bold ${fontSize}px sans-serif`;
+            ctx.textAlign = "left";
+            ctx.textBaseline = "middle";
+            ctx.fillText("2x", lK.right + 3, lK.y);
           }
         }
       }
@@ -1215,10 +1301,38 @@ export const TrackLane = memo(function TrackLane({
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       const canvas = canvasRef.current;
-      if (!canvas || e.button !== 0) return;
+      if (!canvas) return;
+
+      // Right-click drag for sustain creation
+      if (e.button === 2) {
+        const rect = canvas.getBoundingClientRect();
+        const cx2 = e.clientX - rect.left, cy2 = e.clientY - rect.top;
+        const { chart, trackKey, currentTick, zoom, renderDistance, snapDivision, numCols, isDrums, leftyFlip } = propsRef.current;
+        const resolution = chart.metadata.resolution || 192;
+        const vt = visibleTicksFromZoom(zoom, resolution, renderDistance);
+        const gridTicks = snapDivisionToTicks(resolution, snapDivision);
+        const rawDt = yToTickOffset(cy2, canvas.width, canvas.height, vt);
+        const tick = Math.max(0, snapToGrid(currentTick + rawDt, gridTicks));
+        const colIdx = xyToFret(cx2, cy2, canvas.width, canvas.height, vt, numCols);
+        const fret = isDrums ? colIdx + 1 : (leftyFlip ? (numCols - 1 - colIdx) : colIdx);
+        rightDragRef.current = { active: true, startTick: tick, startFret: fret, currentTick: tick };
+        return;
+      }
+
+      if (e.button !== 0) return;
       const rect = canvas.getBoundingClientRect();
       const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
       const { selectedNoteIds, onSelectNotes, editMode, currentTick, chart, trackKey, zoom, renderDistance, snapDivision, onAddPhrase } = propsRef.current;
+
+      // Eraser mode: click to delete note directly
+      if (editMode === "eraser") {
+        const note = getNoteAt(cx, cy, canvas.width, canvas.height);
+        if (note) {
+          const { onDeleteNotes } = propsRef.current;
+          onDeleteNotes([note.id]);
+        }
+        return;
+      }
 
       if (editMode === "phrase") {
         // In phrase mode: start drawing a new phrase
@@ -1305,9 +1419,21 @@ export const TrackLane = memo(function TrackLane({
         return;
       }
 
+      // Update right-click drag
+      if (rightDragRef.current.active) {
+        const resolution = chart.metadata.resolution || 192;
+        const vt = visibleTicksFromZoom(zoom, resolution, renderDistance);
+        const gridTicks = snapDivisionToTicks(resolution, snapDivision);
+        const rawDt = yToTickOffset(cy, canvas.width, canvas.height, vt);
+        const tick = Math.max(0, snapToGrid(currentTick + rawDt, gridTicks));
+        rightDragRef.current.currentTick = tick;
+        return;
+      }
+
       // Hover cursor check for resize handles
       const resizeNote = getSustainResizeAt(cx, cy, canvas.width, canvas.height);
-      const newCursor  = resizeNote ? "ns-resize" : (propsRef.current.editMode === "phrase" ? "crosshair" : "crosshair");
+      const editMode = propsRef.current.editMode;
+      const newCursor = resizeNote ? "ns-resize" : (editMode === "eraser" ? "not-allowed" : "crosshair");
       if (canvasRef.current) canvasRef.current.style.cursor = newCursor;
     },
     [getSustainResizeAt]
@@ -1318,6 +1444,22 @@ export const TrackLane = memo(function TrackLane({
       const canvas = canvasRef.current;
       if (!canvas) return;
       const { selectedNoteIds, onSelectNotes, onAddPhrase, phraseType } = propsRef.current;
+
+      // Handle right-click drag completion (sustain creation)
+      if (rightDragRef.current.active) {
+        const { startTick, startFret, currentTick: endTick } = rightDragRef.current;
+        const length = Math.max(0, endTick - startTick);
+        if (length > 0) {
+          const { onAddNote } = propsRef.current;
+          // We need a special add-note-with-sustain, but we can just add note then
+          // rely on ChartEditor to handle this
+          if (onRightClickDrag) {
+            onRightClickDrag(startTick, startFret, endTick);
+          }
+        }
+        rightDragRef.current.active = false;
+        return;
+      }
 
       // Handle lasso completion
       if (lassoRef.current.active) {
@@ -1356,9 +1498,7 @@ export const TrackLane = memo(function TrackLane({
       const drag = dragRef.current;
       if (!drag.active || !drag.noteId) { dragRef.current.active = false; return; }
 
-      const { chart, trackKey, currentTick, zoom, renderDistance, snapDivision, onMoveNotes } = propsRef.current;
-      const isDrums    = trackKey.includes("Drums");
-      const numCols    = isDrums ? 4 : NUM_FRETS;
+      const { chart, trackKey, currentTick, zoom, renderDistance, snapDivision, onMoveNotes, numCols: nc, isDrums: isd, leftyFlip: lf } = propsRef.current;
       const resolution = chart.metadata.resolution || 192;
       const vt         = visibleTicksFromZoom(zoom, resolution, renderDistance);
       const gridTicks  = snapDivisionToTicks(resolution, snapDivision);
@@ -1367,8 +1507,9 @@ export const TrackLane = memo(function TrackLane({
 
       const rawDt   = yToTickOffset(cy, canvas.width, canvas.height, vt);
       const newTick = Math.max(0, snapToGrid(currentTick + rawDt, gridTicks));
-      const colIdx  = xyToFret(cx, cy, canvas.width, canvas.height, vt, numCols);
-      const newFret = isDrums ? colIdx + 1 : colIdx;
+      const colIdx  = xyToFret(cx, cy, canvas.width, canvas.height, vt, nc);
+      const rawCol  = lf ? (nc - 1 - colIdx) : colIdx;
+      const newFret = isd ? rawCol + 1 : rawCol;
 
       const deltaTick = newTick - drag.startTick;
       const deltaFret = newFret - drag.startFret;
@@ -1397,22 +1538,21 @@ export const TrackLane = memo(function TrackLane({
       const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
 
       const { editMode } = propsRef.current;
-      if (editMode === "phrase") return; // Phrase drawing handled in mousedown/up
+      if (editMode === "phrase" || editMode === "eraser") return;
 
       if (cy <= canvas.height * HORIZON_Y_RATIO || cy >= canvas.height * STRIKE_Y_RATIO) return;
       if (getNoteAt(cx, cy, canvas.width, canvas.height)) return;
 
-      const { chart, trackKey, currentTick, zoom, renderDistance, snapDivision, onAddNote } = propsRef.current;
-      const isDrums    = trackKey.includes("Drums");
-      const numCols    = isDrums ? 4 : NUM_FRETS;
+      const { chart, currentTick, zoom, renderDistance, snapDivision, onAddNote, numCols: nc, isDrums: isd, leftyFlip: lf } = propsRef.current;
       const resolution = chart.metadata.resolution || 192;
       const vt         = visibleTicksFromZoom(zoom, resolution, renderDistance);
       const gridTicks  = snapDivisionToTicks(resolution, snapDivision);
 
       const rawDt = yToTickOffset(cy, canvas.width, canvas.height, vt);
       const tick  = Math.max(0, snapToGrid(currentTick + rawDt, gridTicks));
-      const colIdx = xyToFret(cx, cy, canvas.width, canvas.height, vt, numCols);
-      const fret   = isDrums ? colIdx + 1 : colIdx;
+      const colIdx = xyToFret(cx, cy, canvas.width, canvas.height, vt, nc);
+      const rawCol = lf ? (nc - 1 - colIdx) : colIdx;
+      const fret   = isd ? rawCol + 1 : rawCol;
       onAddNote(tick, fret);
     },
     [getNoteAt]
@@ -1421,6 +1561,8 @@ export const TrackLane = memo(function TrackLane({
   const handleContextMenu = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       e.preventDefault();
+      // Skip context menu if right-click drag was used
+      if (rightDragRef.current.active) return;
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();

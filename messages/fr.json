@@ -86,7 +86,8 @@
       "bass": "Basse",
       "drums": "Batterie",
       "vocals": "Chant",
-      "keys": "Clavier"
+      "keys": "Clavier",
+      "harmony": "Harmonie"
     }
   },
   "cacheDeserializer": {
@@ -662,6 +663,7 @@
       "drums": "Batterie",
       "keys": "Claviers",
       "vocals": "Chant",
+      "harmony": "Harmonie",
       "noInstruments": "Aucun instrument"
     }
   },

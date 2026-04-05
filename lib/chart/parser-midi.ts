@@ -20,6 +20,9 @@ const TRACK_NAME_MAP: Record<string, Instrument> = {
   "PART DRUMS": "Drums",
   "PART KEYS": "Keyboard",
   "PART VOCALS": "Vocals",
+  "HARM1": "Harmony1",
+  "HARM2": "Harmony2",
+  "HARM3": "Harmony3",
   // aliases
   "PART RHYTHM": "DoubleBass",
 };

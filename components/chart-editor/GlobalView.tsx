@@ -51,6 +51,9 @@ export const GlobalView = memo(function GlobalView({
 }: GlobalViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Cache density histogram to avoid recomputing every frame
+  const histCacheRef = useRef<{ trackKey: TrackKey | null; notesLen: number; totalTicks: number; bins: number; hist: Float32Array; maxVal: number } | null>(null);
+
   const propsRef = useRef({
     chart, trackKey, totalTicks, currentTick, viewportTicks,
     tempoMap, sections, onSeek, currentTickRef, isPlaying,
@@ -79,134 +82,145 @@ export const GlobalView = memo(function GlobalView({
     return () => ro.disconnect();
   }, []);
 
-  // Render loop
-  useEffect(() => {
+  // Shared draw function used by both static and RAF paths
+  const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const {
+      chart: c, trackKey: tk, totalTicks: total, viewportTicks: vpTicks,
+      tempoMap: tmap, sections: secs, currentTickRef: ctRef, currentTick: propTick,
+    } = propsRef.current;
+
+    const tick = ctRef?.current ?? propTick;
+    const W = canvas.width;
+    const H = canvas.height;
+    if (W === 0 || H === 0 || total <= 0) return;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Background
+    ctx.fillStyle = "#0c0c12";
+    ctx.fillRect(0, 0, W, H);
+
+    const tickToX = (t: number) => (t / total) * W;
+
+    // ── 1. BPM regions (colored bands) ──
+    if (tmap.length > 0) {
+      let minBpm = Infinity, maxBpm = -Infinity;
+      for (const p of tmap) { if (p.bpm < minBpm) minBpm = p.bpm; if (p.bpm > maxBpm) maxBpm = p.bpm; }
+      const bpmRange = maxBpm - minBpm || 1;
+
+      for (let i = 0; i < tmap.length; i++) {
+        const x1 = tickToX(tmap[i].tick);
+        const x2 = i + 1 < tmap.length ? tickToX(tmap[i + 1].tick) : W;
+        const t = (tmap[i].bpm - minBpm) / bpmRange;
+        const hue = 220 - t * 220;
+        ctx.fillStyle = `hsla(${hue}, 60%, 30%, 0.25)`;
+        ctx.fillRect(x1, 0, x2 - x1, H);
+      }
+    }
+
+    // ── 2. Note density histogram (cached) ──
+    if (tk) {
+      const track = c.tracks[tk];
+      if (track && track.notes.length > 0) {
+        const bins = Math.min(DENSITY_BINS, W);
+        const cache = histCacheRef.current;
+        let hist: Float32Array;
+        let maxVal: number;
+        if (cache && cache.trackKey === tk && cache.notesLen === track.notes.length && cache.totalTicks === total && cache.bins === bins) {
+          hist = cache.hist;
+          maxVal = cache.maxVal;
+        } else {
+          hist = buildDensityHistogram(track.notes, total, bins);
+          maxVal = 1;
+          for (let i = 0; i < hist.length; i++) { if (hist[i] > maxVal) maxVal = hist[i]; }
+          histCacheRef.current = { trackKey: tk, notesLen: track.notes.length, totalTicks: total, bins, hist, maxVal };
+        }
+        const binW = W / bins;
+        const histH = H * 0.6;
+
+        for (let i = 0; i < bins; i++) {
+          if (hist[i] === 0) continue;
+          const barH = (hist[i] / maxVal) * histH;
+          const intensity = hist[i] / maxVal;
+          const hue = (1 - intensity) * 120;
+          ctx.fillStyle = `hsla(${hue}, 80%, 50%, 0.5)`;
+          ctx.fillRect(i * binW, H - barH, binW + 0.5, barH);
+        }
+      }
+    }
+
+    // ── 3. Section markers ──
+    ctx.font = "9px ui-monospace, monospace";
+    ctx.textBaseline = "top";
+    for (const sec of secs) {
+      const x = tickToX(sec.tick);
+      ctx.strokeStyle = "rgba(168,130,255,0.6)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, H);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(168,130,255,0.85)";
+      const label = sec.name.length > 12 ? sec.name.slice(0, 11) + "\u2026" : sec.name;
+      ctx.fillText(label, x + 2, 2);
+    }
+
+    // ── 4. Viewport indicator ──
+    const vpX1 = tickToX(tick);
+    const vpX2 = tickToX(tick + vpTicks);
+    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    ctx.fillRect(vpX1, 0, vpX2 - vpX1, H);
+    ctx.strokeStyle = "rgba(255,255,255,0.6)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(vpX1, 0);
+    ctx.lineTo(vpX1, H);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(vpX2, 0);
+    ctx.lineTo(vpX2, H);
+    ctx.stroke();
+
+    // ── 5. Playhead ──
+    const px = tickToX(tick);
+    ctx.strokeStyle = "#ff4444";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(px, 0);
+    ctx.lineTo(px, H);
+    ctx.stroke();
+
+    // ── 6. Bottom border ──
+    ctx.strokeStyle = "rgba(255,255,255,0.1)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, H - 0.5);
+    ctx.lineTo(W, H - 0.5);
+    ctx.stroke();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Static re-render: when non-tick props change
+  useEffect(() => {
+    renderCanvas();
+  }, [chart, trackKey, totalTicks, viewportTicks, tempoMap, sections, currentTick, renderCanvas]);
+
+  // Playback RAF: smooth 60fps updates only when playing
+  useEffect(() => {
+    if (!isPlaying) return;
     let raf = 0;
-
-    const draw = () => {
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      const {
-        chart: c, trackKey: tk, totalTicks: total, viewportTicks: vpTicks,
-        tempoMap: tmap, sections: secs, currentTickRef: ctRef, currentTick: propTick,
-      } = propsRef.current;
-
-      const tick = ctRef?.current ?? propTick;
-      const W = canvas.width;
-      const H = canvas.height;
-      if (W === 0 || H === 0 || total <= 0) { raf = requestAnimationFrame(draw); return; }
-
-      ctx.clearRect(0, 0, W, H);
-
-      // Background
-      ctx.fillStyle = "#0c0c12";
-      ctx.fillRect(0, 0, W, H);
-
-      const tickToX = (t: number) => (t / total) * W;
-
-      // ── 1. BPM regions (colored bands) ──
-      if (tmap.length > 0) {
-        const minBpm = Math.min(...tmap.map((p) => p.bpm));
-        const maxBpm = Math.max(...tmap.map((p) => p.bpm));
-        const bpmRange = maxBpm - minBpm || 1;
-
-        for (let i = 0; i < tmap.length; i++) {
-          const x1 = tickToX(tmap[i].tick);
-          const x2 = i + 1 < tmap.length ? tickToX(tmap[i + 1].tick) : W;
-          // Hue: blue (slow) → red (fast)
-          const t = (tmap[i].bpm - minBpm) / bpmRange;
-          const hue = 220 - t * 220; // 220=blue → 0=red
-          ctx.fillStyle = `hsla(${hue}, 60%, 30%, 0.25)`;
-          ctx.fillRect(x1, 0, x2 - x1, H);
-        }
-      }
-
-      // ── 2. Note density histogram ──
-      if (tk) {
-        const track = c.tracks[tk];
-        if (track && track.notes.length > 0) {
-          const bins = Math.min(DENSITY_BINS, W);
-          const hist = buildDensityHistogram(track.notes, total, bins);
-          const maxVal = Math.max(1, ...hist);
-          const binW = W / bins;
-          const histH = H * 0.6; // density fills bottom 60%
-
-          for (let i = 0; i < bins; i++) {
-            if (hist[i] === 0) continue;
-            const barH = (hist[i] / maxVal) * histH;
-            const intensity = hist[i] / maxVal;
-            // Green → Yellow → Red
-            const hue = (1 - intensity) * 120;
-            ctx.fillStyle = `hsla(${hue}, 80%, 50%, 0.5)`;
-            ctx.fillRect(i * binW, H - barH, binW + 0.5, barH);
-          }
-        }
-      }
-
-      // ── 3. Section markers ──
-      ctx.font = "9px ui-monospace, monospace";
-      ctx.textBaseline = "top";
-      for (const sec of secs) {
-        const x = tickToX(sec.tick);
-        // Vertical line
-        ctx.strokeStyle = "rgba(168,130,255,0.6)";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, H);
-        ctx.stroke();
-        // Label
-        ctx.fillStyle = "rgba(168,130,255,0.85)";
-        const label = sec.name.length > 12 ? sec.name.slice(0, 11) + "…" : sec.name;
-        ctx.fillText(label, x + 2, 2);
-      }
-
-      // ── 4. Viewport indicator ──
-      const vpX1 = tickToX(tick);
-      const vpX2 = tickToX(tick + vpTicks);
-      // Shaded region
-      ctx.fillStyle = "rgba(255,255,255,0.08)";
-      ctx.fillRect(vpX1, 0, vpX2 - vpX1, H);
-      // Left edge
-      ctx.strokeStyle = "rgba(255,255,255,0.6)";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(vpX1, 0);
-      ctx.lineTo(vpX1, H);
-      ctx.stroke();
-      // Right edge (dimmer)
-      ctx.strokeStyle = "rgba(255,255,255,0.25)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(vpX2, 0);
-      ctx.lineTo(vpX2, H);
-      ctx.stroke();
-
-      // ── 5. Playhead ──
-      const px = tickToX(tick);
-      ctx.strokeStyle = "#ff4444";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(px, 0);
-      ctx.lineTo(px, H);
-      ctx.stroke();
-
-      // ── 6. Bottom border ──
-      ctx.strokeStyle = "rgba(255,255,255,0.1)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(0, H - 0.5);
-      ctx.lineTo(W, H - 0.5);
-      ctx.stroke();
-
-      raf = requestAnimationFrame(draw);
+    const loop = () => {
+      renderCanvas();
+      raf = requestAnimationFrame(loop);
     };
-
-    raf = requestAnimationFrame(draw);
+    raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [isPlaying, renderCanvas]);
 
   // Click to seek
   const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {

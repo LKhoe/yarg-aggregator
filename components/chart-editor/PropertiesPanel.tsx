@@ -1,9 +1,10 @@
 "use client";
 
-import { memo, useState, useEffect, useMemo } from "react";
+import { memo, useState, useEffect, useMemo, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type { ChartData, Note, TrackKey } from "@/lib/chart/types";
 import { FRET_COLORS, DRUM_COLORS } from "@/lib/chart/types";
 
@@ -18,9 +19,47 @@ export interface PropertiesPanelProps {
     length: number
   ) => void;
   onDeleteNotes: (ids: string[]) => void;
-  onToggleFlag?: (id: string, flag: "forceHopo" | "forceStrum" | "tap") => void;
+  onToggleFlag?: (id: string, flag: "forceHopo" | "forceStrum" | "tap" | "open" | "cymbal" | "accent" | "ghost" | "doubleKick") => void;
   isVocals?: boolean;
 }
+
+interface FlagToggleProps {
+  checked: boolean;
+  onChange: () => void;
+  label: string;
+  shortcut: string;
+  color?: string;
+}
+
+const FlagToggle = memo(function FlagToggle({ checked, onChange, label, shortcut, color }: FlagToggleProps) {
+  return (
+    <button
+      onClick={onChange}
+      className={cn(
+        "flex items-center gap-2 w-full px-2 py-1 rounded text-xs transition-colors",
+        checked
+          ? "bg-primary/15 text-foreground"
+          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+      )}
+    >
+      <div
+        className={cn(
+          "w-3 h-3 rounded-sm border flex items-center justify-center shrink-0",
+          checked ? "bg-primary border-primary" : "border-muted-foreground/40",
+        )}
+        style={checked && color ? { backgroundColor: color, borderColor: color } : undefined}
+      >
+        {checked && (
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+            <path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        )}
+      </div>
+      <span className="flex-1 text-left">{label}</span>
+      <kbd className="text-[10px] text-muted-foreground/60 font-mono">{shortcut}</kbd>
+    </button>
+  );
+});
 
 export const PropertiesPanel = memo(function PropertiesPanel({
   chart,
@@ -49,129 +88,145 @@ export const PropertiesPanel = memo(function PropertiesPanel({
 
   const singleNote = selectedNotes.length === 1 ? selectedNotes[0] : null;
 
-  const [tick, setTick] = useState(singleNote?.tick ?? 0);
-  const [fret, setFret] = useState(singleNote?.fret ?? 0);
-  const [length, setLength] = useState(singleNote?.length ?? 0);
+  // Local editable state — only used when user is typing; synced from note when selection changes
+  const [editState, setEditState] = useState<{ tick: number; fret: number; length: number; noteId: string | null }>({ tick: 0, fret: 0, length: 0, noteId: null });
 
+  // Sync edit state when selected note changes identity or values
   useEffect(() => {
-    if (singleNote) {
-      setTick(singleNote.tick);
-      setFret(singleNote.fret);
-      setLength(singleNote.length);
+    if (singleNote && singleNote.id !== editState.noteId) {
+      setEditState({ tick: singleNote.tick, fret: singleNote.fret, length: singleNote.length, noteId: singleNote.id });
     }
-  }, [singleNote?.id, singleNote?.tick, singleNote?.fret, singleNote?.length]);
+  }, [singleNote, editState.noteId]);
 
-  const handleApply = () => {
+  // Also update when the note's values change externally (e.g. undo)
+  useEffect(() => {
+    if (singleNote && singleNote.id === editState.noteId) {
+      setEditState({ tick: singleNote.tick, fret: singleNote.fret, length: singleNote.length, noteId: singleNote.id });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [singleNote?.tick, singleNote?.fret, singleNote?.length]);
+
+  const handleApply = useCallback(() => {
     if (!singleNote) return;
-    onUpdateNote(singleNote.id, tick, fret, length);
-  };
+    onUpdateNote(singleNote.id, editState.tick, editState.fret, editState.length);
+  }, [singleNote, editState, onUpdateNote]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter") { e.preventDefault(); handleApply(); }
+  }, [handleApply]);
 
   const fretColor = isDrums
-    ? DRUM_COLORS[fret] ?? "#888"
-    : FRET_COLORS[fret] ?? "#888";
+    ? DRUM_COLORS[editState.fret] ?? "#888"
+    : FRET_COLORS[editState.fret] ?? "#888";
+
+  // Multi-select stats (computed only when needed)
+  const multiStats = useMemo(() => {
+    if (selectedNotes.length <= 1) return null;
+    let minTick = Infinity, maxTick = -Infinity;
+    for (const n of selectedNotes) {
+      if (n.tick < minTick) minTick = n.tick;
+      if (n.tick > maxTick) maxTick = n.tick;
+    }
+    return { minTick, maxTick };
+  }, [selectedNotes]);
 
   return (
-    <div className="p-4 bg-muted/10 min-w-[200px] max-w-[240px] flex flex-col gap-4">
-      <div>
-        <h3 className="text-sm font-semibold mb-1">Properties</h3>
-        {selectedNotes.length === 0 && (
-          <p className="text-xs text-muted-foreground">No notes selected</p>
-        )}
-        {selectedNotes.length > 1 && (
-          <p className="text-xs text-muted-foreground">
-            {selectedNotes.length} notes selected
-          </p>
+    <div className="p-3 bg-muted/10 min-w-[180px] w-full max-w-[260px] flex flex-col gap-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Properties</h3>
+        {selectedNotes.length > 0 && (
+          <span className="text-[10px] font-mono text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+            {selectedNotes.length} sel
+          </span>
         )}
       </div>
+
+      {selectedNotes.length === 0 && (
+        <p className="text-xs text-muted-foreground/60 italic">Click a note to inspect</p>
+      )}
 
       {singleNote && (
         <div className="space-y-3">
           {/* Fret/Pitch color indicator */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 px-1">
             {!isVocals && (
               <div
-                className="w-4 h-4 rounded-sm"
+                className="w-3.5 h-3.5 rounded-sm ring-1 ring-white/10"
                 style={{ backgroundColor: fretColor }}
               />
             )}
-            <span className="text-xs text-muted-foreground">
-              {isVocals ? midiToName(fret) : isDrums ? getDrumLabel(fret) : `Fret ${fret}`}
+            <span className="text-xs font-medium">
+              {isVocals ? midiToName(editState.fret) : isDrums ? getDrumLabel(editState.fret) : `Fret ${editState.fret}`}
             </span>
           </div>
 
-          <div className="space-y-2">
+          {/* Numeric fields */}
+          <div className="grid grid-cols-3 gap-1.5">
             <div>
-              <Label className="text-xs">Tick</Label>
+              <Label className="text-[10px] text-muted-foreground">Tick</Label>
               <Input
                 type="number"
-                value={tick}
-                onChange={(e) => setTick(Number(e.target.value))}
-                className="h-7 text-xs mt-1"
+                value={editState.tick}
+                onChange={(e) => setEditState(s => ({ ...s, tick: Number(e.target.value) }))}
+                onKeyDown={handleKeyDown}
+                className="h-7 text-xs mt-0.5 font-mono"
                 min={0}
               />
             </div>
             <div>
-              <Label className="text-xs">{isVocals ? "Pitch (MIDI)" : "Fret"}</Label>
+              <Label className="text-[10px] text-muted-foreground">{isVocals ? "Pitch" : "Fret"}</Label>
               <Input
                 type="number"
-                value={fret}
-                onChange={(e) => setFret(Number(e.target.value))}
-                className="h-7 text-xs mt-1"
+                value={editState.fret}
+                onChange={(e) => setEditState(s => ({ ...s, fret: Number(e.target.value) }))}
+                onKeyDown={handleKeyDown}
+                className="h-7 text-xs mt-0.5 font-mono"
                 min={isVocals ? 36 : 0}
                 max={isVocals ? 97 : 4}
               />
             </div>
             <div>
-              <Label className="text-xs">Length (ticks)</Label>
+              <Label className="text-[10px] text-muted-foreground">Length</Label>
               <Input
                 type="number"
-                value={length}
-                onChange={(e) => setLength(Number(e.target.value))}
-                className="h-7 text-xs mt-1"
+                value={editState.length}
+                onChange={(e) => setEditState(s => ({ ...s, length: Number(e.target.value) }))}
+                onKeyDown={handleKeyDown}
+                className="h-7 text-xs mt-0.5 font-mono"
                 min={0}
               />
             </div>
           </div>
 
-          {/* Note Flags */}
-          {onToggleFlag && !isVocals && (
-            <div className="space-y-1.5 pt-1">
-              <Label className="text-xs text-muted-foreground">Flags</Label>
-              <div className="space-y-1">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={singleNote.flags?.forceHopo ?? false}
-                    onChange={() => onToggleFlag(singleNote.id, "forceHopo")}
-                    className="h-3 w-3"
-                  />
-                  <span className="text-xs">Force HOPO (H)</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={singleNote.flags?.forceStrum ?? false}
-                    onChange={() => onToggleFlag(singleNote.id, "forceStrum")}
-                    className="h-3 w-3"
-                  />
-                  <span className="text-xs">Force Strum (S)</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={singleNote.flags?.tap ?? false}
-                    onChange={() => onToggleFlag(singleNote.id, "tap")}
-                    className="h-3 w-3"
-                  />
-                  <span className="text-xs">Tap</span>
-                </label>
-              </div>
-            </div>
-          )}
-
           <Button size="sm" className="w-full h-7 text-xs" onClick={handleApply}>
             Apply
           </Button>
+
+          {/* Note Flags */}
+          {onToggleFlag && !isVocals && (
+            <div className="space-y-1 pt-1 border-t border-border/30">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-semibold">Flags</span>
+              <div className="space-y-0.5">
+                {!isDrums && (
+                  <>
+                    <FlagToggle checked={singleNote.flags?.forceHopo ?? false} onChange={() => onToggleFlag(singleNote.id, "forceHopo")} label="Force HOPO" shortcut="H" />
+                    <FlagToggle checked={singleNote.flags?.forceStrum ?? false} onChange={() => onToggleFlag(singleNote.id, "forceStrum")} label="Force Strum" shortcut="S" />
+                    <FlagToggle checked={singleNote.flags?.tap ?? false} onChange={() => onToggleFlag(singleNote.id, "tap")} label="Tap" shortcut="T" />
+                    <FlagToggle checked={singleNote.flags?.open ?? false} onChange={() => onToggleFlag(singleNote.id, "open")} label="Open Note" shortcut="F" color="#9333ea" />
+                  </>
+                )}
+                {isDrums && (
+                  <>
+                    <FlagToggle checked={singleNote.flags?.cymbal ?? false} onChange={() => onToggleFlag(singleNote.id, "cymbal")} label="Cymbal" shortcut="C" color="#eab308" />
+                    <FlagToggle checked={singleNote.flags?.accent ?? false} onChange={() => onToggleFlag(singleNote.id, "accent")} label="Accent" shortcut="A" color="#ef4444" />
+                    <FlagToggle checked={singleNote.flags?.ghost ?? false} onChange={() => onToggleFlag(singleNote.id, "ghost")} label="Ghost" shortcut="^G" />
+                    <FlagToggle checked={singleNote.flags?.doubleKick ?? false} onChange={() => onToggleFlag(singleNote.id, "doubleKick")} label="Double Kick" shortcut="^K" color="#f97316" />
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -187,9 +242,9 @@ export const PropertiesPanel = memo(function PropertiesPanel({
       )}
 
       {/* Chord info for multi-select */}
-      {selectedNotes.length > 1 && (
-        <div className="text-xs text-muted-foreground space-y-1">
-          <p>Ticks: {Math.min(...selectedNotes.map((n) => n.tick))} – {Math.max(...selectedNotes.map((n) => n.tick))}</p>
+      {multiStats && (
+        <div className="text-[10px] text-muted-foreground font-mono px-1">
+          Ticks: {multiStats.minTick} &ndash; {multiStats.maxTick}
         </div>
       )}
     </div>

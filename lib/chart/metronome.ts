@@ -1,4 +1,5 @@
 import type { TempoPoint } from "./tempo-utils";
+import type { Note } from "./types";
 
 /**
  * MetronomeScheduler uses the Web Audio API to schedule click sounds
@@ -153,5 +154,137 @@ export class MetronomeScheduler {
 
     osc.start(time);
     osc.stop(time + duration + 0.01);
+  }
+}
+
+/**
+ * ClapScheduler plays short noise-burst "clap" sounds whenever the
+ * playhead crosses a note position. Uses the same lookahead approach
+ * as MetronomeScheduler.
+ */
+export class ClapScheduler {
+  private audioCtx: AudioContext;
+  private tempoMap: TempoPoint[];
+  private resolution: number;
+  private playbackSpeed: number;
+  private notes: Note[];
+
+  private intervalId: ReturnType<typeof setInterval> | null = null;
+  private startAudioTime = 0;
+  private startTick = 0;
+  private nextNoteIdx = 0;
+  private volume = 0.25;
+
+  private static readonly LOOKAHEAD_MS = 150;
+  private static readonly INTERVAL_MS = 25;
+
+  constructor(
+    audioCtx: AudioContext,
+    tempoMap: TempoPoint[],
+    notes: Note[],
+    resolution: number,
+  ) {
+    this.audioCtx = audioCtx;
+    this.tempoMap = tempoMap;
+    this.notes = [...notes].sort((a, b) => a.tick - b.tick);
+    this.resolution = resolution;
+    this.playbackSpeed = 1;
+  }
+
+  start(startTick: number, playbackSpeed: number): void {
+    this.stop();
+    this.playbackSpeed = playbackSpeed;
+    this.startTick = startTick;
+    this.startAudioTime = this.audioCtx.currentTime;
+
+    // Find the first note at or after startTick
+    this.nextNoteIdx = 0;
+    for (let i = 0; i < this.notes.length; i++) {
+      if (this.notes[i].tick >= startTick) {
+        this.nextNoteIdx = i;
+        break;
+      }
+      this.nextNoteIdx = this.notes.length;
+    }
+
+    this.intervalId = setInterval(() => this.schedule(), ClapScheduler.INTERVAL_MS);
+  }
+
+  stop(): void {
+    if (this.intervalId !== null) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+  }
+
+  setPlaybackSpeed(speed: number): void {
+    this.playbackSpeed = speed;
+  }
+
+  private tickToAudioTime(tick: number): number {
+    let segment = this.tempoMap[0];
+    for (const point of this.tempoMap) {
+      if (point.tick <= tick) segment = point;
+      else break;
+    }
+    const seconds = segment.timeSeconds + (tick - segment.tick) / segment.ticksPerSecond;
+    const startSeg = (() => {
+      let seg = this.tempoMap[0];
+      for (const p of this.tempoMap) {
+        if (p.tick <= this.startTick) seg = p;
+        else break;
+      }
+      return seg;
+    })();
+    const startSeconds = startSeg.timeSeconds + (this.startTick - startSeg.tick) / startSeg.ticksPerSecond;
+    return this.startAudioTime + (seconds - startSeconds) / this.playbackSpeed;
+  }
+
+  private schedule(): void {
+    const lookAheadTime = this.audioCtx.currentTime + ClapScheduler.LOOKAHEAD_MS / 1000;
+
+    // Deduplicate: only play one clap per tick (chords)
+    let lastScheduledTick = -1;
+
+    while (this.nextNoteIdx < this.notes.length) {
+      const note = this.notes[this.nextNoteIdx];
+      const audioTime = this.tickToAudioTime(note.tick);
+      if (audioTime > lookAheadTime) break;
+
+      if (audioTime >= this.audioCtx.currentTime - 0.01 && note.tick !== lastScheduledTick) {
+        this.playClap(audioTime);
+        lastScheduledTick = note.tick;
+      }
+      this.nextNoteIdx++;
+    }
+  }
+
+  private playClap(time: number): void {
+    // White noise burst for clap sound
+    const bufferSize = this.audioCtx.sampleRate * 0.04;
+    const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.15));
+    }
+
+    const source = this.audioCtx.createBufferSource();
+    source.buffer = buffer;
+
+    const bandpass = this.audioCtx.createBiquadFilter();
+    bandpass.type = "bandpass";
+    bandpass.frequency.value = 2000;
+    bandpass.Q.value = 0.7;
+
+    const gain = this.audioCtx.createGain();
+    gain.gain.setValueAtTime(this.volume, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+
+    source.connect(bandpass);
+    bandpass.connect(gain);
+    gain.connect(this.audioCtx.destination);
+
+    source.start(time);
+    source.stop(time + 0.05);
   }
 }

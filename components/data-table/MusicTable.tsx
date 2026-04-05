@@ -164,7 +164,7 @@ const MusicRow = memo(
   }: MusicRowProps) {
     return (
       <TableRow
-        className={`group/row cursor-pointer row-pop transition-[background-color,box-shadow,transform] duration-200 hover:shadow-[inset_3px_0_0_0_var(--primary),0_2px_8px_-2px_oklch(0.65_0.25_280/0.15)] hover:bg-primary/4 ${music.installed ? "bg-green-500/5 hover:bg-green-500/10" : ""}`}
+        className={`group/row cursor-pointer row-pop transition-[background-color,box-shadow,transform] duration-200 hover:bg-primary/4 ${music.installed ? "bg-green-500/5 hover:bg-green-500/10" : ""}`}
         onClick={(e) => {
           const row = e.currentTarget;
           const rect = row.getBoundingClientRect();

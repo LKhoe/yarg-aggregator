@@ -24,6 +24,7 @@ export default function Header() {
               preload={true}
               width={40}
               height={40}
+              unoptimized={false}
             />
           </div>
           <div>

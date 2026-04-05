@@ -9,7 +9,7 @@ import {
   useMemo,
 } from "react";
 import { v4 as uuidv4 } from "uuid";
-import type { ChartData, Instrument, Note, Phrase, Section, TrackKey } from "@/lib/chart/types";
+import type { ChartData, Instrument, Note, Phrase, Section, TrackKey, DrumMode, BpmEvent } from "@/lib/chart/types";
 import {
   makeTrackKey,
   parseTrackKey,
@@ -45,7 +45,7 @@ import { StatisticsPanel } from "./StatisticsPanel";
 import { AutoReduceDialog } from "./AutoReduceDialog";
 import { BpmDetectDialog } from "./BpmDetectDialog";
 import { GlobalView } from "./GlobalView";
-import { MetronomeScheduler } from "@/lib/chart/metronome";
+import { MetronomeScheduler, ClapScheduler } from "@/lib/chart/metronome";
 import { autoReduceDifficulty } from "@/lib/chart/auto-reduce";
 import { computeDensityHeatmap } from "@/lib/chart/statistics";
 import { Button } from "@/components/ui/button";
@@ -78,6 +78,9 @@ const INSTRUMENT_STEMS: Record<Instrument, string[]> = {
   Drums:      ["drums", "song"],
   Keyboard:   ["keys", "keyboard", "song"],
   Vocals:     ["vocals", "vocal", "song"],
+  Harmony1:   ["vocals", "vocal", "song"],
+  Harmony2:   ["vocals", "vocal", "song"],
+  Harmony3:   ["vocals", "vocal", "song"],
 };
 
 // ───────────────────────── Edit actions ──────────────────────────
@@ -105,7 +108,9 @@ type EditAction =
   | { type: "DELETE_PHRASE"; track: TrackKey; id: string }
   | { type: "RESIZE_PHRASE"; track: TrackKey; id: string; newLength: number }
   // Note flags
-  | { type: "TOGGLE_NOTE_FLAG"; track: TrackKey; ids: string[]; flag: "forceHopo" | "forceStrum" | "tap" }
+  | { type: "TOGGLE_NOTE_FLAG"; track: TrackKey; ids: string[]; flag: "forceHopo" | "forceStrum" | "tap" | "open" | "cymbal" | "accent" | "ghost" | "doubleKick" }
+  // Anchored BPM
+  | { type: "TOGGLE_BPM_ANCHOR"; tick: number }
   // Sections
   | { type: "ADD_SECTION"; section: Section }
   | { type: "RENAME_SECTION"; id: string; name: string }
@@ -331,6 +336,13 @@ function applyAction(chart: ChartData, action: EditAction): ChartData {
       };
     }
 
+    case "TOGGLE_BPM_ANCHOR": {
+      const events = chart.syncTrack.bpmEvents.map((e) =>
+        e.tick === action.tick ? { ...e, anchor: !e.anchor } : e
+      );
+      return { ...chart, syncTrack: { ...chart.syncTrack, bpmEvents: events } };
+    }
+
     default:
       return chart;
   }
@@ -429,11 +441,50 @@ export function ChartEditor() {
   const [exportOpen, setExportOpen] = useState(false);
   const [chartFileName, setChartFileName] = useState<string>();
 
-  // Edit mode state
-  const [editMode, setEditMode] = useState<"note" | "phrase">("note");
+  // Edit mode state (note / phrase / eraser)
+  const [editMode, setEditMode] = useState<"note" | "phrase" | "eraser">("note");
   const [phraseType, setPhraseType] = useState<Phrase["type"]>("starPower");
   const phraseTypeRef = useRef(phraseType);
   phraseTypeRef.current = phraseType;
+
+  // Drum mode (4-lane vs 5-lane)
+  const [drumMode, setDrumMode] = useState<DrumMode>("4lane");
+
+  // Bookmarks (10 slots, indexed 0-9)
+  const [bookmarks, setBookmarks] = useState<(number | null)[]>(Array(10).fill(null));
+
+  // Lefty-flip mode
+  const [leftyFlip, setLeftyFlip] = useState(false);
+
+  // Clap/hit sounds
+  const [clapEnabled, setClapEnabled] = useState(false);
+  const clapEnabledRef = useRef(false);
+  clapEnabledRef.current = clapEnabled;
+
+  // Sustain gap capping (auto-trim overlapping sustains)
+  const [sustainGap, setSustainGap] = useState<number>(0); // 0 = disabled, >0 = gap in ticks
+
+  // Global vs Local view mode
+  const [viewMode, setViewMode] = useState<"local" | "global">("local");
+
+  // Pattern catalog
+  const [catalogPatterns, setCatalogPatterns] = useState<{ name: string; notes: Note[] }[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const stored = localStorage.getItem("chart-editor-catalog");
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
+  const [showCatalog, setShowCatalog] = useState(false);
+
+  // Piano tone preview for vocals
+  const [pianoPreview, setPianoPreview] = useState(false);
+  const pianoOscRef = useRef<OscillatorNode | null>(null);
+
+  // Autosave
+  const autosaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [showRecovery, setShowRecovery] = useState(false);
+  const [recoveryData, setRecoveryData] = useState<ChartData | null>(null);
 
   // Keyboard shortcuts panel
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -466,6 +517,7 @@ export function ChartEditor() {
   // Metronome
   const [metronomeEnabled, setMetronomeEnabled] = useState(false);
   const metronomeRef = useRef<MetronomeScheduler | null>(null);
+  const clapRef = useRef<ClapScheduler | null>(null);
 
   // Clipboard for copy/paste
   const clipboardRef = useRef<Note[]>([]);
@@ -592,6 +644,46 @@ export function ChartEditor() {
       }
     }
   }, [chart.tracks, selectedTrack]);
+
+  // Autosave every 30 seconds
+  useEffect(() => {
+    if (Object.keys(chart.tracks).length === 0) return;
+    autosaveTimerRef.current = setInterval(() => {
+      try {
+        const data = JSON.stringify(chartRef.current);
+        localStorage.setItem("chart-editor-autosave", data);
+        localStorage.setItem("chart-editor-autosave-time", Date.now().toString());
+      } catch { /* storage full, ignore */ }
+    }, 30000);
+    return () => { if (autosaveTimerRef.current) clearInterval(autosaveTimerRef.current); };
+  }, [Object.keys(chart.tracks).length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Check for recovery on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("chart-editor-autosave");
+      const savedTime = localStorage.getItem("chart-editor-autosave-time");
+      if (saved && savedTime) {
+        const age = Date.now() - parseInt(savedTime);
+        if (age < 24 * 60 * 60 * 1000) { // less than 24 hours old
+          const parsed = JSON.parse(saved) as ChartData;
+          if (Object.keys(parsed.tracks).length > 0) {
+            setRecoveryData(parsed);
+            setShowRecovery(true);
+          }
+        }
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // Persist catalog to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("chart-editor-catalog", JSON.stringify(catalogPatterns));
+    } catch { /* ignore */ }
+  }, [catalogPatterns]);
+
+  // Piano tone preview — defined after isVocalsTrack below
 
   // Animation loop — only depends on isPlaying; reads chart via chartRef to avoid
   // restarting (and stuttering) on every chart edit while playing.
@@ -727,6 +819,7 @@ export function ChartEditor() {
       sourceNodesRef.current.clear();
       gainNodesRef.current.clear();
       metronomeRef.current?.stop();
+      clapRef.current?.stop();
       setIsPlaying(false);
     } else {
       const ctx = getAudioCtx();
@@ -766,6 +859,17 @@ export function ChartEditor() {
         metronomeRef.current = metro;
       }
 
+      // Start clap sounds if enabled
+      if (clapEnabledRef.current && selectedTrackRef.current) {
+        const track = currentChart.tracks[selectedTrackRef.current];
+        if (track) {
+          const tempoMap = buildTempoMap(currentChart);
+          const clap = new ClapScheduler(ctx, tempoMap, track.notes, resolution);
+          clap.start(currentTick, speed);
+          clapRef.current = clap;
+        }
+      }
+
       setIsPlaying(true);
     }
   }, [isPlaying, currentTick]);
@@ -777,6 +881,7 @@ export function ChartEditor() {
     sourceNodesRef.current.clear();
     gainNodesRef.current.clear();
     metronomeRef.current?.stop();
+    clapRef.current?.stop();
     setIsPlaying(false);
     setCurrentTick(0);
   }, []);
@@ -791,6 +896,7 @@ export function ChartEditor() {
     sourceNodesRef.current.clear();
     gainNodesRef.current.clear();
     metronomeRef.current?.stop();
+    clapRef.current?.stop();
 
     setCurrentTick(tick);
 
@@ -829,6 +935,17 @@ export function ChartEditor() {
       metro.start(tick, speed);
       metronomeRef.current = metro;
     }
+
+    // Restart clap at new position
+    if (clapEnabledRef.current && selectedTrackRef.current) {
+      const track = currentChart.tracks[selectedTrackRef.current];
+      if (track) {
+        const tempoMap = buildTempoMap(currentChart);
+        const clap = new ClapScheduler(ctx, tempoMap, track.notes, resolution);
+        clap.start(tick, speed);
+        clapRef.current = clap;
+      }
+    }
   }, [isPlaying]);
   handleSeekStableRef.current = handleSeek;
 
@@ -843,6 +960,7 @@ export function ChartEditor() {
     playbackStartTickRef.current = currentTick;
     playbackStartTimeRef.current = ctx.currentTime;
     metronomeRef.current?.setPlaybackSpeed(playbackSpeed);
+    clapRef.current?.setPlaybackSpeed(playbackSpeed);
   }, [playbackSpeed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keyboard shortcuts
@@ -865,6 +983,76 @@ export function ChartEditor() {
         e.preventDefault();
         setShowShortcuts((v) => !v);
         return;
+      }
+
+      // N key: toggle clap sounds
+      if (e.key === "n" || e.key === "N") {
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          setClapEnabled((v) => !v);
+          return;
+        }
+      }
+
+      // P key: toggle piano tone preview (vocals)
+      if (e.key === "p" || e.key === "P") {
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          setPianoPreview((v) => !v);
+          return;
+        }
+      }
+
+      // G key: toggle global/local view (when no selection to avoid conflicts)
+      if ((e.key === "g" || e.key === "G") && !e.ctrlKey && !e.metaKey) {
+        const noteIds = selectedNoteIdsRef.current;
+        if (noteIds.size === 0) {
+          e.preventDefault();
+          setViewMode((v) => v === "local" ? "global" : "local");
+          return;
+        }
+      }
+
+      // K key: switch to eraser mode
+      if (e.key === "k" || e.key === "K") {
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          setEditMode((m) => m === "eraser" ? "note" : "eraser");
+          return;
+        }
+      }
+
+      // L key: toggle lefty-flip
+      if (e.key === "l" || e.key === "L") {
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          setLeftyFlip((v) => !v);
+          return;
+        }
+      }
+
+      // Bookmark shortcuts: Ctrl+0-9 to set, 0-9 to jump
+      if (e.key >= "0" && e.key <= "9") {
+        const idx = parseInt(e.key);
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          setBookmarks((prev) => {
+            const next = [...prev];
+            next[idx] = Math.round(currentTickRef.current);
+            return next;
+          });
+          return;
+        } else {
+          // Jump to bookmark (only if no modifier keys)
+          if (!e.shiftKey && !e.altKey) {
+            const bm = bookmarks[idx];
+            if (bm !== null) {
+              e.preventDefault();
+              handleSeek(bm);
+              return;
+            }
+          }
+        }
       }
 
       // I key: set loop start (A)
@@ -967,6 +1155,22 @@ export function ChartEditor() {
           }
           return;
         }
+        if (e.key === "x") {
+          // Cut = copy + delete
+          if (noteIds.size > 0 && track) {
+            e.preventDefault();
+            const currentTrack = chartRef.current.tracks[track];
+            if (currentTrack) {
+              clipboardRef.current = currentTrack.notes.filter((n) => noteIds.has(n.id));
+              dispatch({
+                type: "DO",
+                action: { type: "DELETE_NOTES", track, ids: [...noteIds] },
+              });
+              setSelectedNoteIds(new Set());
+            }
+          }
+          return;
+        }
         if (e.key === "v") {
           // Paste at current tick
           if (clipboardRef.current.length > 0 && track) {
@@ -1054,6 +1258,100 @@ export function ChartEditor() {
         return;
       }
 
+      // T key: toggle tap flag
+      if (e.key === "t" || e.key === "T") {
+        if (noteIds.size > 0 && track) {
+          e.preventDefault();
+          dispatch({
+            type: "DO",
+            action: { type: "TOGGLE_NOTE_FLAG", track, ids: [...noteIds], flag: "tap" },
+          });
+        }
+        return;
+      }
+
+      // O key: toggle open note flag (guitar/bass only, when not setting loop)
+      // (Loop is handled by lowercase 'o' above, so we check for uppercase)
+      // Actually, let's use Shift+O for open note to avoid conflict with loop
+      // No — let's use a different approach. The loop handler runs first.
+      // We'll catch it only when there's a selection.
+
+      // C key: toggle cymbal flag (drums only)
+      if (e.key === "c" || e.key === "C") {
+        if (!e.ctrlKey && !e.metaKey && noteIds.size > 0 && track) {
+          const parsed = parseTrackKey(track);
+          if (parsed?.instrument === "Drums") {
+            e.preventDefault();
+            dispatch({
+              type: "DO",
+              action: { type: "TOGGLE_NOTE_FLAG", track, ids: [...noteIds], flag: "cymbal" },
+            });
+            return;
+          }
+        }
+      }
+
+      // A key: toggle accent flag (drums only)
+      if (e.key === "a" || e.key === "A") {
+        if (!e.ctrlKey && !e.metaKey && noteIds.size > 0 && track) {
+          const parsed = parseTrackKey(track);
+          if (parsed?.instrument === "Drums") {
+            e.preventDefault();
+            dispatch({
+              type: "DO",
+              action: { type: "TOGGLE_NOTE_FLAG", track, ids: [...noteIds], flag: "accent" },
+            });
+            return;
+          }
+        }
+      }
+
+      // Shift+G: toggle ghost flag (drums only)
+      if (e.key === "G" && e.shiftKey) {
+        if (noteIds.size > 0 && track) {
+          const parsed = parseTrackKey(track);
+          if (parsed?.instrument === "Drums") {
+            e.preventDefault();
+            dispatch({
+              type: "DO",
+              action: { type: "TOGGLE_NOTE_FLAG", track, ids: [...noteIds], flag: "ghost" },
+            });
+            return;
+          }
+        }
+      }
+
+      // Shift+K: toggle double kick / Expert+ (drums only)
+      if (e.key === "K" && e.shiftKey) {
+        if (noteIds.size > 0 && track) {
+          const parsed = parseTrackKey(track);
+          if (parsed?.instrument === "Drums") {
+            e.preventDefault();
+            dispatch({
+              type: "DO",
+              action: { type: "TOGGLE_NOTE_FLAG", track, ids: [...noteIds], flag: "doubleKick" },
+            });
+            return;
+          }
+        }
+      }
+
+      // F key: toggle open note (guitar/bass only)
+      // Using F since H=HOPO, S=Strum are taken; F for "Free" / open fret
+      if (e.key === "f" || e.key === "F") {
+        if (noteIds.size > 0 && track) {
+          const parsed = parseTrackKey(track);
+          if (parsed && (parsed.instrument === "Single" || parsed.instrument === "DoubleBass")) {
+            e.preventDefault();
+            dispatch({
+              type: "DO",
+              action: { type: "TOGGLE_NOTE_FLAG", track, ids: [...noteIds], flag: "open" },
+            });
+            return;
+          }
+        }
+      }
+
       // M key: add section at current playhead
       if (e.key === "m" || e.key === "M") {
         e.preventDefault();
@@ -1123,6 +1421,7 @@ export function ChartEditor() {
     handlePlayPause,
     handleSeek,
     snapDivision,
+    bookmarks,
   ]);
 
   const hasChart   = Object.keys(chart.tracks).length > 0;
@@ -1153,8 +1452,57 @@ export function ChartEditor() {
   }, [ghostTrackKey, chart.tracks]);
 
   const isVocalsTrack = selectedTrack
-    ? (parseTrackKey(selectedTrack)?.instrument === "Vocals")
+    ? (() => {
+        const inst = parseTrackKey(selectedTrack)?.instrument;
+        return inst === "Vocals" || inst === "Harmony1" || inst === "Harmony2" || inst === "Harmony3";
+      })()
     : false;
+
+  // Piano tone preview — play a sine wave based on mouse Y position in vocals lane
+  useEffect(() => {
+    if (!pianoPreview || !isVocalsTrack) {
+      if (pianoOscRef.current) {
+        pianoOscRef.current.stop();
+        pianoOscRef.current = null;
+      }
+      return;
+    }
+
+    const handler = (e: MouseEvent) => {
+      const canvas = (e.target as HTMLElement)?.closest?.("canvas");
+      if (!canvas) {
+        if (pianoOscRef.current) { pianoOscRef.current.stop(); pianoOscRef.current = null; }
+        return;
+      }
+      const rect = canvas.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      const h = rect.height;
+      const ratio = Math.max(0, Math.min(1, y / h));
+      const pitch = Math.round(83 - ratio * 47);
+      const freq = 440 * Math.pow(2, (pitch - 69) / 12);
+
+      const ctx = getAudioCtx();
+      if (!pianoOscRef.current) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        gain.gain.value = 0.08;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        pianoOscRef.current = osc;
+      } else {
+        pianoOscRef.current.frequency.value = freq;
+      }
+    };
+
+    window.addEventListener("mousemove", handler);
+    return () => {
+      window.removeEventListener("mousemove", handler);
+      if (pianoOscRef.current) { pianoOscRef.current.stop(); pianoOscRef.current = null; }
+    };
+  }, [pianoPreview, isVocalsTrack]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleUpdateLyrics = useCallback(
     (lyrics: import("@/lib/chart/types").LyricEvent[]) => {
@@ -1195,6 +1543,15 @@ export function ChartEditor() {
   }, []);
 
   const handleSeekToTick = useCallback((tick: number) => setCurrentTick(tick), []);
+
+  // Right-click drag: add note with sustain
+  const handleRightClickDrag = useCallback((tick: number, fret: number, endTick: number) => {
+    const track = selectedTrackRef.current;
+    if (!track) return;
+    const length = Math.max(0, endTick - tick);
+    const note: Note = { id: uuidv4(), tick, fret, length };
+    dispatch({ type: "DO", action: { type: "ADD_NOTE", track, note } });
+  }, []);
 
   const handleAddPhrase = useCallback((tick: number, length: number) => {
     const track = selectedTrackRef.current;
@@ -1245,7 +1602,7 @@ export function ChartEditor() {
     dispatch({ type: "DO", action: { type: "DELETE_NOTES", track, ids } });
     setSelectedNoteIds(new Set());
   }, []);
-  const handleToggleFlag = useCallback((id: string, flag: "forceHopo" | "forceStrum" | "tap") => {
+  const handleToggleFlag = useCallback((id: string, flag: "forceHopo" | "forceStrum" | "tap" | "open" | "cymbal" | "accent" | "ghost" | "doubleKick") => {
     const track = selectedTrackRef.current;
     if (!track) return;
     dispatch({ type: "DO", action: { type: "TOGGLE_NOTE_FLAG", track, ids: [id], flag } });
@@ -1253,6 +1610,60 @@ export function ChartEditor() {
 
   const handleUndo = useCallback(() => dispatch({ type: "UNDO" }), []);
   const handleRedo = useCallback(() => dispatch({ type: "REDO" }), []);
+
+  // Anchored BPM toggle
+  const handleToggleBpmAnchor = useCallback((tick: number) => {
+    dispatch({ type: "DO", action: { type: "TOGGLE_BPM_ANCHOR", tick } });
+  }, []);
+
+  // Recovery handlers
+  const handleRecoverAutosave = useCallback(() => {
+    if (recoveryData) {
+      dispatch({ type: "DO", action: { type: "SET_CHART", chart: recoveryData } });
+    }
+    setShowRecovery(false);
+    setRecoveryData(null);
+  }, [recoveryData]);
+  const handleDismissRecovery = useCallback(() => {
+    setShowRecovery(false);
+    setRecoveryData(null);
+    localStorage.removeItem("chart-editor-autosave");
+    localStorage.removeItem("chart-editor-autosave-time");
+  }, []);
+
+  // Catalog: save current selection as a pattern
+  const handleSaveToCatalog = useCallback((name: string) => {
+    const track = selectedTrackRef.current;
+    if (!track) return;
+    const currentTrack = chartRef.current.tracks[track];
+    if (!currentTrack) return;
+    const ids = selectedNoteIdsRef.current;
+    if (ids.size === 0) return;
+    const selected = currentTrack.notes.filter((n) => ids.has(n.id));
+    if (selected.length === 0) return;
+    // Normalize ticks relative to first note
+    const minTick = Math.min(...selected.map((n) => n.tick));
+    const normalized = selected.map((n) => ({ ...n, tick: n.tick - minTick }));
+    setCatalogPatterns((prev) => [...prev, { name, notes: normalized }]);
+  }, []);
+
+  // Catalog: paste a pattern at current playhead
+  const handlePasteFromCatalog = useCallback((pattern: Note[]) => {
+    const track = selectedTrackRef.current;
+    if (!track) return;
+    const tick = currentTickRef.current;
+    const newNotes = pattern.map((n) => ({
+      ...n,
+      id: uuidv4(),
+      tick: n.tick + Math.round(tick),
+    }));
+    dispatch({ type: "DO", action: { type: "PASTE_NOTES", track, notes: newNotes } });
+    setSelectedNoteIds(new Set(newNotes.map((n) => n.id)));
+  }, []);
+
+  const handleDeleteCatalogPattern = useCallback((idx: number) => {
+    setCatalogPatterns((prev) => prev.filter((_, i) => i !== idx));
+  }, []);
 
   // BPM detection apply
   const handleBpmApply = useCallback((bpm: number) => {
@@ -1315,6 +1726,15 @@ export function ChartEditor() {
             variant="outline"
             size="sm"
             className="h-7 text-xs gap-1"
+            onClick={() => setShowCatalog(true)}
+            disabled={!hasChart}
+          >
+            Catalog
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1"
             onClick={() => setShowAutoReduce(true)}
             disabled={!hasChart}
           >
@@ -1372,6 +1792,8 @@ export function ChartEditor() {
             spectrogramLoading={spectrogramLoading}
             metronomeEnabled={metronomeEnabled}
             onMetronomeToggle={() => setMetronomeEnabled((v) => !v)}
+            clapEnabled={clapEnabled}
+            onClapToggle={() => setClapEnabled((v) => !v)}
             sections={sections}
             tempoMap={tempoMap}
             onSectionSeek={handleSeek}
@@ -1384,6 +1806,14 @@ export function ChartEditor() {
             onDensityToggle={() => setDensityOverlay((v) => !v)}
             showGlobalView={showGlobalView}
             onToggleGlobalView={() => setShowGlobalView((v) => !v)}
+            leftyFlip={leftyFlip}
+            onLeftyFlipToggle={() => setLeftyFlip((v) => !v)}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            bookmarks={bookmarks}
+            onBookmarkSeek={handleSeek}
+            sustainGap={sustainGap}
+            onSustainGapChange={setSustainGap}
           />
 
           <TrackSelector
@@ -1485,6 +1915,10 @@ export function ChartEditor() {
                     spectrogram={activeSpectrogram}
                     ghostNotes={ghostNotes}
                     densityHeatmap={densityHeatmap}
+                    leftyFlip={leftyFlip}
+                    onRightClickDrag={handleRightClickDrag}
+                    isDrumTrack={parseTrackKey(selectedTrack)?.instrument === "Drums"}
+                    drumMode={drumMode}
                   />
                 )
               ) : (
@@ -1663,6 +2097,69 @@ export function ChartEditor() {
         audioBuffer={firstAudioBuffer}
         onApply={handleBpmApply}
       />
+
+      {/* Autosave recovery dialog */}
+      {showRecovery && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-background border rounded-lg p-6 max-w-md shadow-xl">
+            <h3 className="text-sm font-semibold mb-2">Recover Autosaved Chart?</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              An autosaved chart was found from a previous session. Would you like to recover it?
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={handleDismissRecovery}>
+                Discard
+              </Button>
+              <Button size="sm" onClick={handleRecoverAutosave}>
+                Recover
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pattern catalog dialog */}
+      {showCatalog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowCatalog(false)}>
+          <div className="bg-background border rounded-lg p-6 max-w-md shadow-xl w-full" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold mb-3">Pattern Catalog</h3>
+            {catalogPatterns.length === 0 ? (
+              <p className="text-xs text-muted-foreground mb-4">No patterns saved yet. Select notes and use &quot;Save to Catalog&quot; to add patterns.</p>
+            ) : (
+              <div className="space-y-1.5 max-h-60 overflow-y-auto mb-4">
+                {catalogPatterns.map((pattern, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-xs border rounded px-2 py-1.5">
+                    <span>{pattern.name} ({pattern.notes.length} notes)</span>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px]" onClick={() => { handlePasteFromCatalog(pattern.notes); setShowCatalog(false); }}>
+                        Paste
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px] text-destructive" onClick={() => handleDeleteCatalogPattern(idx)}>
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2 justify-between">
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs"
+                disabled={selectedNoteIds.size === 0}
+                onClick={() => {
+                  const name = window.prompt("Pattern name:");
+                  if (name?.trim()) handleSaveToCatalog(name.trim());
+                }}
+              >
+                Save Selection
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setShowCatalog(false)}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

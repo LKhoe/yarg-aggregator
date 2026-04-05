@@ -10,10 +10,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { FileText, Music } from "lucide-react";
+import { FileText, Music, Settings } from "lucide-react";
 import type { ChartData } from "@/lib/chart/types";
 import { downloadChart } from "@/lib/chart/serializer-chart";
 import { downloadMidi } from "@/lib/chart/serializer-midi";
+import { generateSongIni } from "@/lib/chart/song-ini";
 import { cn } from "@/lib/utils";
 
 export interface ExportDialogProps {
@@ -22,7 +23,17 @@ export interface ExportDialogProps {
   chart: ChartData;
 }
 
-type Format = "chart" | "midi";
+type Format = "chart" | "midi" | "songini";
+
+function downloadTextFile(content: string, filename: string) {
+  const blob = new Blob([content], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export function ExportDialog({ open, onOpenChange, chart }: ExportDialogProps) {
   const [format, setFormat] = useState<Format>("chart");
@@ -31,8 +42,11 @@ export function ExportDialog({ open, onOpenChange, chart }: ExportDialogProps) {
     const name = chart.metadata.name || "notes";
     if (format === "chart") {
       downloadChart(chart, `${name}.chart`);
-    } else {
+    } else if (format === "midi") {
       downloadMidi(chart, `${name}.mid`);
+    } else if (format === "songini") {
+      const ini = generateSongIni(chart);
+      downloadTextFile(ini, "song.ini");
     }
     onOpenChange(false);
   };
@@ -47,7 +61,7 @@ export function ExportDialog({ open, onOpenChange, chart }: ExportDialogProps) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-3 mt-2">
+        <div className="grid grid-cols-3 gap-3 mt-2">
           {(
             [
               {
@@ -61,6 +75,12 @@ export function ExportDialog({ open, onOpenChange, chart }: ExportDialogProps) {
                 label: ".mid",
                 sub: "MIDI format",
                 Icon: Music,
+              },
+              {
+                value: "songini" as Format,
+                label: "song.ini",
+                sub: "CH metadata",
+                Icon: Settings,
               },
             ] as const
           ).map(({ value, label, sub, Icon }) => (

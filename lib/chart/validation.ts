@@ -16,6 +16,9 @@ const MAX_FRETS: Record<Instrument, number> = {
   Drums: 5,
   Keyboard: 5,
   Vocals: 98,
+  Harmony1: 98,
+  Harmony2: 98,
+  Harmony3: 98,
 };
 
 let warnId = 0;

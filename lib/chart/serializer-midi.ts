@@ -9,6 +9,9 @@ const INSTRUMENT_TRACK_NAMES: Record<Instrument, string> = {
   Drums: "PART DRUMS",
   Keyboard: "PART KEYS",
   Vocals: "PART VOCALS",
+  Harmony1: "HARM1",
+  Harmony2: "HARM2",
+  Harmony3: "HARM3",
 };
 
 // Difficulty → base MIDI pitch for 5-fret instruments

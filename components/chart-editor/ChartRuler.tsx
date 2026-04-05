@@ -95,72 +95,74 @@ export const ChartRuler = memo(function ChartRuler({
     ctx.lineTo(W, H - 0.5);
     ctx.stroke();
 
-    // Beat grid lines (thin)
+    // Beat grid lines (thin) — batch strokes
     const beatTicks = resolution;
     const firstBeat = Math.ceil(currentTick / beatTicks) * beatTicks;
+    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
     for (let tick = firstBeat; tick <= currentTick + visibleTicks; tick += beatTicks) {
       const x = tickToX(tick, currentTick, visibleTicks, W);
       if (x < 0 || x > W) continue;
-      ctx.strokeStyle = "rgba(255,255,255,0.05)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, H);
-      ctx.stroke();
+    }
+    ctx.stroke();
 
-      // Beat number label
-      const beatNum = Math.round(tick / resolution) + 1;
-      ctx.fillStyle = "rgba(255,255,255,0.18)";
-      ctx.font = "9px monospace";
-      ctx.fillText(String(beatNum), x + 2, H - 4);
+    // Beat number labels
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.font = "9px monospace";
+    for (let tick = firstBeat; tick <= currentTick + visibleTicks; tick += beatTicks) {
+      const x = tickToX(tick, currentTick, visibleTicks, W);
+      if (x < 0 || x > W) continue;
+      ctx.fillText(String(Math.round(tick / resolution) + 1), x + 2, H - 4);
     }
 
-    // BPM events
+    // BPM events — batch dashed lines, then labels
+    ctx.strokeStyle = "#3b82f6";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
     for (const ev of bpmEvents) {
       const x = tickToX(ev.tick, currentTick, visibleTicks, W);
       if (x < -20 || x > W + 20) continue;
-
-      ctx.strokeStyle = "#3b82f6";
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([3, 3]);
-      ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, H - 10);
-      ctx.stroke();
-      ctx.setLineDash([]);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
 
-      ctx.fillStyle = "#60a5fa";
-      ctx.font = "bold 9px monospace";
-      const label = `${Math.round(ev.bpm)}`;
-      ctx.fillText(label, x + 2, 10);
+    ctx.fillStyle = "#60a5fa";
+    ctx.font = "bold 9px monospace";
+    for (const ev of bpmEvents) {
+      const x = tickToX(ev.tick, currentTick, visibleTicks, W);
+      if (x < -20 || x > W + 20) continue;
+      ctx.fillText(`${Math.round(ev.bpm)}`, x + 2, 10);
     }
 
     // Time signatures
+    ctx.fillStyle = "#a78bfa";
+    ctx.font = "9px sans-serif";
     for (const ts of timeSignatures) {
       const x = tickToX(ts.tick, currentTick, visibleTicks, W);
       if (x < -40 || x > W + 40) continue;
-
-      ctx.fillStyle = "#a78bfa";
-      ctx.font = "9px sans-serif";
       ctx.fillText(`${ts.numerator}/${ts.denominator}`, x + 2, H - 14);
     }
 
-    // Section markers
+    // Section markers — batch vertical lines by type, then draw labels
+    ctx.font = "bold 9px sans-serif";
+    ctx.lineWidth = 2;
     for (const section of sections) {
       const x = tickToX(section.tick, currentTick, visibleTicks, W);
       if (x < -100 || x > W + 100) continue;
 
-      // Vertical line
       ctx.strokeStyle = section.type === "solo" ? "#f59e0b" : "#a855f7";
-      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, H);
       ctx.stroke();
 
-      // Label background
       const label = section.name;
-      ctx.font = "bold 9px sans-serif";
       const textW = ctx.measureText(label).width;
       ctx.fillStyle = section.type === "solo" ? "rgba(245,158,11,0.25)" : "rgba(168,85,247,0.25)";
       ctx.fillRect(x + 2, 2, textW + 4, 12);
