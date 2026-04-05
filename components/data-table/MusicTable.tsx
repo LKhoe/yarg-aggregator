@@ -85,6 +85,7 @@ interface MusicTableProps {
 }
 
 const INSTRUMENTS = ["guitar", "bass", "drums", "vocals", "keys"] as const;
+const FILTER_INSTRUMENTS = [...INSTRUMENTS, "harmony"] as const;
 const LIMIT = 20;
 
 // Hoist IntersectionObserver options to avoid object re-creation every render
@@ -806,7 +807,7 @@ export default function MusicTable({
               </MultiSelectTrigger>
               <MultiSelectContent>
                 <MultiSelectGroup>
-                  {INSTRUMENTS.map((inst: string) => (
+                  {FILTER_INSTRUMENTS.map((inst: string) => (
                     <MultiSelectItem
                       key={inst}
                       value={inst}
@@ -814,7 +815,7 @@ export default function MusicTable({
                     >
                       <div className="flex items-center gap-2">
                         <InstrumentIcon
-                          instrument={inst}
+                          instrument={inst === "harmony" ? "harmony_3" : inst}
                           className="size-4 sm:size-5"
                         />
                         <span className="text-sm">

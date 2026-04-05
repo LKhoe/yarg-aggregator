@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
       : "";
 
     // Validate instruments against known values
-    const validInstruments = ["guitar", "bass", "drums", "keys", "vocals"];
+    const validInstruments = ["guitar", "bass", "drums", "keys", "vocals", "harmony"];
     const instruments = instrumentsParam
       ? instrumentsParam.split(",").filter((i) => validInstruments.includes(i))
       : [];

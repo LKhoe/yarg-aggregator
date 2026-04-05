@@ -189,6 +189,7 @@ export class MusicService {
 
     if (instruments.length > 0) {
       const instrumentConditions = instruments
+        .filter((inst) => inst !== "harmony")
         .map((instrument) => this.getDifficultyField(instrument))
         .filter(
           (
@@ -197,6 +198,10 @@ export class MusicService {
             field !== null,
         )
         .map((field) => sql`${field} IS NOT NULL`);
+
+      if (instruments.includes("harmony")) {
+        instrumentConditions.push(sql`${song.vocalParts} >= 2`);
+      }
 
       if (instrumentConditions.length > 0) {
         conditions.push(and(...instrumentConditions));
