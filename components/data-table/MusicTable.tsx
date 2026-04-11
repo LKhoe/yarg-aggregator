@@ -812,6 +812,12 @@ export default function MusicTable({
                       key={inst}
                       value={inst}
                       className="capitalize"
+                      badgeLabel={
+                        <InstrumentIcon
+                          instrument={inst === "harmony" ? "harmony_3" : inst}
+                          className="size-4 sm:size-5"
+                        />
+                      }
                     >
                       <div className="flex items-center gap-2">
                         <InstrumentIcon
@@ -874,22 +880,24 @@ export default function MusicTable({
 
             {/* Expand/collapse — hidden on mobile */}
             {isTabletOrAbove && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowFilters((v) => !v)}
-                className="h-9 w-9 shrink-0 relative"
-                aria-label={showFilters ? "Collapse filters" : "Expand filters"}
-              >
-                <ChevronDown
-                  className={`h-4 w-4 transition-transform duration-200 ${showFilters ? "rotate-180" : ""}`}
-                />
+              <div className="relative shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowFilters((v) => !v)}
+                  className="h-9 w-9"
+                  aria-label={showFilters ? "Collapse filters" : "Expand filters"}
+                >
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform duration-200 ${showFilters ? "rotate-180" : ""}`}
+                  />
+                </Button>
                 {!showFilters && activeFilterCount > 0 && (
-                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center font-medium">
+                  <span className="absolute -top-1 -right-1 z-10 pointer-events-none h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center font-medium">
                     {activeFilterCount}
                   </span>
                 )}
-              </Button>
+              </div>
             )}
           </div>
         </div>
