@@ -1,0 +1,14 @@
+# YARG Content Aggregator
+
+The YARG Content Aggregator is a modern, high-performance web platform designed to index and serve music charts for Yet Another Rhythm Game (YARG). By searching external repositories like Enchor.us and Rhythmverse and storing metadata locally, it provides a fast, centralized, and collaborative experience for players.
+
+## Navigation and Endpoints
+- Home / Browser: /
+- User Accounts / Profiles: /u/[username]
+- Playlists / Setlists: /lists/[id]
+
+## Key Features
+- **Unified Search**: Browse and filter music charts from multiple sources in one place.
+- **Fuzzy Split-Term Search**: Find songs easily even if you type words out of order.
+- **Advanced Filtering**: Filter by instrument difficulty (guitar, bass, drums, keys, vocals), genre, artist, and more.
+- **YARG Game Integration**: Track installed songs directly through the browser.

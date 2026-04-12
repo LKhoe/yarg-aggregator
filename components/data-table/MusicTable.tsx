@@ -332,6 +332,8 @@ interface ExpandableContentProps {
   showOnlyInstalled: boolean;
   onShowOnlyInstalledChange: (v: boolean) => void;
   selectedInstallationId: string | null | undefined;
+  source: string;
+  onSourceChange: (v: string) => void;
 }
 
 function ExpandableContent({
@@ -344,10 +346,12 @@ function ExpandableContent({
   showOnlyInstalled,
   onShowOnlyInstalledChange,
   selectedInstallationId,
+  source,
+  onSourceChange,
 }: ExpandableContentProps) {
   const { t } = useTranslations();
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 pt-1">
       {/* Active exact-match filter badges */}
       <AnimatePresence>
         {(artist || albumFilter || charter) && (
@@ -412,8 +416,27 @@ function ExpandableContent({
         )}
       </AnimatePresence>
 
-      {/* Installation section */}
+      {/* Source & Installation section */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pt-2 border-t border-border/20">
+        <Select
+          value={source || "all"}
+          onValueChange={(v) => onSourceChange(v === "all" ? "" : v)}
+        >
+          <SelectTrigger
+            className={`w-full sm:w-40 h-9 shrink-0 ${source ? "active-filter" : ""}`}
+            aria-label={t("table.source")}
+          >
+            <SelectValue placeholder={t("table.allSources")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("table.allSources")}</SelectItem>
+            <SelectItem value="enchor">Enchor.us</SelectItem>
+            <SelectItem value="rhythmverse">Rhythmverse</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <div className="hidden sm:block w-[1px] h-4 bg-border/50 mx-1"></div>
+
         <span className="text-xs text-muted-foreground whitespace-nowrap">
           {t("table.showInstalled")}
         </span>
@@ -801,7 +824,7 @@ export default function MusicTable({
               }}
             >
               <MultiSelectTrigger
-                className={`h-9 w-full sm:flex-1 lg:w-40 text-sm ${instruments.length > 0 ? "active-filter" : ""}`}
+                className={`h-9 w-full sm:flex-[2] lg:w-72 text-sm ${instruments.length > 0 ? "active-filter" : ""}`}
               >
                 <MultiSelectValue placeholder={t("table.allInstruments")} />
               </MultiSelectTrigger>
@@ -845,7 +868,7 @@ export default function MusicTable({
               <ComboboxInput
                 placeholder={t("table.allGenres") || "All genres"}
                 showClear={!!genre}
-                className={`w-full sm:flex-1 lg:w-44 h-9 text-sm ${genre ? "active-filter" : ""}`}
+                className={`w-full sm:flex-1 lg:w-56 h-9 text-sm ${genre ? "active-filter" : ""}`}
               />
               <ComboboxContent>
                 <ComboboxEmpty>{t("table.noGenresFound")}</ComboboxEmpty>
@@ -858,25 +881,6 @@ export default function MusicTable({
                 </ComboboxList>
               </ComboboxContent>
             </Combobox>
-
-            <Select
-              value={source || "all"}
-              onValueChange={(v) => {
-                setSource(v === "all" ? "" : v);
-                handleFilterChange();
-              }}
-            >
-              <SelectTrigger
-                className={`w-full sm:flex-1 lg:w-32 h-9 ${source ? "active-filter" : ""}`}
-              >
-                <SelectValue placeholder={t("table.allSources")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("table.allSources")}</SelectItem>
-                <SelectItem value="enchor">Enchor.us</SelectItem>
-                <SelectItem value="rhythmverse">Rhythmverse</SelectItem>
-              </SelectContent>
-            </Select>
 
             {/* Expand/collapse — hidden on mobile */}
             {isTabletOrAbove && (
@@ -924,6 +928,8 @@ export default function MusicTable({
                   showOnlyInstalled={showOnlyInstalled}
                   onShowOnlyInstalledChange={(v) => { setShowOnlyInstalled(v); handleFilterChange(); }}
                   selectedInstallationId={selectedInstallationId}
+                  source={source}
+                  onSourceChange={(v) => { setSource(v); handleFilterChange(); }}
                 />
               </motion.div>
             )}
@@ -939,6 +945,8 @@ export default function MusicTable({
             showOnlyInstalled={showOnlyInstalled}
             onShowOnlyInstalledChange={(v) => { setShowOnlyInstalled(v); handleFilterChange(); }}
             selectedInstallationId={selectedInstallationId}
+            source={source}
+            onSourceChange={(v) => { setSource(v); handleFilterChange(); }}
           />
         )}
       </div>
