@@ -326,7 +326,7 @@ export function MonitoringDashboard({ data }: { data: MonitoringData }) {
           title={t("admin.monitoring.webVitals")}
         />
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="p-0 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
