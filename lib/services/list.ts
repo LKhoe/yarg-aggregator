@@ -496,15 +496,30 @@ export class ListService {
   static async getIntersectionSongs(
     listIds: string[],
     minCount: number,
+    userId: string,
     installationId?: string | null,
   ): Promise<IntersectionSong[]> {
     if (listIds.length === 0) return [];
     if (listIds.length > 100) throw new Error("Too many list IDs");
 
+    // Only allow lists the user owns or that are public
+    const accessibleLists = await db
+      .select({ id: songList.id })
+      .from(songList)
+      .where(
+        and(
+          inArray(songList.id, listIds),
+          or(eq(songList.userId, userId), eq(songList.isPublic, true)),
+        ),
+      );
+    const accessibleListIds = accessibleLists.map((l) => l.id);
+
+    if (accessibleListIds.length === 0) return [];
+
     const items = await db
       .select({ songId: songListItem.songId })
       .from(songListItem)
-      .where(inArray(songListItem.listId, listIds));
+      .where(inArray(songListItem.listId, accessibleListIds));
 
     const countMap = new Map<string, number>();
     for (const item of items) {

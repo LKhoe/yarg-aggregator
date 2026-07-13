@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
     const songs = await ListService.getIntersectionSongs(
       allListIds,
       minCount,
+      authUser.id,
       installationId ?? null,
     );
 
