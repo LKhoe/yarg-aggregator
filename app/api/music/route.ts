@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MusicService } from "@/lib/services/music";
 import { getAuthenticatedUser } from "@/lib/middleware/auth";
+import { musicBatchRateLimit } from "@/lib/services/rate-limit";
 import type { SearchParams } from "@/types";
 
 export async function POST(request: NextRequest) {
   try {
+    const rl = await musicBatchRateLimit(request);
+    if (rl.blocked) {
+      return NextResponse.json(
+        { error: "Too many requests. Please slow down." },
+        {
+          status: 429,
+          headers: rl.retryAfter ? { "Retry-After": String(rl.retryAfter) } : undefined,
+        },
+      );
+    }
+
     const body = await request.json();
     const { musicIds } = body;
 

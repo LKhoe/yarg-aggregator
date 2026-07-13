@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import he from "he";
 import { getAuthenticatedUser } from "@/lib/middleware/auth";
+import { lyricsRateLimit } from "@/lib/services/rate-limit";
 
 function slugify(text: string): string {
   return text
@@ -73,6 +74,17 @@ export async function GET(request: NextRequest) {
   const user = await getAuthenticatedUser(request);
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = await lyricsRateLimit(user.id);
+  if (rl.blocked) {
+    return NextResponse.json(
+      { error: "Too many requests. Please slow down." },
+      {
+        status: 429,
+        headers: rl.retryAfter ? { "Retry-After": String(rl.retryAfter) } : undefined,
+      },
+    );
   }
 
   const searchParams = request.nextUrl.searchParams;

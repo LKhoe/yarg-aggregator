@@ -44,3 +44,25 @@ export async function installedSongsRateLimit(
 ): Promise<{ blocked: boolean; retryAfter?: number }> {
   return checkRateLimit(`ratelimit:installed-songs:${userId}`, 10, 600);
 }
+
+/** 60 requests per 10 minutes per IP, for the unauthenticated batch music lookup endpoint. */
+export async function musicBatchRateLimit(
+  request: NextRequest,
+): Promise<{ blocked: boolean; retryAfter?: number }> {
+  const ip = getClientIp(request);
+  return checkRateLimit(`ratelimit:music-batch:${ip}`, 60, 600);
+}
+
+/** 20 requests per 10 minutes per user, for the external lyrics-lookup proxy (3 upstream calls per request). */
+export async function lyricsRateLimit(
+  userId: string,
+): Promise<{ blocked: boolean; retryAfter?: number }> {
+  return checkRateLimit(`ratelimit:lyrics:${userId}`, 20, 600);
+}
+
+/** 15 requests per 10 minutes per user, for the external playlist URL import (Spotify/YouTube quota). */
+export async function importUrlRateLimit(
+  userId: string,
+): Promise<{ blocked: boolean; retryAfter?: number }> {
+  return checkRateLimit(`ratelimit:import-url:${userId}`, 15, 600);
+}

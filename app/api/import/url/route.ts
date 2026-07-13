@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from "@/lib/middleware/auth";
 import { getPublicPlaylistTracks as getSpotifyTracks } from "@/services/platforms/spotify-public";
 import { getPublicPlaylistTracks as getYouTubeTracks } from "@/services/platforms/youtube-public";
 import { PlaylistMatcherService } from "@/lib/services/playlist-matcher";
+import { importUrlRateLimit } from "@/lib/services/rate-limit";
 
 function detectPlatform(url: string): "spotify" | "youtube" | null {
   try {
@@ -25,6 +26,17 @@ export async function POST(request: NextRequest) {
   const authUser = await getAuthenticatedUser(request);
   if (!authUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = await importUrlRateLimit(authUser.id);
+  if (rl.blocked) {
+    return NextResponse.json(
+      { error: "Too many requests. Please slow down." },
+      {
+        status: 429,
+        headers: rl.retryAfter ? { "Retry-After": String(rl.retryAfter) } : undefined,
+      },
+    );
   }
 
   try {
