@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { user, userProfile, songList, session, trustedDevice, account } from "@/lib/db/schema";
 import { eq, ilike, or, sql, and, ne } from "drizzle-orm";
 import type { Role, UserProfile } from "@/lib/db/schema";
+import { escapeLikePattern } from "@/lib/validation";
 
 export type UserWithProfile = {
   id: string;
@@ -118,7 +119,7 @@ export class UserService {
     limit: number = 20,
     offset: number = 0,
   ): Promise<{ users: UserWithProfile[]; total: number }> {
-    const searchPattern = `%${query}%`;
+    const searchPattern = `%${escapeLikePattern(query)}%`;
 
     const results = await db
       .select()

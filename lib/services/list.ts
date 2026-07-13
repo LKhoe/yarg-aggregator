@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { songList, songListItem, song, artist, album, downloadUrl, userProfile, installationSong } from "@/lib/db/schema";
 import { eq, and, sql, or, desc, inArray, ne, ilike, count } from "drizzle-orm";
 import type { SongList, SongListItem, Song } from "@/lib/db/schema";
+import { escapeLikePattern } from "@/lib/validation";
 
 export type ListWithItemCount = SongList & {
   itemCount: number;
@@ -460,7 +461,7 @@ export class ListService {
   static async searchPublicLists(query: string, excludeUserId: string): Promise<PublicListResult[]> {
     if (query.length < 2) return [];
 
-    const pattern = `%${query}%`;
+    const pattern = `%${escapeLikePattern(query)}%`;
 
     const results = await db
       .select({

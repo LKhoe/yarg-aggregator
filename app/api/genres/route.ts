@@ -2,18 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { genre } from "@/lib/db/schema";
 import { ilike, asc } from "drizzle-orm";
+import { escapeLikePattern } from "@/lib/validation";
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const all = searchParams.get("all") === "true";
     const q = searchParams.get("q") || "";
-    const limit = Math.min(parseInt(searchParams.get("limit") || "20", 10), 100);
-    const cursor = parseInt(searchParams.get("cursor") || "0", 10);
+    const parsedLimit = parseInt(searchParams.get("limit") || "20", 10);
+    const limit = Number.isFinite(parsedLimit)
+      ? Math.min(Math.max(parsedLimit, 1), 100)
+      : 20;
+    const parsedCursor = parseInt(searchParams.get("cursor") || "0", 10);
+    const cursor = Number.isFinite(parsedCursor) ? Math.max(parsedCursor, 0) : 0;
 
     const conditions = [];
     if (q) {
-      conditions.push(ilike(genre.name, `%${q}%`));
+      conditions.push(ilike(genre.name, `%${escapeLikePattern(q)}%`));
     }
 
     const baseQuery = db

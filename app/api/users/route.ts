@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { userProfile } from "@/lib/db/schema";
 import { ilike, asc, sql } from "drizzle-orm";
 import { getAuthenticatedUser } from "@/lib/middleware/auth";
+import { escapeLikePattern } from "@/lib/validation";
 
 export async function GET(request: NextRequest) {
   const authUser = await getAuthenticatedUser(request);
@@ -13,11 +14,14 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const q = searchParams.get("q") || "";
-    const limit = Math.min(parseInt(searchParams.get("limit") || "20", 10), 50);
+    const parsedLimit = parseInt(searchParams.get("limit") || "20", 10);
+    const limit = Number.isFinite(parsedLimit)
+      ? Math.min(Math.max(parsedLimit, 1), 50)
+      : 20;
 
     const conditions = [];
     if (q) {
-      conditions.push(ilike(userProfile.displayName, `%${q}%`));
+      conditions.push(ilike(userProfile.displayName, `%${escapeLikePattern(q)}%`));
     }
 
     const baseQuery = db

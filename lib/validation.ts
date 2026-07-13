@@ -17,3 +17,8 @@ export function isValidHttpsUrl(v: unknown): boolean {
 
 export const MAX_ARRAY_INPUT = 500;
 export const MAX_LIST_IDS = 50;
+
+/** Escapes SQL LIKE/ILIKE wildcards (% and _) so user input is matched literally. */
+export function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&");
+}

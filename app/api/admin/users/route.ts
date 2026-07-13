@@ -7,8 +7,12 @@ export const GET = withAuth(
     try {
       const { searchParams } = new URL(request.url);
       const query = searchParams.get("q") || "";
-      const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "20"), 1), 100);
-      const offset = Math.max(parseInt(searchParams.get("offset") || "0"), 0);
+      const parsedLimit = parseInt(searchParams.get("limit") || "20", 10);
+      const limit = Number.isFinite(parsedLimit)
+        ? Math.min(Math.max(parsedLimit, 1), 100)
+        : 20;
+      const parsedOffset = parseInt(searchParams.get("offset") || "0", 10);
+      const offset = Number.isFinite(parsedOffset) ? Math.max(parsedOffset, 0) : 0;
 
       let result;
       if (query) {
