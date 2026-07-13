@@ -110,7 +110,7 @@ export async function getPlaylistTracks(
     });
 
     const data = await fetchWithAuth<AppleMusicResponse<AppleMusicTrackRaw>>(
-      `${APPLE_MUSIC_API}/me/library/playlists/${playlistId}/tracks?${params}`,
+      `${APPLE_MUSIC_API}/me/library/playlists/${encodeURIComponent(playlistId)}/tracks?${params}`,
       developerToken,
       musicUserToken,
     );

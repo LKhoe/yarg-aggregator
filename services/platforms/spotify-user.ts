@@ -86,7 +86,7 @@ export async function getPlaylistTracks(
 ): Promise<SpotifyTrackInfo[]> {
   const tracks: SpotifyTrackInfo[] = [];
   let nextUrl: string | null =
-    `${SPOTIFY_API}/playlists/${playlistId}/items?limit=100&fields=items(item(name, artists(name), album(name)))`;
+    `${SPOTIFY_API}/playlists/${encodeURIComponent(playlistId)}/items?limit=100&fields=items(item(name, artists(name), album(name)))`;
 
   while (nextUrl) {
     const data: SpotifyPaginatedResponse<SpotifyPlaylistTrackRaw> =
