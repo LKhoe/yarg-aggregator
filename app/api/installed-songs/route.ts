@@ -101,11 +101,7 @@ export const POST = withAuth(
     } catch (error) {
       console.error("Error importing installed songs:", error);
       return NextResponse.json(
-        {
-          success: false,
-          error:
-            error instanceof Error ? error.message : "Unknown error occurred",
-        },
+        { success: false, error: "Failed to import installed songs" },
         { status: 500 },
       );
     }

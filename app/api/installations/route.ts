@@ -9,10 +9,7 @@ export const GET = withAuth(async (_request: NextRequest) => {
   } catch (error) {
     console.error("Error fetching installations:", error);
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Unknown error occurred",
-      },
+      { error: "Failed to fetch installations" },
       { status: 500 },
     );
   }

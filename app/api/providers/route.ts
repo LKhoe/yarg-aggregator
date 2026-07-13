@@ -104,9 +104,10 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error starting provider:", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to start provider";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to start provider" },
+      { status: 500 },
+    );
   }
 }
 
@@ -157,9 +158,10 @@ export async function DELETE(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error stopping provider:", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to stop provider";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to stop provider" },
+      { status: 500 },
+    );
   }
 }
 
@@ -222,8 +224,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(enrichedData);
   } catch (error) {
     console.error("Error getting provider status:", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to get provider status";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to get provider status" },
+      { status: 500 },
+    );
   }
 }

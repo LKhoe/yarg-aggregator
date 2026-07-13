@@ -194,8 +194,7 @@ export async function POST(request: NextRequest) {
           console.error("Error processing upload:", error);
           const errorMessage = JSON.stringify({
             type: "error",
-            message:
-              error instanceof Error ? error.message : "Internal server error",
+            message: "Failed to process upload",
           });
           controller.enqueue(encoder.encode(`data: ${errorMessage}\n\n`));
           controller.close();
