@@ -37,3 +37,10 @@ export async function agentRateLimit(
 ): Promise<{ blocked: boolean; retryAfter?: number }> {
   return checkRateLimit(`ratelimit:agent:${userId}`, 30, 600);
 }
+
+/** 10 uploads per 10 minutes per user, for the shared installed-songs catalog endpoint. */
+export async function installedSongsRateLimit(
+  userId: string,
+): Promise<{ blocked: boolean; retryAfter?: number }> {
+  return checkRateLimit(`ratelimit:installed-songs:${userId}`, 10, 600);
+}
