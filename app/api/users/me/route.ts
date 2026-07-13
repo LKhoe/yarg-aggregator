@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { APIError } from "better-auth";
+import { auth } from "@/lib/auth";
 import { getAuthenticatedUser } from "@/lib/middleware/auth";
 import { UserService } from "@/lib/services/user";
 import { isValidHttpsUrl, isValidLocale } from "@/lib/validation";
@@ -128,10 +130,50 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  let password: string | undefined;
   try {
-    await UserService.deleteUser(authUser.id);
-    return NextResponse.json({ success: true });
+    const body = await request.json();
+    password = typeof body?.password === "string" ? body.password : undefined;
+  } catch {
+    // No JSON body provided — falls back to the session-freshness check below.
+  }
+
+  try {
+    const { headers, response } = await auth.api.deleteUser({
+      headers: request.headers,
+      body: { password },
+      returnHeaders: true,
+    });
+
+    const res = NextResponse.json(response);
+    const setCookies =
+      typeof headers.getSetCookie === "function"
+        ? headers.getSetCookie()
+        : ([headers.get("set-cookie")].filter(Boolean) as string[]);
+    for (const cookie of setCookies) {
+      res.headers.append("set-cookie", cookie);
+    }
+    return res;
   } catch (error) {
+    if (error instanceof APIError) {
+      const code = (error.body as { code?: string } | undefined)?.code;
+      if (code === "SESSION_EXPIRED") {
+        return NextResponse.json(
+          { error: "Please confirm your password to delete your account", code },
+          { status: 401 },
+        );
+      }
+      if (code === "INVALID_PASSWORD" || code === "CREDENTIAL_ACCOUNT_NOT_FOUND") {
+        return NextResponse.json(
+          { error: "Incorrect password", code },
+          { status: 400 },
+        );
+      }
+      return NextResponse.json(
+        { error: "Failed to delete account" },
+        { status: error.statusCode ?? 500 },
+      );
+    }
     console.error("Error deleting user:", error);
     return NextResponse.json(
       { error: "Failed to delete account" },

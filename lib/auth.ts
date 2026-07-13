@@ -76,6 +76,12 @@ export const auth = betterAuth({
     updateAge: 60 * 60 * 24, // refresh daily
   },
 
+  user: {
+    deleteUser: {
+      enabled: true,
+    },
+  },
+
   account: {
     accountLinking: {
       enabled: true,

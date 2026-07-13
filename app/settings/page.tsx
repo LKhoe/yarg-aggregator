@@ -32,6 +32,9 @@ function SettingsContent() {
   const [displayName, setDisplayName] = useState(user?.profile.displayName || "");
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [needsPassword, setNeedsPassword] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,18 +61,34 @@ function SettingsContent() {
     }
   };
 
-  const handleDeleteAccount = async () => {
+  const handleDeleteAccount = async (e: React.MouseEvent) => {
+    // Keep the dialog open ourselves so we can show a password prompt on failure.
+    e.preventDefault();
     setIsDeleting(true);
+    setDeleteError(null);
 
     try {
       const response = await fetch("/api/users/me", {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(needsPassword ? { password: deletePassword } : {}),
       });
 
       if (response.ok) {
         toast.success(t("profile.deleteSuccess"));
         router.push("/");
         router.refresh();
+        return;
+      }
+
+      const data = await response.json().catch(() => ({}));
+      if (data.code === "SESSION_EXPIRED") {
+        setNeedsPassword(true);
+      } else if (data.code === "INVALID_PASSWORD") {
+        setNeedsPassword(true);
+        setDeleteError(t("profile.deleteAccountIncorrectPassword"));
+      } else if (data.code === "CREDENTIAL_ACCOUNT_NOT_FOUND") {
+        setDeleteError(t("profile.deleteAccountReauthRequired"));
       } else {
         toast.error(t("profile.deleteError"));
       }
@@ -166,12 +185,29 @@ function SettingsContent() {
                   {t("profile.deleteAccountWarning")}
                 </AlertDialogDescription>
               </AlertDialogHeader>
+              {needsPassword && (
+                <div className="space-y-2">
+                  <Label htmlFor="delete-password">
+                    {t("profile.deleteAccountPasswordLabel")}
+                  </Label>
+                  <Input
+                    id="delete-password"
+                    type="password"
+                    value={deletePassword}
+                    onChange={(e) => setDeletePassword(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+              )}
+              {deleteError && (
+                <p className="text-sm text-destructive">{deleteError}</p>
+              )}
               <AlertDialogFooter>
                 <AlertDialogCancel>{t("profile.cancel")}</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleDeleteAccount}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  disabled={isDeleting}
+                  disabled={isDeleting || (needsPassword && !deletePassword)}
                 >
                   {isDeleting ? t("profile.deleting") : t("profile.confirmDelete")}
                 </AlertDialogAction>
