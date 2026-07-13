@@ -10,7 +10,8 @@ const nextConfig: NextConfig = {
   output: "standalone",
   env: {
     NEXT_PUBLIC_APP_VERSION: version,
-    NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION: process.env.REQUIRE_EMAIL_VERIFICATION ?? "false",
+    NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION:
+      process.env.REQUIRE_EMAIL_VERIFICATION ?? "false",
   },
   experimental: {
     optimizePackageImports: [
@@ -107,6 +108,19 @@ const nextConfig: NextConfig = {
         hostname: "i.ytimg.com",
         port: "",
         pathname: "/vi/**/**",
+      },
+      // Playlist cover art in the import dialog
+      {
+        protocol: "https",
+        hostname: "**.scdn.co",
+      },
+      {
+        protocol: "https",
+        hostname: "**.spotifycdn.com",
+      },
+      {
+        protocol: "https",
+        hostname: "**.mzstatic.com",
       },
     ],
   },
