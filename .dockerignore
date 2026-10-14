@@ -18,7 +18,6 @@ lab_automated_chart
 # Docker
 Dockerfile
 docker-compose*.yml
-deploy.sh
 
 # docs & config not needed in image
 README.md

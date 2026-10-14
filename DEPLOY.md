@@ -1,198 +1,128 @@
-# Deployment Guide
+# Deployment
 
-This guide covers deploying YARG Aggregator using Docker, optimized for Raspberry Pi but works on any Docker-compatible system.
+YARG Aggregator runs on a Raspberry Pi 4 with umbrelOS 2. It is deployed **from the Mac**
+through a Docker context named `umbrel`: `docker compose` runs on the Mac, but the
+image is built and the container runs on the Pi. Nothing is cloned on the Pi.
 
-## Prerequisites
-
-- **Docker** (20.10+)
-- **Docker Compose** (v2.0+)
-- **Git** (to clone the repository)
-
-### Raspberry Pi Specific
-
-For Raspberry Pi, ensure Docker is installed:
-```bash
-curl -fsSL https://get.docker.com | sudo sh
-sudo usermod -aG docker $USER
-# Log out and back in for group changes
+```
+┌──────────── this repo ───────────────┐     ┌──────────── LocalInfra ─────────────┐
+│  yarg-aggregator (Next.js)  :3000    │     │                                     │
+│      ├── localinfra_postgres ────────┼────►│  localinfra-postgres  db/role "yarg"│
+│      ├── localinfra_redis ───────────┼────►│  localinfra-redis     user  "yarg"  │
+│      └── umbrel_main_network         │     │                       (keys yarg:*) │
+└──────────│───────────────────────────┘     │  localinfra-backup → external drive │
+           ▼                                 └─────────────────────────────────────┘
+  Cloudflare Tunnel app (umbrelOS) → http://yarg-aggregator:3000
+  LAN: http://umbrel.local:3000
 ```
 
-## Quick Start
+- **Postgres and Redis** come from [LocalInfra](https://github.com/LKhoe/LocalInfra) (start
+  it first). This repo has no data volumes; the database is backed up nightly by LocalInfra.
+- **Public access** goes through the umbrelOS Cloudflare Tunnel app, which is on
+  `umbrel_main_network`; the container joins that network, so the tunnel reaches it as
+  `http://yarg-aggregator:3000`.
+- **Migrations** run automatically on every container start (`docker-entrypoint.sh`:
+  wait for Postgres → `scripts/migrate.mjs` → `scripts/apply-sql.mjs` → start Next.js).
 
-Postgres and Redis are **not** part of this project. They run in the shared
-[LocalInfra](../../LocalInfra) stack. Before the first deploy:
+## Prerequisites (on the Mac)
 
-1. Start LocalInfra on the Pi (see its README).
-2. Provision this app: `DOCKER_CONTEXT=pi LocalInfra/scripts/new-project.sh yarg`
-3. Put the printed `DATABASE_URL` / `REDIS_*` variables in this project's `.env` on the Pi.
+- Docker CLI (Docker Desktop) and the `umbrel` context, with SSH key login to the Pi.
+  Setup steps are in the LocalInfra README, section 1.
+- LocalInfra running on the Pi: `DOCKER_CONTEXT=umbrel docker ps --filter name=localinfra`
+  shows `localinfra-postgres` and `localinfra-redis` as healthy.
+
+## First deploy
+
+The easiest way is LocalInfra's bootstrap. It provisions the `yarg` database role and
+Redis user, writes their credentials into this repo's `.env`, then builds and starts
+the app:
 
 ```bash
-# 1. Clone the repository
-git clone <repository-url>
-cd yarg-aggregator
-
-# 2. Create environment file
-cp .env.production.example .env
-
-# 3. Edit .env with your values (see Configuration below)
-nano .env
-
-# 4. Build and start
-docker compose up -d --build
-
-# 5. Check status
-docker compose ps
-docker compose logs -f yarg-aggregator
+cp .env.example .env      # then fill in the app settings below (leave the DB/Redis lines)
+../../LocalInfra/scripts/bootstrap-pi.sh
 ```
 
-## Configuration
-
-Copy `.env.production.example` to `.env` and configure:
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | ✅ | `postgresql://yarg:<pw>@localinfra-postgres:5432/yarg` (from `new-project.sh`) |
-| `REDIS_USERNAME` / `REDIS_PASSWORD` | ✅ | Redis ACL user for this app (from `new-project.sh`) |
-| `REDIS_KEY_PREFIX` | ✅ | `yarg:`, the namespace for every Redis key/channel (the ACL only allows `yarg:*`) |
-| `BETTER_AUTH_SECRET` | ✅ | Auth secret: `openssl rand -base64 32` |
-| `NEXT_PUBLIC_APP_URL` | ✅ | Your public URL (e.g., `http://192.168.1.100:3000`) |
-| `BETTER_AUTH_URL` | ✅ | Same as `NEXT_PUBLIC_APP_URL` |
-| `GOOGLE_CLIENT_ID` | ❌ | For Google OAuth login |
-| `GOOGLE_CLIENT_SECRET` | ❌ | For Google OAuth login |
-
-### Generate Secrets
+By hand, the same thing:
 
 ```bash
-# Generate BETTER_AUTH_SECRET
-openssl rand -base64 32
+DOCKER_CONTEXT=umbrel ../../LocalInfra/scripts/new-project.sh yarg   # paste its output into .env
+DOCKER_CONTEXT=umbrel docker compose up -d --build
 ```
 
-## Common Commands
+The build runs on the Pi and takes about 3–5 minutes.
 
-### Start/Stop
+## Configuration (`.env`)
+
+Compose reads `.env` **on the Mac**. It is git-ignored; `.env.example` lists every key.
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `DATABASE_URL` | ✅ | from `new-project.sh`: `postgresql://yarg:<pw>@localinfra-postgres:5432/yarg` |
+| `POSTGRES_HOST`, `POSTGRES_PORT` | ✅ | `localinfra-postgres`, `5432` (the entrypoint waits for it) |
+| `REDIS_HOST`, `REDIS_PORT` | ✅ | `localinfra-redis`, `6379` |
+| `REDIS_USERNAME`, `REDIS_PASSWORD` | ✅ | from `new-project.sh` (Redis ACL user `yarg`) |
+| `REDIS_KEY_PREFIX` | ✅ | `yarg:`; the ACL only allows keys/channels `yarg:*` |
+| `BETTER_AUTH_SECRET` | ✅ | `openssl rand -base64 32` |
+| `BETTER_AUTH_URL` | ✅ | public URL, e.g. `https://yarg.example.com` |
+| `NEXT_PUBLIC_APP_URL` | ✅ | same as `BETTER_AUTH_URL`. Baked in at **build** time: rebuild after changing it |
+| `PORT` | | host port on the Pi, default `3000` |
+| `GOOGLE_*`, `SPOTIFY_*`, `APPLE_*` | | OAuth sign-in; the callback URLs must use the public URL |
+| `LASTFM_API_KEY`, `LASTFM_API_SECRET` | | Last.fm sign-in and import (disabled when empty) |
+| `YOUTUBE_API_KEY`, `SOUNDCLOUD_CLIENT_ID`, `OPENROUTER_API_KEY` | | optional features |
+
+After the first sign-up on a fresh database, that account is the admin. Fill the library
+from **Admin → Providers**.
+
+## Redeploy after changes
 
 ```bash
-# Start all services
-docker compose up -d
-
-# Stop all services
-docker compose down
-
-# Restart a specific service
-docker compose restart yarg-aggregator
+DOCKER_CONTEXT=umbrel docker compose up -d --build
 ```
 
-### View Logs
+Only the app container is rebuilt and restarted; LocalInfra keeps running. Check it:
 
 ```bash
-# All services
-docker compose logs -f
-
-# Specific service
-docker compose logs -f yarg-aggregator
-
-# Last 100 lines
-docker compose logs --tail 100 yarg-aggregator
+DOCKER_CONTEXT=umbrel docker compose ps                  # STATUS should say (healthy)
+DOCKER_CONTEXT=umbrel docker compose logs -f yarg-aggregator
+curl -s http://umbrel.local:3000/api/health              # {"status":"ok"}
 ```
 
-### Update Application
+## Common commands
+
+All from the repo folder on the Mac:
 
 ```bash
-# Pull latest code
-git pull
-
-# Rebuild and restart
-docker compose up -d --build
-
-# Or force rebuild from scratch
-docker compose build --no-cache
-docker compose up -d
+DOCKER_CONTEXT=umbrel docker compose restart yarg-aggregator
+DOCKER_CONTEXT=umbrel docker compose down                 # removes the app container only; data stays in LocalInfra
+DOCKER_CONTEXT=umbrel docker compose logs --tail 100 yarg-aggregator
+DOCKER_CONTEXT=umbrel docker compose exec yarg-aggregator sh
 ```
 
-### Database Operations
+### Database
 
-The database lives in LocalInfra (`localinfra-postgres`, database and role `yarg`).
-Nightly backups go to the external drive automatically (see the LocalInfra README).
-
-```bash
-# Ad-hoc backup (custom format)
-docker exec localinfra-postgres pg_dump -U yarg -Fc yarg > yarg.dump
-
-# Restore (replaces contents)
-docker exec -i localinfra-postgres pg_restore -U yarg -d yarg --clean --if-exists --no-owner < yarg.dump
-
-# Access database shell
-docker exec -it localinfra-postgres psql -U yarg yarg
-```
-
-### Cleanup
+The database is `yarg` in `localinfra-postgres`. Nightly backups are handled by
+LocalInfra (its README, section 5).
 
 ```bash
-# Remove the app container (data lives in LocalInfra, untouched)
-docker compose down
-
-# Prune unused Docker resources
-docker system prune -f
+# shell
+DOCKER_CONTEXT=umbrel docker exec -it localinfra-postgres psql -U postgres -d yarg
+# ad-hoc dump to the Mac
+DOCKER_CONTEXT=umbrel docker exec localinfra-postgres pg_dump -U postgres -Fc yarg > yarg.dump
+# restore (replaces contents)
+DOCKER_CONTEXT=umbrel docker exec -i localinfra-postgres pg_restore -U postgres -d yarg --clean --if-exists --no-owner --role=yarg < yarg.dump
 ```
 
 ## Troubleshooting
 
-### Container won't start
-
-```bash
-# Check logs for errors
-docker compose logs yarg-aggregator
-
-# Check that LocalInfra is up and healthy
-docker ps --filter name=localinfra
-
-# Restart from scratch
-docker compose down
-docker compose up -d
-```
-
-### Database migration errors
-
-```bash
-# View migration logs
-docker compose logs yarg-aggregator | grep -i "migration\|drizzle"
-
-# Manually enter container to debug
-docker compose exec yarg-aggregator sh
-```
-
-### Out of memory (Raspberry Pi)
-
-Adjust memory limits in `docker-compose.yml`:
-```yaml
-deploy:
-  resources:
-    limits:
-      memory: 768M  # Increase from 512M
-```
-
-### Port already in use
-
-Change the port in `.env`:
-```bash
-PORT=3001  # Use a different port
-```
-
-## Architecture
-
-```
-┌──────────── this project ────────────┐     ┌──────────── LocalInfra ─────────────┐
-│  yarg-aggregator (Next.js)  :3000    │     │                                     │
-│      │                    │          │     │  localinfra-postgres  db/role "yarg"│
-│      └── localinfra_postgres ────────┼────►│  localinfra-redis     user  "yarg"  │
-│                           └─ localinfra_redis ──►  (keys "yarg:*")              │
-└──────────────────────────────────────┘     │  localinfra-backup → external drive │
-           │                                 └─────────────────────────────────────┘
-           ▼
-      Host :3000 (configurable)
-```
-
-## Data Persistence
-
-This project has no data volumes. Postgres and Redis data live in LocalInfra's volumes,
-and Postgres is backed up nightly to the external drive by `localinfra-backup`.
+- **Container not healthy**: `DOCKER_CONTEXT=umbrel docker compose logs yarg-aggregator`.
+  The entrypoint prints each step (database wait, migrations, SQL setup).
+- **`Database connection failed after 30 attempts`**: LocalInfra isn't running, or the
+  container isn't on `localinfra_postgres`: `DOCKER_CONTEXT=umbrel docker ps --filter name=localinfra`.
+- **Redis `NOPERM` errors**: `REDIS_KEY_PREFIX` must be `yarg:` and match the ACL user.
+- **`network umbrel_main_network declared as external, but could not be found`**:
+  start any umbrelOS app once (the Cloudflare Tunnel app creates it), or remove that
+  network from `docker-compose.yml` if you don't use the tunnel.
+- **Sign-in redirects to the wrong host**: `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` must be
+  the public URL; rebuild after changing `NEXT_PUBLIC_APP_URL`.
+- **Out of memory**: the container is limited to 512 MB (`deploy.resources.limits.memory`
+  in `docker-compose.yml`).
