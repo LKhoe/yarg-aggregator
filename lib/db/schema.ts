@@ -6,13 +6,25 @@ import {
   pgEnum,
   boolean,
   index,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import type { FetchGap, FetchParseIssue } from "@/types";
 
 // Enums
 export const sourceEnum = pgEnum("source", ["enchor", "rhythmverse"]);
 export const roleEnum = pgEnum("role", ["user", "moderator", "admin"]);
+export const fetchRunStatusEnum = pgEnum("fetch_run_status", [
+  "queued",
+  "running",
+  "completed",
+  "completed_with_errors",
+  "failed",
+  "cancelled",
+  "interrupted",
+]);
+export const fetchRunModeEnum = pgEnum("fetch_run_mode", ["incremental", "full"]);
 export const chatMessageRoleEnum = pgEnum("chat_message_role", [
   "user",
   "assistant",
@@ -263,9 +275,50 @@ export const provider = pgTable("provider", {
   id: text("id").primaryKey(),
   name: sourceEnum("name").notNull().unique(),
   lastSuccessfulFetch: timestamp("last_successful_fetch"),
+  // Newest sourceUpdatedAt known to be fully ingested: the next incremental
+  // fetch stops a little below it. Never moves past an unfilled gap.
+  sourceCursor: timestamp("source_cursor"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// One provider fetch (or its gap retries): progress, failures and outcome
+export const providerFetchRun = pgTable(
+  "provider_fetch_run",
+  {
+    id: text("id")
+      .primaryKey()
+      .$default(() => randomUUID()),
+    source: sourceEnum("source").notNull(),
+    mode: fetchRunModeEnum("mode").notNull(),
+    status: fetchRunStatusEnum("status").notNull().default("queued"),
+    cutoff: timestamp("cutoff"),
+    currentPage: integer("current_page").notNull().default(0),
+    totalPages: integer("total_pages"),
+    pageMap: text("page_map").notNull().default(""),
+    songsFetched: integer("songs_fetched").notNull().default(0),
+    added: integer("added").notNull().default(0),
+    updated: integer("updated").notNull().default(0),
+    ignored: integer("ignored").notNull().default(0),
+    parseIssues: integer("parse_issues").notNull().default(0),
+    newestSeenAt: timestamp("newest_seen_at"),
+    oldestSeenAt: timestamp("oldest_seen_at"),
+    gaps: jsonb("gaps").$type<FetchGap[]>().notNull().default([]),
+    issues: jsonb("issues").$type<FetchParseIssue[]>().notNull().default([]),
+    error: text("error"),
+    startedAt: timestamp("started_at"),
+    finishedAt: timestamp("finished_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("provider_fetch_run_source_created_idx").on(
+      table.source,
+      table.createdAt,
+    ),
+    index("provider_fetch_run_status_idx").on(table.status),
+  ],
+);
 
 // Installation table - tracks game installations (YARG instances)
 export const installation = pgTable(
@@ -489,6 +542,8 @@ export type DownloadUrl = typeof downloadUrl.$inferSelect;
 export type NewDownloadUrl = typeof downloadUrl.$inferInsert;
 export type Provider = typeof provider.$inferSelect;
 export type NewProvider = typeof provider.$inferInsert;
+export type ProviderFetchRun = typeof providerFetchRun.$inferSelect;
+export type NewProviderFetchRun = typeof providerFetchRun.$inferInsert;
 export type User = typeof user.$inferSelect;
 export type NewUser = typeof user.$inferInsert;
 export type Installation = typeof installation.$inferSelect;

@@ -197,7 +197,7 @@ async function saveSongsInBatches(
         genreId,
         charter: songData.charter,
         previewUrl: null,
-        albumImageUrl: songData.coverUrl,
+        albumImageUrl: songData.coverUrl || null,
         vocalParts: songData.vocalParts ?? null,
         ...diffs,
         ...(songData.sourceUpdatedAt

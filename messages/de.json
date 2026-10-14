@@ -242,7 +242,9 @@
     "stats": {
       "added": "Hinzugefügt",
       "updated": "Aktualisiert",
-      "ignored": "Ignoriert"
+      "ignored": "Ignoriert",
+      "issues": "Unlesbar",
+      "gaps": "Fehlgeschlagene Seiten"
     },
     "uploadCompleted": "Upload abgeschlossen! Hinzugefügt: {added}, Aktualisiert: {updated}, Ignoriert: {ignored}",
     "uploadFailed": "Upload fehlgeschlagen: {error}",
@@ -274,7 +276,95 @@
     "songs": "Lieder",
     "never": "Nie abgerufen",
     "fetchFromApi": "Von API abrufen",
-    "uploadZip": "ZIP hochladen"
+    "uploadZip": "ZIP hochladen",
+    "modes": {
+      "incremental": "Inkrementell",
+      "full": "Vollständig"
+    },
+    "runStatus": {
+      "queued": "In Warteschlange",
+      "running": "Läuft",
+      "completed": "Abgeschlossen",
+      "completed_with_errors": "Abgeschlossen mit Lücken",
+      "failed": "Fehlgeschlagen",
+      "cancelled": "Gestoppt",
+      "interrupted": "Unterbrochen"
+    },
+    "actions": {
+      "stop": "Stoppen",
+      "stopRequested": "Stoppt nach der aktuellen Anfrage…",
+      "retryGaps": "{count} erneut versuchen",
+      "resume": "Fortsetzen",
+      "fullRefetch": "Alles neu abrufen",
+      "fullRefetchTitle": "Alles erneut abrufen?",
+      "fullRefetchDescription": "Liest jede Seite von {source} statt nur der Änderungen seit dem letzten Abruf. Wegen des Ratenlimits kann das lange dauern.",
+      "confirm": "Alles abrufen",
+      "cancel": "Abbrechen",
+      "started": "Abruf von {source} gestartet",
+      "retryStarted": "Fehlgeschlagene Seiten von {source} werden erneut versucht"
+    },
+    "wait": {
+      "rate_limit": "{source} drosselt unsere Anfragen. Seite {page} wird in {time} erneut versucht (Wartezeit {attempt}/{max})",
+      "retry": "Seite {page} ist fehlgeschlagen. Versuch {attempt}/{max} in {time}: {error}",
+      "cooldown": "{source} bekommt eine Pause. Weiter in {time}"
+    },
+    "progress": {
+      "queued": "Wartet in der Warteschlange…",
+      "pageOf": "Seite {page} von {total}",
+      "page": "Seite {page}",
+      "songs": "{count} Songs gelesen",
+      "pace": "{seconds}s zwischen Anfragen",
+      "cutoff": "Stoppt bei Charts, die vor {date} aktualisiert wurden",
+      "fullListing": "Liest die gesamte Liste",
+      "retryingGaps": "Ruft die fehlgeschlagenen Seiten erneut ab",
+      "elapsed": "Läuft seit {duration}",
+      "took": "Dauer: {duration}"
+    },
+    "pageMap": {
+      "title": "Seiten",
+      "done": "Abgerufen",
+      "recovered": "Wiederhergestellt",
+      "failed": "Fehlgeschlagen",
+      "pending": "Ausstehend",
+      "current": "Aktuell"
+    },
+    "log": {
+      "title": "Aktivität",
+      "empty": "Noch keine Aktivität",
+      "run_started": "Abruf gestartet",
+      "page_ok": "Seite {page}: {songs} Songs ({ms} ms)",
+      "page_issues": "Seite {page}: {count} Einträge konnten nicht gelesen werden",
+      "page_retry": "Seite {page}: {error}. Versuch {attempt}/{max} in {seconds}s",
+      "rate_limited": "Seite {page}: Ratenlimit ({error}). Warte {seconds}s ({attempt}/{max})",
+      "page_failed": "Seite {page} nach {attempts} Versuchen fehlgeschlagen: {error}",
+      "processing_failed": "Seite {page} konnte nicht gespeichert werden: {error}",
+      "source_shrank": "{removed} Einträge sind aus der Quelle verschwunden. Vorherige Seite wird erneut gelesen",
+      "circuit_open": "{failures} Seiten in Folge fehlgeschlagen. Pause von {seconds}s",
+      "gap_retry": "Seite {page} wird erneut versucht",
+      "gap_recovered": "Inhalt von Seite {page} wiederhergestellt",
+      "gap_still_failing": "Seite {page} schlägt weiter fehl. Für später vorgemerkt",
+      "cancelled": "Vom Benutzer gestoppt",
+      "run_finished": "Fertig: {added} hinzugefügt, {updated} aktualisiert, {gaps} fehlgeschlagene Seiten",
+      "resumed": "Fortsetzung ab Seite {page}"
+    },
+    "history": {
+      "title": "Letzte Abrufe",
+      "empty": "Noch keine Abrufe",
+      "failedPages": "{count} fehlgeschlagen"
+    },
+    "gaps": {
+      "title": "Fehlgeschlagene Seiten",
+      "page": "Seite {page}",
+      "attempts": "{count} Versuche",
+      "hint": "Ein erneuter Versuch ruft genau diese Abschnitte ab. Bis sie wiederhergestellt sind, liest jeder neue Abruf sie ebenfalls, es geht also nichts verloren."
+    },
+    "issues": {
+      "title": "Unlesbare Einträge",
+      "entry": "Seite {page}, Eintrag {index}",
+      "hint": "Die Quelle hat diese Einträge ohne die nötigen Daten geliefert.",
+      "unknown": "Unbekannter Eintrag"
+    },
+    "truncated": "Die ersten {count} werden angezeigt"
   },
   "community": {
     "title": "Community",
@@ -662,7 +752,7 @@
     },
     "instruments": {
       "guitar": "Gitarre",
-      "bass": "Bass", 
+      "bass": "Bass",
       "drums": "Schlagzeug",
       "keys": "Tasten",
       "vocals": "Gesang",

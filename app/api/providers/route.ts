@@ -1,13 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { ProviderService } from "@/lib/services/provider";
 import { providerQueue } from "@/lib/queue";
 import { getAuthenticatedUser, hasPermission } from "@/lib/middleware/auth";
 import { getRedisClient } from "@/lib/redis";
+import { db } from "@/lib/db";
+import { providerFetchRun } from "@/lib/db/schema";
+import {
+  LOCK_TTL_SECONDS,
+  providerKeys,
+  publishSnapshot,
+  snapshotFromRow,
+} from "@/services/providers/fetch-runner";
+import type { FetchRunSnapshot, ProviderSource } from "@/types";
 
 const redis = getRedisClient();
 
-export async function POST(request: NextRequest) {
-  // Check authentication and authorization
+const SOURCES: ProviderSource[] = ["enchor", "rhythmverse"];
+const RESUMABLE = ["completed_with_errors", "failed", "cancelled", "interrupted"] as const;
+
+async function authorize(request: NextRequest) {
   const authUser = await getAuthenticatedUser(request);
   if (!authUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -15,93 +27,109 @@ export async function POST(request: NextRequest) {
   if (!hasPermission(authUser.profile.role, "moderator")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  return null;
+}
+
+/**
+ * Start a fetch.
+ *   { source, mode?: "incremental" | "full" }   new run
+ *   { source, action: "retry_gaps" }             re-fetch the failed pages of the latest run
+ */
+export async function POST(request: NextRequest) {
+  const denied = await authorize(request);
+  if (denied) return denied;
 
   try {
     const body = await request.json();
-    const { source, retryFailed = false } = body;
+    const source = body.source as ProviderSource;
+    const action = body.action === "retry_gaps" ? "retry_gaps" : "fetch";
+    const mode = body.mode === "full" ? "full" : "incremental";
 
-    if (!["enchor", "rhythmverse"].includes(source)) {
+    if (!SOURCES.includes(source)) {
       return NextResponse.json(
         { error: "Invalid source. Must be enchor or rhythmverse" },
         { status: 400 },
       );
     }
 
+    const active = await db
+      .select({ id: providerFetchRun.id })
+      .from(providerFetchRun)
+      .where(
+        and(
+          eq(providerFetchRun.source, source),
+          inArray(providerFetchRun.status, ["queued", "running"]),
+        ),
+      )
+      .limit(1);
     // Atomically acquire the running lock
-    const acquired = await redis.set(
-      `provider:${source}:running`,
-      "true",
-      "EX",
-      120,
-      "NX",
-    );
+    const acquired =
+      active.length === 0 &&
+      (await redis.set(providerKeys.lock(source), "queued", "EX", LOCK_TTL_SECONDS, "NX"));
     if (!acquired) {
       return NextResponse.json(
         { error: `Provider is already running for ${source}` },
         { status: 409 },
       );
     }
+    // A stale stop request must not cancel this new run
+    await redis.del(providerKeys.cancel(source));
 
-    const providerData = await ProviderService.findByName(source);
-    const latestSourceUpdatedAt = providerData?.lastSuccessfulFetch;
+    let createdRunId: string | null = null;
+    try {
+      let snapshot: FetchRunSnapshot;
+      let runId: string;
 
-    console.log("Starting job: ", source, latestSourceUpdatedAt);
-
-    if (retryFailed) {
-      // For retry, we just create a new job with the same logic
-      const retryJobData = {
-        name: `retry-${source}`,
-        data: {
-          source: source as "enchor" | "rhythmverse",
-          latestSourceUpdatedAt,
-        },
-        opts: {
-          removeOnComplete: true,
-          removeOnFail: false,
-        },
-      };
-
-      try {
-        await providerQueue.add(
-          retryJobData.name,
-          retryJobData.data,
-          retryJobData.opts,
-        );
-      } catch (error) {
-        await redis.del(`provider:${source}:running`);
-        throw error;
+      if (action === "retry_gaps") {
+        const [latest] = await db
+          .select()
+          .from(providerFetchRun)
+          .where(eq(providerFetchRun.source, source))
+          .orderBy(desc(providerFetchRun.createdAt))
+          .limit(1);
+        if (
+          !latest ||
+          !(RESUMABLE as readonly string[]).includes(latest.status) ||
+          latest.gaps.length === 0
+        ) {
+          await redis.del(providerKeys.lock(source));
+          return NextResponse.json(
+            { error: "The latest run has no failed pages to retry" },
+            { status: 400 },
+          );
+        }
+        runId = latest.id;
+        snapshot = { ...snapshotFromRow(latest), status: "queued", phase: "queued" };
+      } else {
+        await ProviderService.findOrCreate(source);
+        const [run] = await db
+          .insert(providerFetchRun)
+          .values({ source, mode, status: "queued" })
+          .returning();
+        runId = createdRunId = run.id;
+        snapshot = snapshotFromRow(run);
       }
 
-      return NextResponse.json({
-        success: true,
-        message: `Retrying failed jobs for ${source}`,
-      });
-    }
+      await providerQueue.add(
+        `${action}-${source}`,
+        { runId, source, action },
+        { removeOnComplete: true, removeOnFail: 50 },
+      );
+      await publishSnapshot(snapshot);
 
-    // Create a single job for this source
-    const jobData = {
-      name: `fetch-${source}`,
-      data: {
-        source: source as "enchor" | "rhythmverse",
-        latestSourceUpdatedAt,
-      },
-      opts: {
-        removeOnComplete: true,
-        removeOnFail: false,
-      },
-    };
-
-    try {
-      await providerQueue.add(jobData.name, jobData.data, jobData.opts);
+      return NextResponse.json({ success: true, runId, message: "Provider fetch started" });
     } catch (error) {
-      await redis.del(`provider:${source}:running`);
+      await redis.del(providerKeys.lock(source));
+      if (createdRunId) {
+        // Never leave a "queued" run behind: it would block every later fetch
+        await db
+          .update(providerFetchRun)
+          .set({ status: "failed", error: "Could not be queued", finishedAt: new Date() })
+          .where(eq(providerFetchRun.id, createdRunId))
+          .catch(() => undefined);
+      }
       throw error;
     }
-
-    return NextResponse.json({
-      success: true,
-      message: "Provider fetch started",
-    });
   } catch (error) {
     console.error("Error starting provider:", error);
     return NextResponse.json(
@@ -111,50 +139,35 @@ export async function POST(request: NextRequest) {
   }
 }
 
+/** Ask the running (or queued) fetch of a source to stop; it stops between requests */
 export async function DELETE(request: NextRequest) {
-  // Check authentication and authorization
-  const authUser = await getAuthenticatedUser(request);
-  if (!authUser) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  if (!hasPermission(authUser.profile.role, "moderator")) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const denied = await authorize(request);
+  if (denied) return denied;
 
   try {
     const body = await request.json();
-    const { source } = body;
+    const source = body.source as ProviderSource;
 
-    if (!["enchor", "rhythmverse"].includes(source)) {
+    if (!SOURCES.includes(source)) {
       return NextResponse.json(
         { error: "Invalid source. Must be enchor or rhythmverse" },
         { status: 400 },
       );
     }
 
-    // Check if provider is currently running
-    const isRunning = await redis.get(`provider:${source}:running`);
-    if (isRunning !== "true") {
+    const lock = await redis.get(providerKeys.lock(source));
+    if (!lock) {
       return NextResponse.json(
         { error: `Provider is not running for ${source}` },
         { status: 400 },
       );
     }
 
-    // Clear the running flag in Redis
-    await redis.del(`provider:${source}:running`);
-
-    // Get and remove active jobs for this source
-    const activeJobs = await providerQueue.getActive();
-    for (const job of activeJobs) {
-      if (job.data.source === source) {
-        await job.remove();
-      }
-    }
+    await redis.set(providerKeys.cancel(source), "1", "EX", 15 * 60);
 
     return NextResponse.json({
       success: true,
-      message: `Provider ${source} stopped successfully`,
+      message: `Stopping ${source}; the current request finishes first`,
     });
   } catch (error) {
     console.error("Error stopping provider:", error);
@@ -166,62 +179,23 @@ export async function DELETE(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const authUser = await getAuthenticatedUser(request);
-  if (!authUser) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  if (!hasPermission(authUser.profile.role, "moderator")) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const denied = await authorize(request);
+  if (denied) return denied;
 
   try {
-    // Get all providers from database
     const providers = await ProviderService.getAll();
-
-    // Check running status from Redis for each provider
-    const enrichedProviders = await Promise.all(
+    const enriched = await Promise.all(
       providers.map(async (provider) => {
-        const isRunning =
-          (await redis.get(`provider:${provider.name}:running`)) === "true";
-        const progressRaw = await redis.get(
-          `provider:${provider.name}:progress`,
-        );
-        const progress = progressRaw ? JSON.parse(progressRaw) : null;
+        const isRunning = (await redis.get(providerKeys.lock(provider.name))) !== null;
+        const snapshotRaw = await redis.get(providerKeys.snapshot(provider.name));
         return {
           ...provider,
           isRunning,
-          progress,
+          run: snapshotRaw ? (JSON.parse(snapshotRaw) as FetchRunSnapshot) : null,
         };
       }),
     );
-
-    // Get queue stats
-    const activeCount = await providerQueue.getActiveCount();
-    const waitingCount = await providerQueue.getWaitingCount();
-    const completedCount = await providerQueue.getCompletedCount();
-    const failedCount = await providerQueue.getFailedCount();
-    const delayedCount = await providerQueue.getDelayedCount();
-
-    const queueStats = {
-      active: activeCount,
-      waiting: waitingCount,
-      completed: completedCount,
-      failed: failedCount,
-      delayed: delayedCount,
-      total:
-        activeCount +
-        waitingCount +
-        completedCount +
-        failedCount +
-        delayedCount,
-    };
-
-    const enrichedData = enrichedProviders.map((provider) => ({
-      ...provider,
-      queueStats: provider.isRunning ? queueStats : null,
-    }));
-
-    return NextResponse.json(enrichedData);
+    return NextResponse.json(enriched);
   } catch (error) {
     console.error("Error getting provider status:", error);
     return NextResponse.json(

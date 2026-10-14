@@ -242,7 +242,9 @@
     "stats": {
       "added": "已添加",
       "updated": "已更新",
-      "ignored": "已忽略"
+      "ignored": "已忽略",
+      "issues": "无法解析",
+      "gaps": "失败页面"
     },
     "uploadCompleted": "上传完成！已添加：{added}，已更新：{updated}，已忽略：{ignored}",
     "uploadFailed": "上传失败：{error}",
@@ -274,7 +276,95 @@
     "songs": "首歌曲",
     "never": "从未获取",
     "fetchFromApi": "从API获取",
-    "uploadZip": "上传ZIP"
+    "uploadZip": "上传ZIP",
+    "modes": {
+      "incremental": "增量",
+      "full": "全量"
+    },
+    "runStatus": {
+      "queued": "排队中",
+      "running": "运行中",
+      "completed": "已完成",
+      "completed_with_errors": "完成但有缺口",
+      "failed": "失败",
+      "cancelled": "已停止",
+      "interrupted": "已中断"
+    },
+    "actions": {
+      "stop": "停止",
+      "stopRequested": "将在当前请求结束后停止…",
+      "retryGaps": "重试 {count} 个",
+      "resume": "继续",
+      "fullRefetch": "全部重新获取",
+      "fullRefetchTitle": "重新获取全部内容？",
+      "fullRefetchDescription": "读取 {source} 的每一页，而不仅是上次获取后的变化。由于速率限制，这可能需要很长时间。",
+      "confirm": "全部获取",
+      "cancel": "取消",
+      "started": "已开始从 {source} 获取",
+      "retryStarted": "正在重试 {source} 的失败页面"
+    },
+    "wait": {
+      "rate_limit": "{source} 正在限制请求速率。{time} 后重试第 {page} 页（等待 {attempt}/{max}）",
+      "retry": "第 {page} 页失败。{time} 后进行第 {attempt}/{max} 次重试：{error}",
+      "cooldown": "让 {source} 休息一下。{time} 后继续"
+    },
+    "progress": {
+      "queued": "正在队列中等待…",
+      "pageOf": "第 {page} 页，共 {total} 页",
+      "page": "第 {page} 页",
+      "songs": "已读取 {count} 首歌曲",
+      "pace": "请求间隔 {seconds} 秒",
+      "cutoff": "遇到 {date} 之前更新的谱面时停止",
+      "fullListing": "正在读取完整列表",
+      "retryingGaps": "正在重新获取失败的页面",
+      "elapsed": "已运行 {duration}",
+      "took": "用时 {duration}"
+    },
+    "pageMap": {
+      "title": "页面",
+      "done": "已获取",
+      "recovered": "已恢复",
+      "failed": "失败",
+      "pending": "待获取",
+      "current": "当前"
+    },
+    "log": {
+      "title": "活动",
+      "empty": "暂无活动",
+      "run_started": "开始获取",
+      "page_ok": "第 {page} 页：{songs} 首歌曲（{ms} 毫秒）",
+      "page_issues": "第 {page} 页：{count} 个条目无法读取",
+      "page_retry": "第 {page} 页：{error}。{seconds} 秒后进行第 {attempt}/{max} 次重试",
+      "rate_limited": "第 {page} 页：触发速率限制（{error}）。等待 {seconds} 秒（{attempt}/{max}）",
+      "page_failed": "第 {page} 页在 {attempts} 次尝试后失败：{error}",
+      "processing_failed": "第 {page} 页无法保存：{error}",
+      "source_shrank": "来源中有 {removed} 个条目消失了。正在重新读取上一页",
+      "circuit_open": "连续 {failures} 页失败。暂停 {seconds} 秒",
+      "gap_retry": "正在重试失败的第 {page} 页",
+      "gap_recovered": "已恢复第 {page} 页的内容",
+      "gap_still_failing": "第 {page} 页仍然失败。留待稍后重试",
+      "cancelled": "已被用户停止",
+      "run_finished": "完成：新增 {added}，更新 {updated}，失败页面 {gaps}",
+      "resumed": "从第 {page} 页继续"
+    },
+    "history": {
+      "title": "最近的运行",
+      "empty": "暂无运行记录",
+      "failedPages": "{count} 个失败"
+    },
+    "gaps": {
+      "title": "失败的页面",
+      "page": "第 {page} 页",
+      "attempts": "尝试 {count} 次",
+      "hint": "重试会精确地重新获取这些区段。在恢复之前，每次新的获取也会重新读取它们，因此不会遗漏任何内容。"
+    },
+    "issues": {
+      "title": "无法解析的条目",
+      "entry": "第 {page} 页，第 {index} 个条目",
+      "hint": "来源返回的这些条目缺少添加所需的数据。",
+      "unknown": "未知条目"
+    },
+    "truncated": "仅显示前 {count} 个"
   },
   "community": {
     "title": "社区",
@@ -662,7 +752,7 @@
     },
     "instruments": {
       "guitar": "吉他",
-      "bass": "贝斯", 
+      "bass": "贝斯",
       "drums": "鼓",
       "keys": "键盘",
       "vocals": "人声",

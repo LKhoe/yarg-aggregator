@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { provider } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, lt, or } from "drizzle-orm";
 import { convertProvider } from "@/lib/db/converters";
 import type { IProvider } from "@/types";
 
@@ -60,6 +60,35 @@ export class ProviderService {
         .set({ lastSuccessfulFetch: date })
         .where(eq(provider.name, name));
     }
+  }
+
+  /** Newest sourceUpdatedAt known to be fully ingested (incremental fetch cutoff) */
+  static async getSourceCursor(
+    name: "enchor" | "rhythmverse",
+  ): Promise<Date | null> {
+    const [row] = await db
+      .select({ sourceCursor: provider.sourceCursor })
+      .from(provider)
+      .where(eq(provider.name, name))
+      .limit(1);
+    return row?.sourceCursor ?? null;
+  }
+
+  /** Moves the cursor forward only; a cursor never moves back past ingested data */
+  static async advanceSourceCursor(
+    name: "enchor" | "rhythmverse",
+    date: Date,
+  ): Promise<void> {
+    await this.findOrCreate(name);
+    await db
+      .update(provider)
+      .set({ sourceCursor: date, updatedAt: new Date() })
+      .where(
+        and(
+          eq(provider.name, name),
+          or(isNull(provider.sourceCursor), lt(provider.sourceCursor, date)),
+        ),
+      );
   }
 
   static async getAll(): Promise<IProvider[]> {

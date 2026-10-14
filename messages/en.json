@@ -242,7 +242,9 @@
     "stats": {
       "added": "Added",
       "updated": "Updated",
-      "ignored": "Ignored"
+      "ignored": "Ignored",
+      "issues": "Unparseable",
+      "gaps": "Failed pages"
     },
     "uploadCompleted": "Upload completed! Added: {added}, Updated: {updated}, Ignored: {ignored}",
     "uploadFailed": "Upload failed: {error}",
@@ -274,7 +276,95 @@
     "songs": "songs",
     "never": "Never fetched",
     "fetchFromApi": "Fetch from API",
-    "uploadZip": "Upload ZIP"
+    "uploadZip": "Upload ZIP",
+    "modes": {
+      "incremental": "Incremental",
+      "full": "Full"
+    },
+    "runStatus": {
+      "queued": "Queued",
+      "running": "Running",
+      "completed": "Completed",
+      "completed_with_errors": "Completed with gaps",
+      "failed": "Failed",
+      "cancelled": "Stopped",
+      "interrupted": "Interrupted"
+    },
+    "actions": {
+      "stop": "Stop",
+      "stopRequested": "Stopping after the current request…",
+      "retryGaps": "Retry {count} failed",
+      "resume": "Resume",
+      "fullRefetch": "Full refetch",
+      "fullRefetchTitle": "Fetch everything again?",
+      "fullRefetchDescription": "Reads every page of {source} instead of only what changed since the last fetch. Because of the rate limit this can take a long time.",
+      "confirm": "Fetch everything",
+      "cancel": "Cancel",
+      "started": "Started fetching from {source}",
+      "retryStarted": "Retrying the failed pages of {source}"
+    },
+    "wait": {
+      "rate_limit": "{source} is rate limiting us. Trying page {page} again in {time} (wait {attempt}/{max})",
+      "retry": "Page {page} failed. Retry {attempt}/{max} in {time}: {error}",
+      "cooldown": "Giving {source} a break. Continuing in {time}"
+    },
+    "progress": {
+      "queued": "Waiting in the queue…",
+      "pageOf": "Page {page} of {total}",
+      "page": "Page {page}",
+      "songs": "{count} songs read",
+      "pace": "{seconds}s between requests",
+      "cutoff": "Stops at charts updated before {date}",
+      "fullListing": "Reading the whole listing",
+      "retryingGaps": "Re-fetching the pages that failed",
+      "elapsed": "Running for {duration}",
+      "took": "Took {duration}"
+    },
+    "pageMap": {
+      "title": "Pages",
+      "done": "Fetched",
+      "recovered": "Recovered",
+      "failed": "Failed",
+      "pending": "Pending",
+      "current": "Current"
+    },
+    "log": {
+      "title": "Activity",
+      "empty": "No activity yet",
+      "run_started": "Fetch started",
+      "page_ok": "Page {page}: {songs} songs ({ms} ms)",
+      "page_issues": "Page {page}: {count} entries could not be read",
+      "page_retry": "Page {page}: {error}. Retry {attempt}/{max} in {seconds}s",
+      "rate_limited": "Page {page}: rate limited ({error}). Waiting {seconds}s ({attempt}/{max})",
+      "page_failed": "Page {page} failed after {attempts} attempts: {error}",
+      "processing_failed": "Page {page} could not be saved: {error}",
+      "source_shrank": "{removed} entries disappeared from the source. Re-reading the previous page",
+      "circuit_open": "{failures} pages failed in a row. Pausing {seconds}s",
+      "gap_retry": "Retrying failed page {page}",
+      "gap_recovered": "Recovered the content of page {page}",
+      "gap_still_failing": "Page {page} still fails. Kept for a later retry",
+      "cancelled": "Stopped by user",
+      "run_finished": "Finished: {added} added, {updated} updated, {gaps} failed pages",
+      "resumed": "Resuming from page {page}"
+    },
+    "history": {
+      "title": "Recent runs",
+      "empty": "No runs yet",
+      "failedPages": "{count} failed"
+    },
+    "gaps": {
+      "title": "Failed pages",
+      "page": "Page {page}",
+      "attempts": "{count} attempts",
+      "hint": "Retrying re-fetches exactly these stretches. Until they are recovered, every new fetch re-reads them too, so nothing is lost."
+    },
+    "issues": {
+      "title": "Unparseable entries",
+      "entry": "Page {page}, entry {index}",
+      "hint": "The source returned these entries without the data needed to add them.",
+      "unknown": "Unknown entry"
+    },
+    "truncated": "Showing the first {count}"
   },
   "community": {
     "title": "Community",
@@ -662,7 +752,7 @@
     },
     "instruments": {
       "guitar": "Guitar",
-      "bass": "Bass", 
+      "bass": "Bass",
       "drums": "Drums",
       "keys": "Keys",
       "vocals": "Vocals",

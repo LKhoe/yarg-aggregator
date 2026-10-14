@@ -242,7 +242,9 @@
     "stats": {
       "added": "Adicionado",
       "updated": "Atualizado",
-      "ignored": "Ignorado"
+      "ignored": "Ignorado",
+      "issues": "Ilegíveis",
+      "gaps": "Páginas com falha"
     },
     "uploadCompleted": "Upload concluído! Adicionado: {added}, Atualizado: {updated}, Ignorado: {ignored}",
     "uploadFailed": "Falha no upload: {error}",
@@ -274,7 +276,95 @@
     "songs": "músicas",
     "never": "Nunca buscado",
     "fetchFromApi": "Buscar da API",
-    "uploadZip": "Enviar ZIP"
+    "uploadZip": "Enviar ZIP",
+    "modes": {
+      "incremental": "Incremental",
+      "full": "Completa"
+    },
+    "runStatus": {
+      "queued": "Na fila",
+      "running": "Em execução",
+      "completed": "Concluída",
+      "completed_with_errors": "Concluída com lacunas",
+      "failed": "Falhou",
+      "cancelled": "Interrompida",
+      "interrupted": "Interrompida pelo servidor"
+    },
+    "actions": {
+      "stop": "Parar",
+      "stopRequested": "Parando após a requisição atual…",
+      "retryGaps": "Tentar {count} de novo",
+      "resume": "Retomar",
+      "fullRefetch": "Buscar tudo de novo",
+      "fullRefetchTitle": "Buscar tudo novamente?",
+      "fullRefetchDescription": "Lê todas as páginas do {source} em vez de só o que mudou desde a última busca. Por causa do limite de requisições, isso pode demorar bastante.",
+      "confirm": "Buscar tudo",
+      "cancel": "Cancelar",
+      "started": "Busca no {source} iniciada",
+      "retryStarted": "Tentando de novo as páginas com falha do {source}"
+    },
+    "wait": {
+      "rate_limit": "O {source} está limitando as requisições. Nova tentativa da página {page} em {time} (espera {attempt}/{max})",
+      "retry": "A página {page} falhou. Tentativa {attempt}/{max} em {time}: {error}",
+      "cooldown": "Dando um tempo ao {source}. Continua em {time}"
+    },
+    "progress": {
+      "queued": "Aguardando na fila…",
+      "pageOf": "Página {page} de {total}",
+      "page": "Página {page}",
+      "songs": "{count} músicas lidas",
+      "pace": "{seconds}s entre requisições",
+      "cutoff": "Para nos charts atualizados antes de {date}",
+      "fullListing": "Lendo a listagem inteira",
+      "retryingGaps": "Buscando de novo as páginas que falharam",
+      "elapsed": "Em execução há {duration}",
+      "took": "Levou {duration}"
+    },
+    "pageMap": {
+      "title": "Páginas",
+      "done": "Buscada",
+      "recovered": "Recuperada",
+      "failed": "Falhou",
+      "pending": "Pendente",
+      "current": "Atual"
+    },
+    "log": {
+      "title": "Atividade",
+      "empty": "Nenhuma atividade ainda",
+      "run_started": "Busca iniciada",
+      "page_ok": "Página {page}: {songs} músicas ({ms} ms)",
+      "page_issues": "Página {page}: {count} entradas não puderam ser lidas",
+      "page_retry": "Página {page}: {error}. Tentativa {attempt}/{max} em {seconds}s",
+      "rate_limited": "Página {page}: limite de requisições ({error}). Aguardando {seconds}s ({attempt}/{max})",
+      "page_failed": "A página {page} falhou após {attempts} tentativas: {error}",
+      "processing_failed": "A página {page} não pôde ser salva: {error}",
+      "source_shrank": "{removed} entradas sumiram da fonte. Relendo a página anterior",
+      "circuit_open": "{failures} páginas falharam seguidas. Pausando {seconds}s",
+      "gap_retry": "Tentando de novo a página {page}",
+      "gap_recovered": "Conteúdo da página {page} recuperado",
+      "gap_still_failing": "A página {page} continua falhando. Guardada para tentar depois",
+      "cancelled": "Parada pelo usuário",
+      "run_finished": "Fim: {added} adicionadas, {updated} atualizadas, {gaps} páginas com falha",
+      "resumed": "Retomando a partir da página {page}"
+    },
+    "history": {
+      "title": "Execuções recentes",
+      "empty": "Nenhuma execução ainda",
+      "failedPages": "{count} com falha"
+    },
+    "gaps": {
+      "title": "Páginas com falha",
+      "page": "Página {page}",
+      "attempts": "{count} tentativas",
+      "hint": "Tentar de novo busca exatamente esses trechos. Enquanto não forem recuperados, toda nova busca também os relê, então nada se perde."
+    },
+    "issues": {
+      "title": "Entradas ilegíveis",
+      "entry": "Página {page}, entrada {index}",
+      "hint": "A fonte retornou essas entradas sem os dados necessários para adicioná-las.",
+      "unknown": "Entrada desconhecida"
+    },
+    "truncated": "Mostrando as primeiras {count}"
   },
   "community": {
     "title": "Comunidade",
@@ -662,7 +752,7 @@
     },
     "instruments": {
       "guitar": "Guitarra",
-      "bass": "Baixo", 
+      "bass": "Baixo",
       "drums": "Bateria",
       "keys": "Teclas",
       "vocals": "Vocais",

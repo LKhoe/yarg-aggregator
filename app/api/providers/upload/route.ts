@@ -156,9 +156,14 @@ export async function POST(request: NextRequest) {
             .filter((d): d is Date => d !== null);
           if (dates.length > 0) {
             const maxDate = new Date(
-              Math.max(...dates.map((d) => d.getTime())),
+              dates.reduce((max, d) => Math.max(max, d.getTime()), 0),
             );
             await ProviderService.updateLastSuccessfulFetchIfNewer(
+              source as "enchor" | "rhythmverse",
+              maxDate,
+            );
+            // A full dump covers everything up to its newest entry
+            await ProviderService.advanceSourceCursor(
               source as "enchor" | "rhythmverse",
               maxDate,
             );

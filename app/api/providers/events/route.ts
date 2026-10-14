@@ -5,8 +5,10 @@ import {
 } from "@/lib/redis";
 import { ProviderService } from "@/lib/services/provider";
 import { db } from "@/lib/db";
-import { downloadUrl } from "@/lib/db/schema";
-import { countDistinct } from "drizzle-orm";
+import { downloadUrl, providerFetchRun } from "@/lib/db/schema";
+import { countDistinct, desc, eq } from "drizzle-orm";
+import { providerKeys, snapshotFromRow } from "@/services/providers/fetch-runner";
+import type { FetchRunSnapshot } from "@/types";
 import { NextRequest } from "next/server";
 import { getAuthenticatedUser, hasPermission } from "@/lib/middleware/auth";
 
@@ -33,7 +35,7 @@ export async function GET(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        // Send initial state: current progress from Redis + lastSuccessfulFetch from DB
+        // Initial state: live run snapshot (Redis, else the latest run in the DB) + counts
         const providers = await ProviderService.getAll();
         const initialState: Record<string, unknown> = {};
 
@@ -51,14 +53,22 @@ export async function GET(request: NextRequest) {
         }
 
         for (const p of providers) {
-          const isRunning =
-            (await reader.get(`provider:${p.name}:running`)) === "true";
-          const progressRaw = await reader.get(`provider:${p.name}:progress`);
-          const progress = progressRaw ? JSON.parse(progressRaw) : null;
+          const isRunning = (await reader.get(providerKeys.lock(p.name))) !== null;
+          const snapshotRaw = await reader.get(providerKeys.snapshot(p.name));
+          let run: FetchRunSnapshot | null = snapshotRaw ? JSON.parse(snapshotRaw) : null;
+          if (!run) {
+            const [latest] = await db
+              .select()
+              .from(providerFetchRun)
+              .where(eq(providerFetchRun.source, p.name))
+              .orderBy(desc(providerFetchRun.createdAt))
+              .limit(1);
+            run = latest ? snapshotFromRow(latest) : null;
+          }
           initialState[p.name] = {
             name: p.name,
             isRunning,
-            progress,
+            run,
             lastSuccessfulFetch: p.lastSuccessfulFetch ?? null,
             songCount: countMap[p.name] ?? 0,
           };

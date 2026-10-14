@@ -242,7 +242,9 @@
     "stats": {
       "added": "Ajouté",
       "updated": "Mis à jour",
-      "ignored": "Ignoré"
+      "ignored": "Ignoré",
+      "issues": "Illisibles",
+      "gaps": "Pages en échec"
     },
     "uploadCompleted": "Téléchargement terminé ! Ajouté : {added}, Mis à jour : {updated}, Ignoré : {ignored}",
     "uploadFailed": "Échec du téléchargement : {error}",
@@ -274,7 +276,95 @@
     "songs": "chansons",
     "never": "Jamais récupéré",
     "fetchFromApi": "Récupérer de l'API",
-    "uploadZip": "Envoyer ZIP"
+    "uploadZip": "Envoyer ZIP",
+    "modes": {
+      "incremental": "Incrémentale",
+      "full": "Complète"
+    },
+    "runStatus": {
+      "queued": "En file d'attente",
+      "running": "En cours",
+      "completed": "Terminée",
+      "completed_with_errors": "Terminée avec des trous",
+      "failed": "Échouée",
+      "cancelled": "Arrêtée",
+      "interrupted": "Interrompue"
+    },
+    "actions": {
+      "stop": "Arrêter",
+      "stopRequested": "Arrêt après la requête en cours…",
+      "retryGaps": "Réessayer {count}",
+      "resume": "Reprendre",
+      "fullRefetch": "Tout récupérer à nouveau",
+      "fullRefetchTitle": "Tout récupérer à nouveau ?",
+      "fullRefetchDescription": "Lit toutes les pages de {source} au lieu de seulement ce qui a changé depuis la dernière récupération. À cause de la limite de requêtes, cela peut être long.",
+      "confirm": "Tout récupérer",
+      "cancel": "Annuler",
+      "started": "Récupération depuis {source} lancée",
+      "retryStarted": "Nouvel essai des pages en échec de {source}"
+    },
+    "wait": {
+      "rate_limit": "{source} limite nos requêtes. Nouvel essai de la page {page} dans {time} (attente {attempt}/{max})",
+      "retry": "La page {page} a échoué. Essai {attempt}/{max} dans {time} : {error}",
+      "cooldown": "Pause pour {source}. Reprise dans {time}"
+    },
+    "progress": {
+      "queued": "En attente dans la file…",
+      "pageOf": "Page {page} sur {total}",
+      "page": "Page {page}",
+      "songs": "{count} morceaux lus",
+      "pace": "{seconds}s entre les requêtes",
+      "cutoff": "S'arrête aux charts mis à jour avant le {date}",
+      "fullListing": "Lecture de la liste complète",
+      "retryingGaps": "Nouvelle récupération des pages en échec",
+      "elapsed": "En cours depuis {duration}",
+      "took": "Durée : {duration}"
+    },
+    "pageMap": {
+      "title": "Pages",
+      "done": "Récupérée",
+      "recovered": "Récupérée au 2e essai",
+      "failed": "En échec",
+      "pending": "En attente",
+      "current": "En cours"
+    },
+    "log": {
+      "title": "Activité",
+      "empty": "Aucune activité pour l'instant",
+      "run_started": "Récupération lancée",
+      "page_ok": "Page {page} : {songs} morceaux ({ms} ms)",
+      "page_issues": "Page {page} : {count} entrées illisibles",
+      "page_retry": "Page {page} : {error}. Essai {attempt}/{max} dans {seconds}s",
+      "rate_limited": "Page {page} : limite de requêtes ({error}). Attente de {seconds}s ({attempt}/{max})",
+      "page_failed": "La page {page} a échoué après {attempts} essais : {error}",
+      "processing_failed": "La page {page} n'a pas pu être enregistrée : {error}",
+      "source_shrank": "{removed} entrées ont disparu de la source. Relecture de la page précédente",
+      "circuit_open": "{failures} pages en échec d'affilée. Pause de {seconds}s",
+      "gap_retry": "Nouvel essai de la page {page}",
+      "gap_recovered": "Contenu de la page {page} récupéré",
+      "gap_still_failing": "La page {page} échoue encore. Conservée pour plus tard",
+      "cancelled": "Arrêtée par l'utilisateur",
+      "run_finished": "Terminé : {added} ajoutés, {updated} mis à jour, {gaps} pages en échec",
+      "resumed": "Reprise à partir de la page {page}"
+    },
+    "history": {
+      "title": "Exécutions récentes",
+      "empty": "Aucune exécution",
+      "failedPages": "{count} en échec"
+    },
+    "gaps": {
+      "title": "Pages en échec",
+      "page": "Page {page}",
+      "attempts": "{count} essais",
+      "hint": "Réessayer récupère exactement ces tronçons. Tant qu'ils ne sont pas récupérés, chaque nouvelle récupération les relit aussi : rien n'est perdu."
+    },
+    "issues": {
+      "title": "Entrées illisibles",
+      "entry": "Page {page}, entrée {index}",
+      "hint": "La source a renvoyé ces entrées sans les données nécessaires pour les ajouter.",
+      "unknown": "Entrée inconnue"
+    },
+    "truncated": "Affichage des {count} premiers"
   },
   "community": {
     "title": "Communauté",
@@ -662,7 +752,7 @@
     },
     "instruments": {
       "guitar": "Guitare",
-      "bass": "Basse", 
+      "bass": "Basse",
       "drums": "Batterie",
       "keys": "Claviers",
       "vocals": "Chant",

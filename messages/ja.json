@@ -242,7 +242,9 @@
     "stats": {
       "added": "追加済み",
       "updated": "更新済み",
-      "ignored": "無視済み"
+      "ignored": "無視済み",
+      "issues": "解析不可",
+      "gaps": "失敗ページ"
     },
     "uploadCompleted": "アップロード完了！追加：{added}、更新：{updated}、無視：{ignored}",
     "uploadFailed": "アップロード失敗：{error}",
@@ -274,7 +276,95 @@
     "songs": "曲",
     "never": "未取得",
     "fetchFromApi": "APIから取得",
-    "uploadZip": "ZIPアップロード"
+    "uploadZip": "ZIPアップロード",
+    "modes": {
+      "incremental": "差分",
+      "full": "全件"
+    },
+    "runStatus": {
+      "queued": "待機中",
+      "running": "実行中",
+      "completed": "完了",
+      "completed_with_errors": "欠落ありで完了",
+      "failed": "失敗",
+      "cancelled": "停止",
+      "interrupted": "中断"
+    },
+    "actions": {
+      "stop": "停止",
+      "stopRequested": "現在のリクエストの後に停止します…",
+      "retryGaps": "{count} 件を再試行",
+      "resume": "再開",
+      "fullRefetch": "すべて再取得",
+      "fullRefetchTitle": "すべて再取得しますか？",
+      "fullRefetchDescription": "前回の取得以降の変更だけでなく、{source} の全ページを読み込みます。レート制限のため時間がかかる場合があります。",
+      "confirm": "すべて取得",
+      "cancel": "キャンセル",
+      "started": "{source} からの取得を開始しました",
+      "retryStarted": "{source} の失敗したページを再試行しています"
+    },
+    "wait": {
+      "rate_limit": "{source} がリクエストを制限しています。{time} 後にページ {page} を再試行します（待機 {attempt}/{max}）",
+      "retry": "ページ {page} が失敗しました。{time} 後に再試行 {attempt}/{max}: {error}",
+      "cooldown": "{source} を休ませています。{time} 後に再開します"
+    },
+    "progress": {
+      "queued": "キューで待機中…",
+      "pageOf": "ページ {page} / {total}",
+      "page": "ページ {page}",
+      "songs": "{count} 曲を読み込み",
+      "pace": "リクエスト間隔 {seconds} 秒",
+      "cutoff": "{date} より前に更新されたチャートで停止します",
+      "fullListing": "一覧全体を読み込み中",
+      "retryingGaps": "失敗したページを再取得中",
+      "elapsed": "実行時間 {duration}",
+      "took": "所要時間 {duration}"
+    },
+    "pageMap": {
+      "title": "ページ",
+      "done": "取得済み",
+      "recovered": "復旧済み",
+      "failed": "失敗",
+      "pending": "未取得",
+      "current": "取得中"
+    },
+    "log": {
+      "title": "アクティビティ",
+      "empty": "まだアクティビティはありません",
+      "run_started": "取得を開始しました",
+      "page_ok": "ページ {page}: {songs} 曲（{ms} ms）",
+      "page_issues": "ページ {page}: {count} 件のエントリを読み込めませんでした",
+      "page_retry": "ページ {page}: {error}。{seconds} 秒後に再試行 {attempt}/{max}",
+      "rate_limited": "ページ {page}: レート制限（{error}）。{seconds} 秒待機（{attempt}/{max}）",
+      "page_failed": "ページ {page} は {attempts} 回試行後に失敗しました: {error}",
+      "processing_failed": "ページ {page} を保存できませんでした: {error}",
+      "source_shrank": "ソースから {removed} 件が消えました。前のページを再読み込みします",
+      "circuit_open": "{failures} ページ連続で失敗しました。{seconds} 秒一時停止します",
+      "gap_retry": "失敗したページ {page} を再試行中",
+      "gap_recovered": "ページ {page} の内容を復旧しました",
+      "gap_still_failing": "ページ {page} は引き続き失敗しています。後で再試行します",
+      "cancelled": "ユーザーが停止しました",
+      "run_finished": "完了: 追加 {added}、更新 {updated}、失敗ページ {gaps}",
+      "resumed": "ページ {page} から再開"
+    },
+    "history": {
+      "title": "最近の実行",
+      "empty": "まだ実行はありません",
+      "failedPages": "失敗 {count}"
+    },
+    "gaps": {
+      "title": "失敗したページ",
+      "page": "ページ {page}",
+      "attempts": "{count} 回試行",
+      "hint": "再試行するとこの範囲を正確に再取得します。復旧するまでは新しい取得のたびにここも読み直すため、取りこぼしはありません。"
+    },
+    "issues": {
+      "title": "解析できなかったエントリ",
+      "entry": "ページ {page}、エントリ {index}",
+      "hint": "ソースが追加に必要なデータを含まないエントリを返しました。",
+      "unknown": "不明なエントリ"
+    },
+    "truncated": "最初の {count} 件を表示しています"
   },
   "community": {
     "title": "コミュニティ",
@@ -662,7 +752,7 @@
     },
     "instruments": {
       "guitar": "ギター",
-      "bass": "ベース", 
+      "bass": "ベース",
       "drums": "ドラム",
       "keys": "キー",
       "vocals": "ボーカル",
