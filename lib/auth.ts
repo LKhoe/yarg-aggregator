@@ -3,7 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@/lib/db";
 import { userProfile, songList } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
-import { createSign } from "crypto";
+import { createSign, randomUUID } from "crypto";
 import { lastfmPlugin } from "@ley0x/better-auth-lastfm";
 
 /**
@@ -125,12 +125,13 @@ export const auth = betterAuth({
 
           // First user gets admin role — use atomic SQL to avoid race condition
           await db.execute(sql`
-            INSERT INTO user_profile (user_id, display_name, avatar_url, role)
+            INSERT INTO user_profile (id, user_id, display_name, avatar_url, role)
             VALUES (
+              ${randomUUID()},
               ${user.id},
               ${displayName},
               ${user.image ?? null},
-              CASE WHEN (SELECT COUNT(*) FROM user_profile) = 0 THEN 'admin' ELSE 'user' END
+              (CASE WHEN (SELECT COUNT(*) FROM user_profile) = 0 THEN 'admin' ELSE 'user' END)::role
             )
           `);
 
