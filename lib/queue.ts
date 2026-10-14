@@ -1,13 +1,23 @@
 import { Queue, Worker, Job } from "bullmq";
-import { getRedisClient } from "@/lib/redis";
+import {
+  BULLMQ_PREFIX,
+  PROVIDER_EVENTS_CHANNEL,
+  getQueueConnection,
+  getRedisClient,
+} from "@/lib/redis";
 import { fetchEnchor } from "@/services/providers/enchor";
 import { fetchRhythmverse } from "@/services/providers/rhythmverse";
 import { processSongs } from "@/services/songs/index";
 import { ProviderService } from "@/lib/services/provider";
 
-const connection = getRedisClient();
+// BullMQ connection (no keyPrefix) + app client for our own keys (namespaced by REDIS_KEY_PREFIX)
+const connection = getQueueConnection();
+const redis = getRedisClient();
 
-export const providerQueue = new Queue("provider-fetch", { connection });
+export const providerQueue = new Queue("provider-fetch", {
+  connection,
+  prefix: BULLMQ_PREFIX,
+});
 
 interface FetchJobData {
   source: "enchor" | "rhythmverse";
@@ -33,9 +43,9 @@ export const initProviderWorker = () => {
         ? new Date(latestSourceUpdatedAt)
         : undefined;
 
-      await connection.set(`provider:${source}:running`, "true", "EX", 120);
-      await connection.publish(
-        "provider:events",
+      await redis.set(`provider:${source}:running`, "true", "EX", 120);
+      await redis.publish(
+        PROVIDER_EVENTS_CHANNEL,
         JSON.stringify({ source, type: "running", isRunning: true }),
       );
 
@@ -58,16 +68,16 @@ export const initProviderWorker = () => {
             songsFetched: allSongs.length,
             phase: "fetching",
           });
-          await connection.set(
+          await redis.set(
             `provider:${source}:progress`,
             fetchingProgress,
             "EX",
             3600,
           );
-          await connection.publish("provider:events", fetchingProgress);
+          await redis.publish(PROVIDER_EVENTS_CHANNEL, fetchingProgress);
 
           // Refresh running lock TTL
-          await connection.expire(`provider:${source}:running`, 120);
+          await redis.expire(`provider:${source}:running`, 120);
 
           page++;
 
@@ -84,13 +94,13 @@ export const initProviderWorker = () => {
           songsFetched: allSongs.length,
           phase: "processing",
         });
-        await connection.set(
+        await redis.set(
           `provider:${source}:progress`,
           processingProgress,
           "EX",
           3600,
         );
-        await connection.publish("provider:events", processingProgress);
+        await redis.publish(PROVIDER_EVENTS_CHANNEL, processingProgress);
 
         const stats = await processSongs(allSongs, source, async (data) => {
           // Strip details to keep SSE payloads small (counts only)
@@ -103,13 +113,13 @@ export const initProviderWorker = () => {
             progress: data.progress,
             stats: counts,
           });
-          await connection.set(
+          await redis.set(
             `provider:${source}:progress`,
             progressPayload,
             "EX",
             3600,
           );
-          await connection.publish("provider:events", progressPayload);
+          await redis.publish(PROVIDER_EVENTS_CHANNEL, progressPayload);
         });
 
         // Update last successful fetch timestamp
@@ -145,13 +155,13 @@ export const initProviderWorker = () => {
           },
           lastSuccessfulFetch: updatedProvider?.lastSuccessfulFetch ?? null,
         });
-        await connection.set(
+        await redis.set(
           `provider:${source}:progress`,
           completedProgress,
           "EX",
           300, // Keep completion data for 5 minutes
         );
-        await connection.publish("provider:events", completedProgress);
+        await redis.publish(PROVIDER_EVENTS_CHANNEL, completedProgress);
 
         console.log(
           `Provider ${source} fetch completed: ${allSongs.length} songs fetched, stats:\n`,
@@ -168,18 +178,19 @@ export const initProviderWorker = () => {
           phase: "failed",
           error: error instanceof Error ? error.message : "Unknown error",
         });
-        await connection.set(
+        await redis.set(
           `provider:${source}:progress`,
           failedProgress,
           "EX",
           300,
         );
-        await connection.publish("provider:events", failedProgress);
+        await redis.publish(PROVIDER_EVENTS_CHANNEL, failedProgress);
         throw error;
       }
     },
     {
       connection,
+      prefix: BULLMQ_PREFIX,
       concurrency: 1,
       limiter: {
         max: 1,
@@ -189,22 +200,22 @@ export const initProviderWorker = () => {
   );
 
   worker.on("completed", async (job) => {
-    await connection.del(`provider:${job.data.source}:running`);
+    await redis.del(`provider:${job.data.source}:running`);
   });
 
   worker.on("failed", async (job) => {
     if (job?.data?.source) {
-      await connection.del(`provider:${job.data.source}:running`);
+      await redis.del(`provider:${job.data.source}:running`);
     }
   });
 
   worker.on("drained", async () => {
     const providers = ["enchor", "rhythmverse"];
     for (const provider of providers) {
-      await connection.del(`provider:${provider}:running`);
+      await redis.del(`provider:${provider}:running`);
     }
-    await connection.publish(
-      "provider:events",
+    await redis.publish(
+      PROVIDER_EVENTS_CHANNEL,
       JSON.stringify({ type: "drained" }),
     );
   });

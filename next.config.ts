@@ -7,6 +7,7 @@ const withNextIntl = createNextIntlPlugin("./i18n.ts");
 const { version } = require("./package.json");
 
 const nextConfig: NextConfig = {
+  // allowedDevOrigins: ["192.168.0.29"],
   output: "standalone",
   env: {
     NEXT_PUBLIC_APP_VERSION: version,

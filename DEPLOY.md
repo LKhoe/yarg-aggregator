@@ -19,6 +19,13 @@ sudo usermod -aG docker $USER
 
 ## Quick Start
 
+Postgres and Redis are **not** part of this project. They run in the shared
+[LocalInfra](../../LocalInfra) stack. Before the first deploy:
+
+1. Start LocalInfra on the Pi (see its README).
+2. Provision this app: `DOCKER_CONTEXT=pi LocalInfra/scripts/new-project.sh yarg`
+3. Put the printed `DATABASE_URL` / `REDIS_*` variables in this project's `.env` on the Pi.
+
 ```bash
 # 1. Clone the repository
 git clone <repository-url>
@@ -44,7 +51,9 @@ Copy `.env.production.example` to `.env` and configure:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `POSTGRES_PASSWORD` | ✅ | Database password (use a strong random value) |
+| `DATABASE_URL` | ✅ | `postgresql://yarg:<pw>@localinfra-postgres:5432/yarg` (from `new-project.sh`) |
+| `REDIS_USERNAME` / `REDIS_PASSWORD` | ✅ | Redis ACL user for this app (from `new-project.sh`) |
+| `REDIS_KEY_PREFIX` | ✅ | `yarg:`, the namespace for every Redis key/channel (the ACL only allows `yarg:*`) |
 | `BETTER_AUTH_SECRET` | ✅ | Auth secret: `openssl rand -base64 32` |
 | `NEXT_PUBLIC_APP_URL` | ✅ | Your public URL (e.g., `http://192.168.1.100:3000`) |
 | `BETTER_AUTH_URL` | ✅ | Same as `NEXT_PUBLIC_APP_URL` |
@@ -56,9 +65,6 @@ Copy `.env.production.example` to `.env` and configure:
 ```bash
 # Generate BETTER_AUTH_SECRET
 openssl rand -base64 32
-
-# Generate POSTGRES_PASSWORD
-openssl rand -base64 24
 ```
 
 ## Common Commands
@@ -105,25 +111,25 @@ docker compose up -d
 
 ### Database Operations
 
-```bash
-# Backup database
-docker compose exec postgres pg_dump -U postgres yarg_db > backup.sql
+The database lives in LocalInfra (`localinfra-postgres`, database and role `yarg`).
+Nightly backups go to the external drive automatically (see the LocalInfra README).
 
-# Restore database
-docker compose exec -T postgres psql -U postgres yarg_db < backup.sql
+```bash
+# Ad-hoc backup (custom format)
+docker exec localinfra-postgres pg_dump -U yarg -Fc yarg > yarg.dump
+
+# Restore (replaces contents)
+docker exec -i localinfra-postgres pg_restore -U yarg -d yarg --clean --if-exists --no-owner < yarg.dump
 
 # Access database shell
-docker compose exec postgres psql -U postgres yarg_db
+docker exec -it localinfra-postgres psql -U yarg yarg
 ```
 
 ### Cleanup
 
 ```bash
-# Remove containers (keeps data volumes)
+# Remove the app container (data lives in LocalInfra, untouched)
 docker compose down
-
-# Remove everything including volumes (⚠️ DELETES DATA)
-docker compose down -v
 
 # Prune unused Docker resources
 docker system prune -f
@@ -137,8 +143,8 @@ docker system prune -f
 # Check logs for errors
 docker compose logs yarg-aggregator
 
-# Check if database is healthy
-docker compose ps
+# Check that LocalInfra is up and healthy
+docker ps --filter name=localinfra
 
 # Restart from scratch
 docker compose down
@@ -175,30 +181,18 @@ PORT=3001  # Use a different port
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────┐
-│               Docker Network                │
-│                                             │
-│  ┌──────────────┐  ┌─────────┐  ┌─────────┐ │
-│  │    App       │  │ Postgres│  │  Redis  │ │
-│  │  (Next.js)   │──│  :5432  │  │  :6379  │ │
-│  │    :3000     │  └─────────┘  └─────────┘ │
-│  └──────────────┘                           │
-└─────────────────────────────────────────────┘
-           │
+┌──────────── this project ────────────┐     ┌──────────── LocalInfra ─────────────┐
+│  yarg-aggregator (Next.js)  :3000    │     │                                     │
+│      │                    │          │     │  localinfra-postgres  db/role "yarg"│
+│      └── localinfra_postgres ────────┼────►│  localinfra-redis     user  "yarg"  │
+│                           └─ localinfra_redis ──►  (keys "yarg:*")              │
+└──────────────────────────────────────┘     │  localinfra-backup → external drive │
+           │                                 └─────────────────────────────────────┘
            ▼
       Host :3000 (configurable)
 ```
 
 ## Data Persistence
 
-Data is stored in Docker volumes:
-- `postgres_data` - Database files
-- `redis_data` - Redis cache
-
-Volumes persist across container restarts. To backup:
-```bash
-# Find volume location
-docker volume inspect yarg-aggregator_postgres_data
-
-# Or use pg_dump as shown above (recommended)
-```
+This project has no data volumes. Postgres and Redis data live in LocalInfra's volumes,
+and Postgres is backed up nightly to the external drive by `localinfra-backup`.

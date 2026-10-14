@@ -1,4 +1,8 @@
-import { createRedisReader, createRedisSubscriber } from "@/lib/redis";
+import {
+  PROVIDER_EVENTS_CHANNEL,
+  createRedisReader,
+  createRedisSubscriber,
+} from "@/lib/redis";
 import { ProviderService } from "@/lib/services/provider";
 import { db } from "@/lib/db";
 import { downloadUrl } from "@/lib/db/schema";
@@ -67,7 +71,7 @@ export async function GET(request: NextRequest) {
         controller.enqueue(encoder.encode(initEvent));
 
         // Subscribe to provider events channel
-        await subscriber.subscribe("provider:events");
+        await subscriber.subscribe(PROVIDER_EVENTS_CHANNEL);
 
         subscriber.on("message", (_channel: string, message: string) => {
           try {
@@ -96,7 +100,7 @@ export async function GET(request: NextRequest) {
     },
     cancel() {
       if (heartbeat) clearInterval(heartbeat);
-      subscriber.unsubscribe("provider:events").catch(() => {});
+      subscriber.unsubscribe(PROVIDER_EVENTS_CHANNEL).catch(() => {});
       subscriber.disconnect();
     },
   });
