@@ -9,17 +9,17 @@ image is built and the container runs on the Pi. Nothing is cloned on the Pi.
 │  yarg-aggregator (Next.js)  :3000    │     │                                     │
 │      ├── localinfra_postgres ────────┼────►│  localinfra-postgres  db/role "yarg"│
 │      ├── localinfra_redis ───────────┼────►│  localinfra-redis     user  "yarg"  │
-│      └── umbrel_main_network         │     │                       (keys yarg:*) │
+│      └── localinfra_tunnel           │     │                       (keys yarg:*) │
 └──────────│───────────────────────────┘     │  localinfra-backup → external drive │
            ▼                                 └─────────────────────────────────────┘
-  Cloudflare Tunnel app (umbrelOS) → http://yarg-aggregator:3000
+  localinfra-tunnel (Cloudflare) → http://yarg-aggregator:3000
   LAN: http://umbrel.local:3000
 ```
 
 - **Postgres and Redis** come from [LocalInfra](https://github.com/LKhoe/LocalInfra) (start
   it first). This repo has no data volumes; the database is backed up nightly by LocalInfra.
-- **Public access** goes through the umbrelOS Cloudflare Tunnel app, which is on
-  `umbrel_main_network`; the container joins that network, so the tunnel reaches it as
+- **Public access** goes through LocalInfra's Cloudflare tunnel (`localinfra-tunnel`), which is
+  on `localinfra_tunnel`; the container joins that network, so the tunnel reaches it as
   `http://yarg-aggregator:3000`.
 - **Migrations** run automatically on every container start (`docker-entrypoint.sh`:
   wait for Postgres → `scripts/migrate.mjs` → `scripts/apply-sql.mjs` → start Next.js).
@@ -119,9 +119,6 @@ DOCKER_CONTEXT=umbrel docker exec -i localinfra-postgres pg_restore -U postgres 
 - **`Database connection failed after 30 attempts`**: LocalInfra isn't running, or the
   container isn't on `localinfra_postgres`: `DOCKER_CONTEXT=umbrel docker ps --filter name=localinfra`.
 - **Redis `NOPERM` errors**: `REDIS_KEY_PREFIX` must be `yarg:` and match the ACL user.
-- **`network umbrel_main_network declared as external, but could not be found`**:
-  start any umbrelOS app once (the Cloudflare Tunnel app creates it), or remove that
-  network from `docker-compose.yml` if you don't use the tunnel.
 - **Sign-in redirects to the wrong host**: `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` must be
   the public URL; rebuild after changing `NEXT_PUBLIC_APP_URL`.
 - **Out of memory**: the container is limited to 512 MB (`deploy.resources.limits.memory`

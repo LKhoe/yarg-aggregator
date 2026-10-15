@@ -61,8 +61,8 @@ services:
     networks:
       - localinfra_postgres
       - localinfra_redis
-      # Umbrel apps network: lets the Cloudflare Tunnel app reach http://yarg-aggregator:3000
-      - umbrel_main_network
+      # LocalInfra's Cloudflare tunnel reaches the app here: http://yarg-aggregator:3000
+      - localinfra_tunnel
     deploy:
       resources:
         limits:
@@ -81,5 +81,5 @@ networks:
     external: true
   localinfra_redis:
     external: true
-  umbrel_main_network:
+  localinfra_tunnel:
     external: true
