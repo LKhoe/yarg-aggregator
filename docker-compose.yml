@@ -1,5 +1,5 @@
 # YARG Aggregator — app only.
-# Postgres and Redis are provided by the LocalInfra project (../../LocalInfra):
+# Postgres and Redis are provided by the LocalInfra project (../LocalInfra):
 # start it first, then provision this app once with  scripts/new-project.sh yarg
 # and copy the printed variables into this project's .env.
 services:

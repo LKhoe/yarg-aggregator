@@ -33,7 +33,7 @@ stores metadata in PostgreSQL and serves a fast search UI.
   PostgreSQL + Drizzle ORM, Better Auth (email/password, Google, Spotify, Apple, Last.fm),
   BullMQ + Redis, Docker.
 - **Infrastructure**: Postgres and Redis come from the separate LocalInfra repo
-  (`../../LocalInfra`, containers `localinfra-postgres` / `localinfra-redis`). This app has
+  (`../LocalInfra`, containers `localinfra-postgres` / `localinfra-redis`). This app has
   its own DB role `yarg` and a Redis ACL user limited to keys/channels `yarg:*`.
 - **Hosting**: Raspberry Pi 4 with umbrelOS 2; public access via the umbrelOS Cloudflare
   Tunnel app (`umbrel_main_network` → `http://yarg-aggregator:3000`). See `DEPLOY.md`.

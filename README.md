@@ -41,13 +41,13 @@ database role and a Redis user limited to keys starting with `yarg:`.
 
 - **Node.js 24+** (`.nvmrc` pins the version used here: `nvm use`)
 - **Docker Desktop**, to run LocalInfra on the Mac
-- [LocalInfra](https://github.com/LKhoe/LocalInfra) cloned at `../../LocalInfra`
+- [LocalInfra](https://github.com/LKhoe/LocalInfra) cloned at `../LocalInfra`
   relative to this repo, with its `.env` filled in (see its README)
 
 ### 1. Start Postgres and Redis (LocalInfra on Docker Desktop)
 
 ```bash
-cd ../../LocalInfra
+cd ../LocalInfra
 mkdir -p backups-local && touch backups-local/.localinfra-backup-target
 BACKUP_DIR=./backups-local DOCKER_CONTEXT=desktop-linux docker compose up -d --build
 DOCKER_CONTEXT=desktop-linux scripts/new-project.sh yarg     # prints this app's credentials

@@ -39,13 +39,13 @@ the app:
 
 ```bash
 cp .env.example .env      # then fill in the app settings below (leave the DB/Redis lines)
-../../LocalInfra/scripts/bootstrap-pi.sh
+../LocalInfra/scripts/bootstrap-pi.sh
 ```
 
 By hand, the same thing:
 
 ```bash
-DOCKER_CONTEXT=umbrel ../../LocalInfra/scripts/new-project.sh yarg   # paste its output into .env
+DOCKER_CONTEXT=umbrel ../LocalInfra/scripts/new-project.sh yarg   # paste its output into .env
 DOCKER_CONTEXT=umbrel docker compose up -d --build
 ```
 
