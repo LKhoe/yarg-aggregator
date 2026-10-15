@@ -35,9 +35,13 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Install only the runtime deps needed for migrations (pg + drizzle-orm)
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
-RUN npm install --no-save pg drizzle-orm
+# Production deps at the lockfile's exact versions, for the plain-.mjs migration scripts
+# (pg + drizzle-orm) that run outside the Next.js server, and for native files Next's
+# standalone tracing misses (sharp's dlopen'd libvips .so). Must come from the lockfile:
+# a bare `npm install <pkg>` re-resolves every dependency to its latest version, and a newer
+# libvips next to the standalone output's locked sharp fails with "libvips-cpp.so.X: No such file".
+COPY --from=builder --chown=nextjs:nodejs /app/package.json /app/package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 # Copy only the necessary files for standalone mode
 COPY --from=builder /app/public ./public

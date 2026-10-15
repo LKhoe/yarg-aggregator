@@ -89,6 +89,11 @@ stores metadata in PostgreSQL and serves a fast search UI.
 - **Translations have no fallback.** The client `t()` (`contexts/TranslationContext.tsx`)
   returns the key itself when it's missing, so add new keys to all 7 files in `messages/`.
 - **`NEXT_PUBLIC_APP_URL` is baked in at build time** (Docker build arg); rebuild after changing it.
+- **Runner-stage deps come from the lockfile** (`npm ci --omit=dev` in the Dockerfile). Never
+  replace it with `npm install <pkg>`: with a package.json and no lockfile that re-resolves every
+  dependency to the newest matching version, so sharp's libvips (dlopen'd, not traced into the
+  standalone output) drifts from the locked sharp binary and image processing fails with
+  `libvips-cpp.so.X: No such file`.
 - **Schema changes**: edit `lib/db/schema.ts`, run `npm run db:generate`, commit the migration.
   It is applied automatically when the container starts.
 
