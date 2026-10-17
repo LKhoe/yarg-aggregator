@@ -11,7 +11,7 @@ const STATIC_ASSETS = [
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/icon-maskable-512.png',
-  '/icons/apple-touch-icon.png',
+  '/apple-touch-icon.png',
 ];
 
 // Install: cache static assets and take over immediately
