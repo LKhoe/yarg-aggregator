@@ -51,6 +51,9 @@ services:
       - SOUNDCLOUD_CLIENT_ID=${SOUNDCLOUD_CLIENT_ID}
       # OpenRouter
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    labels:
+      # Shown on the Container Health page (resource map, guides)
+      - localinfra.url=${NEXT_PUBLIC_APP_URL:-}
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
       interval: 10s
