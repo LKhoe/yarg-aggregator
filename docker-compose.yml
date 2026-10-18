@@ -1,5 +1,5 @@
 # YARG Aggregator — app only.
-# Postgres and Redis are provided by the LocalInfra project (../LocalInfra):
+# Postgres, Redis and the LLM gateway are provided by the LocalInfra project (../LocalInfra):
 # start it first, then provision this app once with  scripts/new-project.sh yarg
 # and copy the printed variables into this project's .env.
 services:
@@ -49,8 +49,9 @@ services:
       # Music Platform APIs
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
       - SOUNDCLOUD_CLIENT_ID=${SOUNDCLOUD_CLIENT_ID}
-      # OpenRouter
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      # LLM (admin agent) — LocalInfra's LLM gateway (provision-app.sh --llm)
+      - LLM_BASE_URL=${LLM_BASE_URL:-http://localinfra-llm:4000/v1}
+      - LLM_API_KEY=${LLM_API_KEY}
     labels:
       # Shown on the Container Health page (resource map, guides)
       - localinfra.url=${NEXT_PUBLIC_APP_URL:-}
@@ -64,6 +65,7 @@ services:
     networks:
       - localinfra_postgres
       - localinfra_redis
+      - localinfra_llm
       # LocalInfra's Cloudflare tunnel reaches the app here: http://yarg-aggregator:3000
       - localinfra_tunnel
     deploy:
@@ -83,6 +85,8 @@ networks:
   localinfra_postgres:
     external: true
   localinfra_redis:
+    external: true
+  localinfra_llm:
     external: true
   localinfra_tunnel:
     external: true

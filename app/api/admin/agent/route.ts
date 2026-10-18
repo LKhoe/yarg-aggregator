@@ -15,6 +15,7 @@ import {
 import { count, eq, and, asc } from "drizzle-orm";
 import { agentRateLimit } from "@/lib/services/rate-limit";
 import { isValidLocale } from "@/lib/validation";
+import { isLLMConfigured, isLLMTier, LLMError, llmChat, type LLMTier } from "@/lib/services/llm";
 
 
 const SYSTEM_PROMPT = `You are an AI assistant for the YARG Content Aggregator, an admin tool for managing music charts for YARG (Yet Another Rhythm Game) — an open-source rhythm game similar to Rock Band and Guitar Hero.
@@ -248,7 +249,10 @@ const LOCALE_NAMES: Record<string, string> = {
   zh: "Chinese",
 };
 
-const FALLBACK_MODEL = "google/gemma-3-27b-it:free";
+// Tiers of LocalInfra's LLM gateway (lib/services/llm.ts). The agent needs reliable tool
+// calls: cheap paid models by default. Titles and error translations are free.
+const AGENT_TIER: LLMTier = "medium";
+const LIGHT_TIER: LLMTier = "simple";
 
 const MALFORMED_TOOL_CALL_PATTERN =
   /<\/?tool_call>|<\/?function_call>|\{"name"\s*:\s*"(search_songs|get_song_details|get_genres|get_stats|get_user_lists)"/;
@@ -274,47 +278,31 @@ type ChatResponse = {
   }[];
 };
 
-async function sendChat(
-  model: string,
-  messages: Message[],
-): Promise<ChatResponse> {
-  const response = await fetch(
-    "https://openrouter.ai/api/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: messages.map((m) => {
-          if (m.role === "tool") {
-            return { role: "tool", tool_call_id: m.toolCallId, content: m.content };
-          }
-          if (m.role === "assistant" && m.toolCalls) {
-            return { role: "assistant", content: m.content, tool_calls: m.toolCalls };
-          }
-          return { role: m.role, content: m.content };
-        }),
-        tools: TOOLS,
-        tool_choice: "auto",
-      }),
-    },
-  );
+function toWireMessages(messages: Message[]) {
+  return messages.map((m) => {
+    if (m.role === "tool") {
+      return { role: "tool", tool_call_id: m.toolCallId, content: m.content };
+    }
+    if (m.role === "assistant" && m.toolCalls) {
+      return { role: "assistant", content: m.content, tool_calls: m.toolCalls };
+    }
+    return { role: m.role, content: m.content };
+  });
+}
 
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`OpenRouter error ${response.status}: ${err}`);
-  }
-
-  return response.json();
+function sendChat(tier: LLMTier, messages: Message[]): Promise<ChatResponse> {
+  return llmChat<ChatResponse>({
+    model: tier,
+    messages: toWireMessages(messages),
+    tools: TOOLS,
+    tool_choice: "auto",
+  });
 }
 
 async function runAgentLoop(
   clientMessages: { role: "user" | "assistant"; content: string }[],
   locale: string = "en",
-  model?: string,
+  tier: LLMTier = AGENT_TIER,
 ): Promise<{ reply: string; toolCalls: ToolCallTrace[]; model: string }> {
   const safeLocale = isValidLocale(locale) ? locale : "en";
   const languageName = LOCALE_NAMES[safeLocale];
@@ -325,28 +313,18 @@ async function runAgentLoop(
     ...clientMessages,
   ];
 
-  const activeModel = model ?? FALLBACK_MODEL;
+  const result = await runWithModel(tier, [...baseMessages]);
 
-  let result;
-  try {
-    result = await runWithModel(activeModel, [...baseMessages]);
-  } catch (e) {
-    if (activeModel !== FALLBACK_MODEL && e instanceof Error && e.message.includes("404")) {
-      result = await runWithModel(FALLBACK_MODEL, [...baseMessages]);
-    } else {
-      throw e;
-    }
-  }
-
-  if (result.malformed && activeModel !== FALLBACK_MODEL) {
-    return runWithModel(FALLBACK_MODEL, [...baseMessages]);
+  // Free models sometimes write tool calls as text: retry once on the cheap paid tier
+  if (result.malformed && tier === "simple") {
+    return runWithModel(AGENT_TIER, [...baseMessages]);
   }
 
   return result;
 }
 
 async function runWithModel(
-  model: string,
+  tier: LLMTier,
   messages: Message[],
 ): Promise<{
   reply: string;
@@ -355,13 +333,13 @@ async function runWithModel(
   malformed?: boolean;
 }> {
   const toolCalls: ToolCallTrace[] = [];
-  let usedModel = model;
+  let usedModel: string = tier;
 
   for (let i = 0; i < 5; i++) {
-    const response = await sendChat(model, messages);
+    const response = await sendChat(tier, messages);
 
     const choice = response.choices?.[0];
-    if (!choice) throw new Error("No choices in OpenRouter response");
+    if (!choice) throw new Error("No choices in the LLM response");
 
     if (response.model) {
       usedModel = response.model;
@@ -430,38 +408,16 @@ async function runWithModel(
       "You have already called tools multiple times. Now answer the user's question using only the data you have collected so far. Do NOT call any more tools.",
   });
 
-  const finalResponse = await fetch(
-    "https://openrouter.ai/api/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: messages.map((m) => {
-          if (m.role === "tool") {
-            return { role: "tool", tool_call_id: m.toolCallId, content: m.content };
-          }
-          if (m.role === "assistant" && m.toolCalls) {
-            return { role: "assistant", content: m.content, tool_calls: m.toolCalls };
-          }
-          return { role: m.role, content: m.content };
-        }),
-      }),
-    },
-  );
-
-  if (!finalResponse.ok) {
+  let finalData: ChatResponse;
+  try {
+    finalData = await llmChat<ChatResponse>({ model: tier, messages: toWireMessages(messages) });
+  } catch {
     return {
       reply: "I was unable to generate a response. Please try again.",
       toolCalls,
       model: usedModel,
     };
   }
-
-  const finalData: ChatResponse = await finalResponse.json();
   const finalChoice = finalData.choices?.[0];
   const finalContent =
     typeof finalChoice?.message?.content === "string"
@@ -489,26 +445,16 @@ async function generateTitle(
   const language = LOCALE_NAMES[locale] ?? LOCALE_NAMES.en;
 
   try {
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: FALLBACK_MODEL,
-        messages: [
-          {
-            role: "user",
-            content: `Generate a short title (max 50 characters) in ${language} for a conversation that starts with this message. Reply with ONLY the title, no quotes, no punctuation at the end.\n\n${firstMessage}`,
-          },
-        ],
-      }),
+    const data = await llmChat<ChatResponse>({
+      model: LIGHT_TIER,
+      max_tokens: 60,
+      messages: [
+        {
+          role: "user",
+          content: `Generate a short title (max 50 characters) in ${language} for a conversation that starts with this message. Reply with ONLY the title, no quotes, no punctuation at the end.\n\n${firstMessage}`,
+        },
+      ],
     });
-
-    if (!res.ok) return;
-
-    const data = await res.json();
     const title = data.choices?.[0]?.message?.content?.trim()?.slice(0, 50);
     if (!title) return;
 
@@ -529,26 +475,16 @@ async function translateError(
   if (!language || locale === "en") return error;
 
   try {
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: FALLBACK_MODEL,
-        messages: [
-          {
-            role: "user",
-            content: `Translate the following error message to ${language}. Reply with ONLY the translated text, nothing else.\n\n${error}`,
-          },
-        ],
-      }),
+    const data = await llmChat<ChatResponse>({
+      model: LIGHT_TIER,
+      max_tokens: 300,
+      messages: [
+        {
+          role: "user",
+          content: `Translate the following error message to ${language}. Reply with ONLY the translated text, nothing else.\n\n${error}`,
+        },
+      ],
     });
-
-    if (!res.ok) return error;
-
-    const data = await res.json();
     return data.choices?.[0]?.message?.content?.trim() || error;
   } catch {
     return error;
@@ -565,6 +501,7 @@ export const POST = withAuth(
       model?: string;
     };
     const locale = isValidLocale(rawLocale) ? rawLocale : "en";
+    const tier: LLMTier = isLLMTier(model) ? model : AGENT_TIER;
 
     if (!message?.trim()) {
       return NextResponse.json(
@@ -573,9 +510,9 @@ export const POST = withAuth(
       );
     }
 
-    if (!process.env.OPENROUTER_API_KEY) {
+    if (!isLLMConfigured()) {
       return NextResponse.json(
-        { error: "OPENROUTER_API_KEY is not configured" },
+        { error: "LLM_BASE_URL / LLM_API_KEY are not configured" },
         { status: 503 },
       );
     }
@@ -619,7 +556,7 @@ export const POST = withAuth(
       // Create new conversation
       const [conv] = await db
         .insert(agentConversation)
-        .values({ userId: user.id, model: model ?? FALLBACK_MODEL })
+        .values({ userId: user.id, model: tier })
         .returning({ id: agentConversation.id });
       conversationId = conv.id;
       isFirstMessage = true;
@@ -645,7 +582,7 @@ export const POST = withAuth(
     }));
 
     try {
-      const result = await runAgentLoop(chatMessages, locale, model);
+      const result = await runAgentLoop(chatMessages, locale, tier);
 
       // Save the assistant message
       await db.insert(agentMessage).values({
@@ -678,9 +615,15 @@ export const POST = withAuth(
         conversationId,
       });
     } catch (e) {
-      const errMsg = e instanceof Error ? e.message : "Unknown error";
+      // Paid-call limit reached on the gateway: say so, the admin can switch to the free tier
+      const isLimit = e instanceof LLMError && e.isLimit;
+      const errMsg = isLimit
+        ? "The AI usage limit for paid models was reached (monthly budget or calls per day). Pick the Simple (free) tier or try again later."
+        : e instanceof Error
+          ? e.message
+          : "Unknown error";
       const translated = await translateError(errMsg, locale ?? "en");
-      return NextResponse.json({ error: translated }, { status: 502 });
+      return NextResponse.json({ error: translated }, { status: isLimit ? 429 : 502 });
     }
   },
   { requiredRole: "admin" },

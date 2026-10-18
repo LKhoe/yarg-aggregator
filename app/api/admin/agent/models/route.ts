@@ -1,44 +1,36 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/middleware/auth";
-import { OpenRouter } from "@openrouter/sdk";
+import { isLLMConfigured, listLLMTiers, type LLMTier } from "@/lib/services/llm";
 
 export type AgentModel = {
   id: string;
   name: string;
 };
 
+// The picker offers the gateway's tiers; the first one is preselected
+const ORDER: LLMTier[] = ["medium", "simple", "hard"];
+const LABELS: Record<LLMTier, string> = {
+  simple: "Simple (free)",
+  medium: "Medium (cheap)",
+  hard: "Hard (best, pricier)",
+};
+
 export const GET = withAuth(
   async () => {
-    if (!process.env.OPENROUTER_API_KEY) {
+    if (!isLLMConfigured()) {
       return NextResponse.json(
-        { error: "OPENROUTER_API_KEY is not configured" },
+        { error: "LLM_BASE_URL / LLM_API_KEY are not configured" },
         { status: 503 },
       );
     }
 
-    const client = new OpenRouter({
-      apiKey: process.env.OPENROUTER_API_KEY,
+    const tiers = await listLLMTiers();
+    const models: AgentModel[] = ORDER.flatMap((id) => {
+      const tier = tiers.find((t) => t.id === id);
+      return tier ? [{ id, name: `${LABELS[id]} · ${tier.models[0] ?? tier.fallback ?? ""}` }] : [];
     });
 
-    const response = await client.models.list({
-      supportedParameters: "tools",
-    });
-    const allModels = response.data ?? [];
-
-    const freeWithTools: AgentModel[] = allModels
-      .filter((m) => {
-        const isFree =
-          Number(m.pricing.prompt) === 0 &&
-          Number(m.pricing.completion) === 0;
-        return isFree;
-      })
-      .map((m) => ({
-        id: m.id,
-        name: m.name ?? m.id,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-
-    return NextResponse.json({ models: freeWithTools });
+    return NextResponse.json({ models });
   },
   { requiredRole: "admin" },
 );

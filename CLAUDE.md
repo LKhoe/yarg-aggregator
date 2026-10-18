@@ -34,7 +34,9 @@ stores metadata in PostgreSQL and serves a fast search UI.
   BullMQ + Redis, Docker.
 - **Infrastructure**: Postgres and Redis come from the separate LocalInfra repo
   (`../LocalInfra`, containers `localinfra-postgres` / `localinfra-redis`). This app has
-  its own DB role `yarg` and a Redis ACL user limited to keys/channels `yarg:*`.
+  its own DB role `yarg` and a Redis ACL user limited to keys/channels `yarg:*`. LLM calls (admin
+  agent) go through LocalInfra's LLM gateway (`lib/services/llm.ts`, tiers `simple`/`medium`/`hard`),
+  never straight to OpenRouter.
 - **Hosting**: Raspberry Pi 4 with umbrelOS 2; public access via LocalInfra's Cloudflare
   tunnel (`localinfra_tunnel` → `http://yarg-aggregator:3000`). See `DEPLOY.md`.
 
