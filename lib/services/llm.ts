@@ -3,8 +3,9 @@
 // paid calls. Provision the key with:
 //   ../LocalInfra/scripts/provision-app.sh yarg . --no-postgres --no-redis --llm
 //
-//   simple → free models, then a small local model (no tools there): titles, translations
-//   medium → cheap paid models: the admin agent (tool calls)
+//   simple → free models, then a small local model (no tools there): the admin agent by
+//            default, titles, translations
+//   medium → cheap paid models, more reliable tool calls (the admin can pick it)
 //   hard   → good, pricier paid models
 
 export const LLM_TIERS = ["simple", "medium", "hard"] as const;

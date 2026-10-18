@@ -8,7 +8,7 @@ export type AgentModel = {
 };
 
 // The picker offers the gateway's tiers; the first one is preselected
-const ORDER: LLMTier[] = ["medium", "simple", "hard"];
+const ORDER: LLMTier[] = ["simple", "medium", "hard"];
 const LABELS: Record<LLMTier, string> = {
   simple: "Simple (free)",
   medium: "Medium (cheap)",

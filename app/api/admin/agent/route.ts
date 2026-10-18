@@ -249,9 +249,9 @@ const LOCALE_NAMES: Record<string, string> = {
   zh: "Chinese",
 };
 
-// Tiers of LocalInfra's LLM gateway (lib/services/llm.ts). The agent needs reliable tool
-// calls: cheap paid models by default. Titles and error translations are free.
-const AGENT_TIER: LLMTier = "medium";
+// Tiers of LocalInfra's LLM gateway (lib/services/llm.ts). The agent runs on the free tier
+// unless the admin picks medium or hard; titles and error translations are always free.
+const AGENT_TIER: LLMTier = "simple";
 const LIGHT_TIER: LLMTier = "simple";
 
 const MALFORMED_TOOL_CALL_PATTERN =
@@ -315,9 +315,10 @@ async function runAgentLoop(
 
   const result = await runWithModel(tier, [...baseMessages]);
 
-  // Free models sometimes write tool calls as text: retry once on the cheap paid tier
-  if (result.malformed && tier === "simple") {
-    return runWithModel(AGENT_TIER, [...baseMessages]);
+  // Free models sometimes write tool calls as text: retry once, still on the same tier, so a
+  // free conversation never turns into a paid call the admin didn't pick
+  if (result.malformed) {
+    return runWithModel(tier, [...baseMessages]);
   }
 
   return result;
