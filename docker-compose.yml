@@ -5,6 +5,8 @@
 services:
   yarg-aggregator:
     container_name: yarg-aggregator
+    # Fixed tag so deploy.sh can keep the previous build as yarg-aggregator:previous for --rollback
+    image: yarg-aggregator:latest
     build:
       context: .
       dockerfile: Dockerfile

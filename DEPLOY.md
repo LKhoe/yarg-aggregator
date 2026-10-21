@@ -77,9 +77,13 @@ from **Admin → Providers**.
 ## Redeploy after changes
 
 ```bash
-DOCKER_CONTEXT=umbrel docker compose up -d --build
+./deploy.sh              # build on the Pi, restart, wait until healthy
+./deploy.sh --release    # bump the patch version, commit and push first
+./deploy.sh --rollback   # restart the image that was live before the last deploy
 ```
 
+`deploy.sh` is the same file in every app (copied from `LocalInfra/templates/app/deploy.sh`,
+see `LocalInfra/DEPLOYING-APPS.md`); it reads everything app-specific from `docker-compose.yml`.
 Only the app container is rebuilt and restarted; LocalInfra keeps running. Check it:
 
 ```bash
