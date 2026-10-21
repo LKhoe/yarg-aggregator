@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, memo, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, memo, useRef } from "react";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { useTranslations } from "@/hooks/use-translations";
 import {
   Table,
@@ -151,6 +152,9 @@ interface MusicRowProps {
   onAddToList: (listId: string, songId: string) => Promise<unknown>;
   onSongSelect?: (event: SongSelectEvent) => void;
   animationDelay?: number;
+  /** Set when the list is virtualized so the virtualizer can measure the row */
+  virtualIndex?: number;
+  measureRef?: (el: HTMLTableRowElement | null) => void;
 }
 
 const MusicRow = memo(
@@ -162,6 +166,8 @@ const MusicRow = memo(
     onAddToList,
     onSongSelect,
     animationDelay,
+    virtualIndex,
+    measureRef,
   }: MusicRowProps) {
     return (
       <TableRow
@@ -171,7 +177,9 @@ const MusicRow = memo(
           const rect = row.getBoundingClientRect();
           onSongSelect?.({ song: music, rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height } });
         }}
+        data-index={virtualIndex}
         ref={(el) => {
+          measureRef?.(el);
           if (el && animationDelay !== undefined) {
             el.style.opacity = "0";
             el.style.animation = `fade-slide-up 0.3s ease-out ${animationDelay}ms forwards`;
@@ -316,6 +324,7 @@ const MusicRow = memo(
   },
   (prev, next) =>
     prev.music.id === next.music.id &&
+    prev.virtualIndex === next.virtualIndex &&
     prev.music.installed === next.music.installed &&
     prev.music.favorited === next.music.favorited &&
     prev.isAuthenticated === next.isAuthenticated &&
@@ -492,6 +501,12 @@ export default function MusicTable({
   const batchStartIndex = useRef(0);
 
   const isTabletOrAbove = useMediaQuery("(min-width: 640px)");
+
+  // Only the mobile list is virtualized (keeps the DOM small on iOS Safari)
+  const virtualize = !isTabletOrAbove;
+  const tbodyRef = useRef<HTMLTableSectionElement>(null);
+  const [scrollMargin, setScrollMargin] = useState(0);
+  const animatedIds = useRef(new Set<string>());
 
   // Get selected installation from context
   const { selectedInstallationId } = useInstallation();
@@ -761,6 +776,41 @@ export default function MusicTable({
     handleFilterChange();
   }, [externalFilter, handleFilterChange]);
 
+  // Rows animate in once; virtualized rows that remount must not replay it
+  useEffect(() => {
+    data.forEach((m) => m.id && animatedIds.current.add(m.id));
+  }, [data]);
+
+  const isEmpty = data.length === 0;
+  useLayoutEffect(() => {
+    if (!virtualize) return;
+    const update = () => {
+      if (tbodyRef.current)
+        setScrollMargin(
+          tbodyRef.current.getBoundingClientRect().top + window.scrollY,
+        );
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [virtualize, loading, showFilters, isEmpty]);
+
+  const virtualizer = useWindowVirtualizer({
+    count: virtualize ? data.length : 0,
+    estimateSize: () => 53,
+    overscan: 8,
+    scrollMargin,
+    getItemKey: (i) => data[i]?.id ?? i,
+  });
+  const virtualItems = virtualize ? virtualizer.getVirtualItems() : [];
+  const padTop =
+    virtualItems.length > 0 ? virtualItems[0].start - scrollMargin : 0;
+  const padBottom =
+    virtualItems.length > 0
+      ? virtualizer.getTotalSize() -
+        (virtualItems[virtualItems.length - 1].end - scrollMargin)
+      : 0;
+
   // Intersection Observer for infinite scroll
   useEffect(() => {
     // Only set up observer if we have data and more to load
@@ -1010,7 +1060,7 @@ export default function MusicTable({
               </TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody ref={tbodyRef}>
             {loading ? (
               <LoadingSkeleton />
             ) : data.length === 0 ? (
@@ -1025,6 +1075,45 @@ export default function MusicTable({
                   </div>
                 </TableCell>
               </TableRow>
+            ) : virtualize ? (
+              <>
+                {padTop > 0 && (
+                  <tr aria-hidden style={{ height: padTop }}>
+                    <td colSpan={6} className="p-0 border-0" />
+                  </tr>
+                )}
+                {virtualItems.map((vi) => {
+                  const music = data[vi.index];
+                  if (!music) return null;
+                  return (
+                    <MusicRow
+                      key={music.id}
+                      music={music}
+                      virtualIndex={vi.index}
+                      measureRef={virtualizer.measureElement}
+                      isAuthenticated={isAuthenticated}
+                      toggleFavorite={toggleFavorite}
+                      lists={nonFavoriteLists}
+                      onAddToList={addSongToList}
+                      onSongSelect={onSongSelect}
+                      animationDelay={
+                        vi.index >= batchStartIndex.current &&
+                        !animatedIds.current.has(music.id ?? "")
+                          ? Math.min(
+                              (vi.index - batchStartIndex.current) * 30,
+                              300,
+                            )
+                          : undefined
+                      }
+                    />
+                  );
+                })}
+                {padBottom > 0 && (
+                  <tr aria-hidden style={{ height: padBottom }}>
+                    <td colSpan={6} className="p-0 border-0" />
+                  </tr>
+                )}
+              </>
             ) : (
               data.map((music, index) => (
                 <MusicRow
