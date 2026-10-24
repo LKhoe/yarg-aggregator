@@ -155,6 +155,7 @@ async function extractPackageToMap(
           rename,
           opts,
           (msg) => log(msg, pp(20)),
+          (msg) => errors.push(msg),
         );
         if (extracted) counts.midi++;
       }
@@ -170,6 +171,7 @@ async function extractPackageToMap(
           rename,
           opts,
           (msg) => log(msg, pp(45)),
+          (msg) => errors.push(msg),
         );
         if (extracted) counts.mogg++;
       }
@@ -185,6 +187,7 @@ async function extractPackageToMap(
           rename,
           opts,
           (msg) => log(msg, pp(55)),
+          (msg) => errors.push(msg),
           true,
         );
         if (extracted) counts.png++;
@@ -201,6 +204,7 @@ async function extractPackageToMap(
           rename,
           opts,
           (msg) => log(msg, pp(65)),
+          (msg) => errors.push(msg),
         );
         if (extracted) counts.milo++;
       }
@@ -354,6 +358,7 @@ async function extractSingleFileToMap(
   rename: string,
   opts: ExtractionOptions,
   log: (msg: string) => void,
+  onError: (msg: string) => void,
   keep: boolean = false,
 ): Promise<boolean> {
   const dir = `songs/${internalName}${sublevel ? "/gen/" : "/"}${internalName}`;
@@ -361,7 +366,11 @@ async function extractSingleFileToMap(
 
   const entry = pkg.getFile(filePath);
   if (!entry) {
-    log(`Could not find ${extension.toUpperCase()} file: ${filePath}`);
+    const msg = `Could not find ${extension.toUpperCase()} file: ${filePath}`;
+    log(msg);
+    // Without the chart or the audio the song can't be played; album art
+    // and the milo are optional, so those stay in the log only.
+    if (extension === "mid" || extension === "mogg") onError(msg);
     return false;
   }
 
@@ -417,7 +426,9 @@ async function extractSingleFileToMap(
 
     return true;
   } catch (e) {
-    log(`Error extracting ${extension}: ${e}`);
+    const msg = `Error extracting ${filePath}: ${e}`;
+    log(msg);
+    onError(msg);
     return false;
   }
 }

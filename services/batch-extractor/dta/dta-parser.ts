@@ -506,9 +506,16 @@ function getSongPath(line: string): string {
   return match ? match[1] : "";
 }
 
+/**
+ * Folder name between "songs/" and the next "/" (e.g. "songs/foo/foo" → "foo").
+ * Port of DTAParser.GetInternalName(): keeps spaces and apostrophes.
+ */
 function getInternalName(line: string): string {
-  const match = line.match(/songs\/([^/\s"')]+)/);
-  return match ? match[1] : "";
+  const start = line.indexOf("songs/");
+  if (start < 0) return "";
+  const from = start + "songs/".length;
+  const end = line.indexOf("/", from);
+  return end < 0 ? "" : line.substring(from, end);
 }
 
 function extractSongID(line: string): string {

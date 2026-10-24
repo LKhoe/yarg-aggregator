@@ -178,12 +178,17 @@ export class STFSPackage {
 
   /**
    * Find a file entry by its virtual path (e.g., "songs/songs.dta").
+   * Case-insensitive, like the Xbox filesystem and STFSPackage.GetFile():
+   * the DTA path and the package folder names don't always share the same case.
    */
   getFile(path: string): ItemEntry | null {
-    const normalizedPath = path.replace(/\\/g, "/");
+    const wanted = path
+      .replace(/\\/g, "/")
+      .replace(/^\/+|\/+$/g, "")
+      .toLowerCase();
     for (const file of this.files) {
       const filePath = getEntryPath(file, this.folders);
-      if (filePath === normalizedPath) return file;
+      if (filePath.toLowerCase() === wanted) return file;
     }
     return null;
   }
@@ -198,6 +203,13 @@ export class STFSPackage {
     }
 
     const blocks = this.getBlocks(entry.blockCount, entry.startBlock);
+    // A chain that ends early or loops would yield a truncated file
+    // (FileEntry.ReadBlocks() fails in that case too).
+    if (blocks.length < entry.blockCount) {
+      throw new Error(
+        `Block chain for ${entry.name} is incomplete (${blocks.length}/${entry.blockCount} blocks)`,
+      );
+    }
     const chunks: Uint8Array[] = [];
 
     for (let i = 0; i < blocks.length; i++) {
