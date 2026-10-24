@@ -7,6 +7,7 @@ export interface SongMetadata {
   Artist: string;
   Album: string;
   Genre: string;
+  Subgenre: string;
   Year: string;
   Charter: string;
   Playlist: string;
@@ -22,7 +23,9 @@ export interface SongMetadata {
   PreviewEnd: bigint;
   VideoStart: bigint;
   VideoEnd: bigint;
+  CoveredBy: string;
   LoadingPhrase: string;
+  YearSecondary: string;
   LinkBandcamp: string;
   LinkBluesky: string;
   LinkFacebook: string;
@@ -50,6 +53,7 @@ export interface SongMetadata {
   CreditPublishedBy: string;
   CreditWrittenBy: string;
   // Charter info
+  CharterAudio: string;
   CharterBass: string;
   CharterDrums: string;
   CharterEliteDrums: string;
@@ -63,12 +67,19 @@ export interface SongMetadata {
   CharterVocals: string;
 }
 
+export interface ParseSettings {
+  HopoThreshold: bigint;
+  SustainCutoffThreshold: bigint;
+  OverdriveMidiNote: number;
+}
+
 export abstract class SongEntry {
   public _metadata: SongMetadata = {
     Name: "",
     Artist: "",
     Album: "",
     Genre: "",
+    Subgenre: "",
     Year: "",
     Charter: "",
     Playlist: "",
@@ -84,7 +95,9 @@ export abstract class SongEntry {
     PreviewEnd: BigInt(0),
     VideoStart: BigInt(0),
     VideoEnd: BigInt(0),
+    CoveredBy: "",
     LoadingPhrase: "",
+    YearSecondary: "",
     LinkBandcamp: "",
     LinkBluesky: "",
     LinkFacebook: "",
@@ -110,6 +123,7 @@ export abstract class SongEntry {
     CreditProducedBy: "",
     CreditPublishedBy: "",
     CreditWrittenBy: "",
+    CharterAudio: "",
     CharterBass: "",
     CharterDrums: "",
     CharterEliteDrums: "",
@@ -121,6 +135,12 @@ export abstract class SongEntry {
     CharterProGuitar: "",
     CharterVenue: "",
     CharterVocals: "",
+  };
+
+  public _settings: ParseSettings = {
+    HopoThreshold: BigInt(-1),
+    SustainCutoffThreshold: BigInt(-1),
+    OverdriveMidiNote: -1,
   };
 
   public _parts: AvailableParts = new AvailableParts();
@@ -144,6 +164,8 @@ export abstract class SongEntry {
     this._metadata.Artist = strings.Artists[stream.ReadInt32AsLittleEndian()];
     this._metadata.Album = strings.Albums[stream.ReadInt32AsLittleEndian()];
     this._metadata.Genre = strings.Genres[stream.ReadInt32AsLittleEndian()];
+    this._metadata.Subgenre =
+      strings.Subgenres[stream.ReadInt32AsLittleEndian()];
     this._metadata.Year = strings.Years[stream.ReadInt32AsLittleEndian()];
     this._metadata.Charter = strings.Charters[stream.ReadInt32AsLittleEndian()];
     this._metadata.Playlist =
@@ -167,7 +189,9 @@ export abstract class SongEntry {
     this._metadata.VideoStart = stream.ReadInt64AsLittleEndian();
     this._metadata.VideoEnd = stream.ReadInt64AsLittleEndian();
 
+    this._metadata.CoveredBy = stream.ReadString();
     this._metadata.LoadingPhrase = stream.ReadString();
+    this._metadata.YearSecondary = stream.ReadString();
 
     this._metadata.LinkBandcamp = stream.ReadString();
     this._metadata.LinkBluesky = stream.ReadString();
@@ -197,6 +221,7 @@ export abstract class SongEntry {
     this._metadata.CreditPublishedBy = stream.ReadString();
     this._metadata.CreditWrittenBy = stream.ReadString();
 
+    this._metadata.CharterAudio = stream.ReadString();
     this._metadata.CharterBass = stream.ReadString();
     this._metadata.CharterDrums = stream.ReadString();
     this._metadata.CharterEliteDrums = stream.ReadString();
@@ -204,16 +229,14 @@ export abstract class SongEntry {
     this._metadata.CharterKeys = stream.ReadString();
     this._metadata.CharterLowerDiff = stream.ReadString();
     this._metadata.CharterProBass = stream.ReadString();
+    this._metadata.CharterProKeys = stream.ReadString();
+    this._metadata.CharterProGuitar = stream.ReadString();
+    this._metadata.CharterVenue = stream.ReadString();
+    this._metadata.CharterVocals = stream.ReadString();
 
-    //this._metadata.CharterProKeys = stream.ReadString();
-    // Commented out in C# too
-    // _metadata.CharterProGuitar = stream.ReadString();
-    // _metadata.CharterVenue = stream.ReadString();
-    // _metadata.CharterVocals = stream.ReadString();
-
-    // Commented out in C# too
-    // _settings.HopoThreshold
-    // ...
+    this._settings.HopoThreshold = stream.ReadInt64AsLittleEndian();
+    this._settings.SustainCutoffThreshold = stream.ReadInt64AsLittleEndian();
+    this._settings.OverdriveMidiNote = stream.ReadInt32AsLittleEndian();
 
     // No hash recalc or setting sort strings needed for just reading.
   }

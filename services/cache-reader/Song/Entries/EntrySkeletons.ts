@@ -15,24 +15,6 @@ export enum EntryType {
   RBCON_Update,
 }
 
-export class SngEntry extends SongEntry {
-  public static TryDeserialize(
-    directory: string,
-    stream: FixedArrayStream,
-    strings: CacheReadStrings,
-  ): SngEntry | null {
-    return null;
-  }
-
-  public static ForceDeserialize(
-    directory: string,
-    stream: FixedArrayStream,
-    strings: CacheReadStrings,
-  ): SngEntry {
-    return new SngEntry();
-  }
-}
-
 export class CONFileListing {
   // Placeholder properties if used
   public PathIndex: number = 0;

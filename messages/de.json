@@ -99,6 +99,7 @@
     "deserializing": "Cache-Datei wird deserialisiert...",
     "noFileSelected": "Bitte wählen Sie zuerst eine Datei aus",
     "failedToDeserialize": "Fehler beim Deserialisieren der Cache-Datei",
+    "unsupportedVersion": "Nicht unterstützte Song-Cache-Version ({found}). Diese Seite liest Version {expected}; aktualisiere YARG, lass deine Songs neu scannen und lade dann den neuen Cache hoch.",
     "successLoaded": "{count} Lieder erfolgreich aus Cache geladen",
     "saveToDatabase": "In Datenbank speichern",
     "saveButton": "{count} Lieder in Datenbank speichern",

@@ -99,6 +99,7 @@
     "deserializing": "Desserializando archivo de caché...",
     "noFileSelected": "Por favor selecciona un archivo primero",
     "failedToDeserialize": "Falló la desserialización del archivo de caché",
+    "unsupportedVersion": "Versión de caché de canciones no compatible ({found}). Esta página lee la versión {expected}; actualiza YARG, deja que vuelva a escanear tus canciones y sube la caché nueva.",
     "successLoaded": "Cargadas exitosamente {count} canciones del caché",
     "saveToDatabase": "Guardar en Base de Datos",
     "saveButton": "Guardar {count} Canciones en Base de Datos",

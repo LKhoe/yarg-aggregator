@@ -1,10 +1,11 @@
 export enum DifficultyMask {
   None = 0,
-  Easy = 1 << 0,
-  Medium = 1 << 1,
-  Hard = 1 << 2,
-  Expert = 1 << 3,
-  ExpertPlus = 1 << 4,
+  Beginner = 1 << 0,
+  Easy = 1 << 1,
+  Medium = 1 << 2,
+  Hard = 1 << 3,
+  Expert = 1 << 4,
+  ExpertPlus = 1 << 5,
 }
 
 export class PartValues {

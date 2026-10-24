@@ -99,6 +99,7 @@
     "deserializing": "正在反序列化缓存文件...",
     "noFileSelected": "请先选择文件",
     "failedToDeserialize": "反序列化缓存文件失败",
+    "unsupportedVersion": "不支持的歌曲缓存版本（{found}）。此页面读取版本{expected}；请更新YARG并重新扫描歌曲，然后上传新的缓存。",
     "successLoaded": "成功从缓存加载{count}首歌曲",
     "saveToDatabase": "保存到数据库",
     "saveButton": "保存{count}首歌曲到数据库",

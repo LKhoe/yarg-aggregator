@@ -99,6 +99,7 @@
     "deserializing": "Desserializando arquivo de cache...",
     "noFileSelected": "Por favor, selecione um arquivo primeiro",
     "failedToDeserialize": "Falha ao desserializar arquivo de cache",
+    "unsupportedVersion": "Versão do cache de músicas não suportada ({found}). Esta página lê a versão {expected}; atualize o YARG, deixe ele escanear as músicas de novo e envie o cache novo.",
     "successLoaded": "Carregado com sucesso {count} músicas do cache",
     "saveToDatabase": "Salvar no Banco de Dados",
     "saveButton": "Salvar {count} Músicas no Banco de Dados",

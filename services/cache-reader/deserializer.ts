@@ -5,7 +5,7 @@ export default async function deserializeCache(
   cacheFile: File,
 ): Promise<SongEntry[]> {
   const handler = new CacheHandler();
-  await CacheHandler.QuickScan(handler, cacheFile, false);
+  await CacheHandler.QuickScan(handler, cacheFile);
   console.log("Quick scan successful!");
   console.log(`Found ${handler.cacheEntries.length} entries`);
   return handler.cacheEntries;

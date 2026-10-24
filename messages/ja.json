@@ -99,6 +99,7 @@
     "deserializing": "キャッシュファイルをデシリアライズ中...",
     "noFileSelected": "まずファイルを選択してください",
     "failedToDeserialize": "キャッシュファイルのデシリアライズに失敗しました",
+    "unsupportedVersion": "サポートされていない楽曲キャッシュのバージョンです（{found}）。このページはバージョン{expected}を読み込みます。YARGを更新して楽曲を再スキャンしてから、新しいキャッシュをアップロードしてください。",
     "successLoaded": "キャッシュから{count}曲を正常に読み込みました",
     "saveToDatabase": "データベースに保存",
     "saveButton": "{count}曲をデータベースに保存",

@@ -99,6 +99,7 @@
     "deserializing": "Desserialisation du fichier cache...",
     "noFileSelected": "Veuillez sélectionner un fichier d'abord",
     "failedToDeserialize": "Échec de la desserialisation du fichier cache",
+    "unsupportedVersion": "Version du cache de chansons non prise en charge ({found}). Cette page lit la version {expected} ; mettez YARG à jour, laissez-le réanalyser vos chansons, puis envoyez le nouveau cache.",
     "successLoaded": "{count} chansons chargées avec succès du cache",
     "saveToDatabase": "Sauvegarder dans la Base de Données",
     "saveButton": "Sauvegarder {count} Chansons dans la Base de Données",

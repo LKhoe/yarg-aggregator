@@ -2,7 +2,7 @@ import { FixedArrayStream } from "../../IO/FixedArray";
 import { CacheLoopable } from "./CacheLoopable";
 
 export class CacheReadStrings {
-  public static readonly NUM_CATEGORIES = 8;
+  public static readonly NUM_CATEGORIES = 9;
   private categories: string[][] = new Array(CacheReadStrings.NUM_CATEGORIES);
 
   constructor(stream: FixedArrayStream) {
@@ -30,16 +30,19 @@ export class CacheReadStrings {
   public get Genres(): string[] {
     return this.categories[3];
   }
-  public get Years(): string[] {
+  public get Subgenres(): string[] {
     return this.categories[4];
   }
-  public get Charters(): string[] {
+  public get Years(): string[] {
     return this.categories[5];
   }
-  public get Playlists(): string[] {
+  public get Charters(): string[] {
     return this.categories[6];
   }
-  public get Sources(): string[] {
+  public get Playlists(): string[] {
     return this.categories[7];
+  }
+  public get Sources(): string[] {
+    return this.categories[8];
   }
 }

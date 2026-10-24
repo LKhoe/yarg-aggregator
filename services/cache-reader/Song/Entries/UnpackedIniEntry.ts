@@ -1,29 +1,26 @@
 import { FixedArrayStream } from "../../IO/FixedArray";
 import { CacheReadStrings } from "../Cache/CacheReadStrings";
 import { AbridgedFileInfo } from "../../IO/AbridgedFileInfo";
-import { SongEntry } from "./SongEntry";
+import {
+  ChartFormat,
+  IniSubEntry,
+  chartFormatFromIndex,
+  joinCachePath,
+} from "./IniSubEntry";
 
-export enum ChartFormat {
-  Unknown = 0,
-}
+export { ChartFormat };
 
-export class UnpackedIniEntry extends SongEntry {
+export class UnpackedIniEntry extends IniSubEntry {
   public Directory: string;
   public ChartLastWrite: Date;
   public IniLastWrite?: Date;
   public Format: ChartFormat;
 
-  private static CHART_FILE_TYPES: { Filename: string; Format: number }[] = [
-    { Filename: "notes.chart", Format: 1 },
-    { Filename: "notes.mid", Format: 2 },
-    { Filename: "song.chart", Format: 1 },
-  ];
-
   constructor(
     directory: string,
     chartLastWrite: Date,
     iniLastWrite: Date | undefined,
-    format: number,
+    format: ChartFormat,
   ) {
     super();
     this.Directory = directory;
@@ -37,13 +34,8 @@ export class UnpackedIniEntry extends SongEntry {
     stream: FixedArrayStream,
     strings: CacheReadStrings,
   ): UnpackedIniEntry {
-    const subDir = stream.ReadString();
-    //const directory = path.join(baseDirectory, subDir);
-    const directory = [baseDirectory, subDir].join("/").replace(/\/+/g, "/");
-
-    const chartTypeIndex = stream.ReadByte();
-    const chart = UnpackedIniEntry.CHART_FILE_TYPES[chartTypeIndex];
-    const format = chart.Format;
+    const directory = joinCachePath(baseDirectory, stream.ReadString());
+    const format = chartFormatFromIndex(stream.ReadByte());
 
     const chartLastWrite = AbridgedFileInfo.DateTimeFromBinary(
       stream.ReadInt64AsLittleEndian(),
@@ -65,20 +57,4 @@ export class UnpackedIniEntry extends SongEntry {
     entry.Deserialize(stream, strings);
     return entry;
   }
-
-  // Override Deserialize if needed or rely on minimal valid read
-  // public Deserialize(stream: FixedArrayStream, strings: CacheReadStrings): void {
-  // base.Deserialize is called.
-  // If UnpackedIniEntry has ADDITIONAL fields to read, they should be read here.
-  // C# code showed: _year extraction etc.
-  // But for QuickScan structure, we MUST consume the exact amount of bytes.
-  // `UnpackedIniEntry` inherits `IniSubEntry`.
-  // `IniSubEntry` deserializes base, then... checks comments?
-  // In C# `IniSubEntry.Deserialize`:
-  // `base.Deserialize(ref stream, strings);`
-  // `// _background = stream.ReadString();` (commented out)
-  // `(_parsedYear, _yearAsNumber) = ParseYear(_metadata.Year);`
-  // So effectively, `UnpackedIniEntry` deserialization logic IS `SongEntry` deserialization logic for the stream part.
-  // So default inheritance is fine.
-  // }
 }

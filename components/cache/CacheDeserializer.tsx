@@ -40,6 +40,8 @@ import {
 import { toast } from "sonner";
 import { SongEntry } from "@/services/cache-reader/Song/Entries/SongEntry";
 import { UnpackedIniEntry } from "@/services/cache-reader/Song/Entries/UnpackedIniEntry";
+import { SngEntry } from "@/services/cache-reader/Song/Entries/SngEntry";
+import { CacheVersionError } from "@/services/cache-reader/Song/Cache/CacheHandler";
 import { AvailableParts } from "@/services/cache-reader/Song/Entries/AvailableParts";
 import deserializeCache from "@/services/cache-reader/deserializer";
 import {
@@ -108,6 +110,9 @@ function normalizeText(text: string): string {
 function getSongDirectory(entry: SongEntry): string {
   if (entry instanceof UnpackedIniEntry) {
     return entry.Directory;
+  }
+  if (entry instanceof SngEntry) {
+    return entry.Location;
   }
   return entry._metadata.Location || "";
 }
@@ -301,9 +306,14 @@ export default function CacheDeserializer() {
       }
     } catch (err) {
       const errorMessage =
-        err instanceof Error
-          ? err.message
-          : t("cacheDeserializer.failedToDeserialize");
+        err instanceof CacheVersionError
+          ? t("cacheDeserializer.unsupportedVersion", {
+              found: err.found,
+              expected: err.expected,
+            })
+          : err instanceof Error
+            ? err.message
+            : t("cacheDeserializer.failedToDeserialize");
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {

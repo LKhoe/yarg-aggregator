@@ -2,9 +2,9 @@ import { FixedArray, FixedArrayStream } from "../../IO/FixedArray";
 import { CacheReadStrings } from "./CacheReadStrings";
 import { CacheLoopable } from "./CacheLoopable";
 import { AbridgedFileInfo } from "../../IO/AbridgedFileInfo";
+import { SongEntry } from "../Entries/SongEntry";
+import { SngEntry } from "../Entries/SngEntry";
 import {
-  SongEntry,
-  SngEntry,
   QuickCONMods,
   PackedRBCONEntry,
   UnpackedRBCONEntry,
@@ -21,8 +21,25 @@ export class ScanProgressTracker {
   public BadSongCount: number = 0;
 }
 
+// Matches CONEntryGroup.CONEntryType in YARG.Core
+export enum CONEntryType {
+  PackedCONEntry = 0,
+  UnpackedCONEntry = 1,
+  UnpackedPKGEntry = 2,
+}
+
+export class CacheVersionError extends Error {
+  constructor(
+    public readonly found: number,
+    public readonly expected: number,
+  ) {
+    super(`Unsupported song cache version ${found} (expected ${expected})`);
+    this.name = "CacheVersionError";
+  }
+}
+
 export class CacheHandler {
-  private static readonly CACHE_VERSION = 25031401; // 25_03_14_01
+  public static readonly CACHE_VERSION = 26042800; // 26_04_28_00
   private static _progress: ScanProgressTracker = new ScanProgressTracker();
 
   public cacheEntries: SongEntry[] = [];
@@ -35,18 +52,17 @@ export class CacheHandler {
   public static async QuickScan(
     handler: CacheHandler,
     cacheLocation: File,
-    fullDirectoryPlaylists: boolean,
   ): Promise<boolean> {
     try {
-      const cacheFile = await CacheHandler.LoadCacheToMemory(
-        cacheLocation,
-        fullDirectoryPlaylists,
-      );
+      const cacheFile = await CacheHandler.LoadCacheToMemory(cacheLocation);
       if (cacheFile != null) {
         // _progress.Stage = ScanStage.LoadingCache;
         handler.Deserialize_Quick(cacheFile);
       }
     } catch (ex) {
+      if (ex instanceof CacheVersionError) {
+        throw ex;
+      }
       console.error("Error occurred during quick cache file read!", ex);
     }
 
@@ -59,7 +75,6 @@ export class CacheHandler {
 
   private static async LoadCacheToMemory(
     cacheLocation: File,
-    fullDirectoryPlaylists: boolean,
   ): Promise<FixedArray | null> {
     // File object - check if it exists and has content
     if (cacheLocation.size === 0) {
@@ -81,16 +96,11 @@ export class CacheHandler {
     const version = view.getInt32(0, true);
 
     if (version !== CacheHandler.CACHE_VERSION) {
-      console.log("Cache outdated");
-      return null;
+      throw new CacheVersionError(version, CacheHandler.CACHE_VERSION);
     }
 
-    const fullDirFlag = view.getUint8(4) !== 0;
-    if (fullDirFlag !== fullDirectoryPlaylists) {
-      console.log("FullDirectoryFlag flipped");
-      return null;
-    }
-
+    // Byte 4 is the "full directory playlists" flag. The game rescans when it
+    // flips, but it only changes playlist names, so a read-only view ignores it.
     // Skip first 5 bytes
     const data = buffer.subarray(5);
     return new FixedArray(data);
@@ -204,11 +214,16 @@ export class CacheHandler {
     strings: CacheReadStrings,
   ): void {
     const root = AbridgedFileInfo.FromStream(stream);
-    const packed = stream.ReadBoolean();
+    const type: CONEntryType = stream.ReadInt32AsLittleEndian();
 
     let listings: CONFileListing[] | null = null;
-    if (packed) {
+    if (type === CONEntryType.PackedCONEntry) {
       listings = this.GetCacheCONListings(root.FullName);
+    } else if (
+      type !== CONEntryType.UnpackedCONEntry &&
+      type !== CONEntryType.UnpackedPKGEntry
+    ) {
+      throw new Error(`Invalid CON entry type ${type} in cache!`);
     }
 
     const loop = new CacheLoopable(stream);
@@ -216,15 +231,23 @@ export class CacheHandler {
       const name = node.Slice.ReadString();
       const index = node.Slice.ReadByte();
 
-      const entry = packed
-        ? PackedRBCONEntry.ForceDeserialize(
-            listings,
-            root,
-            name,
-            node.Slice,
-            strings,
-          )
-        : UnpackedRBCONEntry.ForceDeserialize(root, name, node.Slice, strings);
+      // Unpacked PKG entries share the unpacked CON layout (subName, midi
+      // last write, then the RBCON fields); only the file extensions differ.
+      const entry =
+        type === CONEntryType.PackedCONEntry
+          ? PackedRBCONEntry.ForceDeserialize(
+              listings,
+              root,
+              name,
+              node.Slice,
+              strings,
+            )
+          : UnpackedRBCONEntry.ForceDeserialize(
+              root,
+              name,
+              node.Slice,
+              strings,
+            );
 
       const mods = this.cacheCONModifications.get(name);
       if (mods) {
