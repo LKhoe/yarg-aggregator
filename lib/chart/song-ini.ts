@@ -72,3 +72,28 @@ function getSongLengthMs(chart: ChartData): number {
 
   return Math.round(time * 1000);
 }
+
+/**
+ * Read the metadata fields the editor knows from a song.ini.
+ * Only non-empty values are returned; `delay` (ms) becomes `offset` (seconds).
+ */
+export function parseSongIni(text: string): Partial<ChartData["metadata"]> {
+  const kv: Record<string, string> = {};
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("[") || line.startsWith(";") || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    kv[line.slice(0, eq).trim().toLowerCase()] = line.slice(eq + 1).trim();
+  }
+
+  const result: Partial<ChartData["metadata"]> = {};
+  const clip = (v: string | undefined) => (v ? v.slice(0, 200) : "");
+  for (const key of ["name", "artist", "album", "genre", "year", "charter"] as const) {
+    const value = clip(kv[key] ?? (key === "charter" ? kv["frets"] : undefined));
+    if (value) result[key] = value;
+  }
+  const delay = Number(kv["delay"]);
+  if (Number.isFinite(delay) && delay !== 0) result.offset = delay / 1000;
+  return result;
+}

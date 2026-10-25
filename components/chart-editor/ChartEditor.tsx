@@ -16,6 +16,7 @@ import {
   DIFFICULTY_ORDER,
   INSTRUMENT_ORDER,
 } from "@/lib/chart/types";
+import type { Difficulty } from "@/lib/chart/types";
 import { parseChart } from "@/lib/chart/parser-chart";
 import { parseMidi } from "@/lib/chart/parser-midi";
 import { computeWaveform, type WaveformData } from "@/lib/chart/waveform";
@@ -49,11 +50,17 @@ import { AutoReduceDialog } from "./AutoReduceDialog";
 import { BpmDetectDialog } from "./BpmDetectDialog";
 import { GlobalView } from "./GlobalView";
 import { NamePromptDialog } from "./NamePromptDialog";
+import { MetadataDialog } from "./MetadataDialog";
+import { classifySongFiles, collectDroppedFiles } from "./song-files";
+import { parseSongIni } from "@/lib/chart/song-ini";
+import { downloadChart } from "@/lib/chart/serializer-chart";
+import { downloadMidi } from "@/lib/chart/serializer-midi";
+import { toast } from "sonner";
 import { MetronomeScheduler, ClapScheduler } from "@/lib/chart/metronome";
 import { autoReduceDifficulty } from "@/lib/chart/auto-reduce";
 import { computeDensityHeatmap } from "@/lib/chart/statistics";
 import { Button } from "@/components/ui/button";
-import { Download, Volume2, VolumeX } from "lucide-react";
+import { Download, Info, Save, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ───────────────────────── Stem model ────────────────────────────
@@ -129,8 +136,9 @@ type EditAction =
   | { type: "SET_LYRICS"; lyrics: import("@/lib/chart/types").LyricEvent[] }
   // Copy/paste
   | { type: "PASTE_NOTES"; track: TrackKey; notes: Note[] }
-  // Auto-reduce / track replacement
-  | { type: "SET_TRACK"; trackKey: TrackKey; track: import("@/lib/chart/types").Track };
+  // Auto-reduce / track replacement / new empty track
+  | { type: "SET_TRACK"; trackKey: TrackKey; track: import("@/lib/chart/types").Track }
+  | { type: "SET_METADATA"; metadata: ChartData["metadata"] };
 
 export interface NotePosition {
   id: string;
@@ -144,6 +152,10 @@ function clampFret(instrument: Instrument, fret: number): number {
     instrument === "Vocals" || instrument === "Harmony1" || instrument === "Harmony2" || instrument === "Harmony3";
   if (!isVocals) return Math.max(0, Math.min(4, fret));
   return fret >= 84 ? Math.min(97, Math.max(96, fret)) : Math.max(36, Math.min(83, fret));
+}
+
+function emptyTrack(difficulty: Difficulty, instrument: Instrument): import("@/lib/chart/types").Track {
+  return { difficulty, instrument, notes: [], phrases: [] };
 }
 
 // Next/previous grid line from `tick` (an off-grid tick moves to the nearest line in that direction)
@@ -417,6 +429,9 @@ function applyAction(chart: ChartData, action: EditAction): ChartData {
       };
     }
 
+    case "SET_METADATA":
+      return { ...chart, metadata: action.metadata };
+
     case "SET_TRACK": {
       return {
         ...chart,
@@ -589,6 +604,12 @@ export function ChartEditor() {
 
   // Validation & Statistics panels
   const [showValidation, setShowValidation] = useState(false);
+
+  // Song info (metadata) dialog
+  const [showMetadata, setShowMetadata] = useState(false);
+
+  // Chart as of the last save or load: anything else is unsaved work
+  const [savedChart, setSavedChart] = useState<ChartData>(INITIAL_CHART);
   const [showStatistics, setShowStatistics] = useState(false);
 
   // Ghost notes (difficulty reference overlay)
@@ -622,6 +643,8 @@ export function ChartEditor() {
 
   // Visualization mode (waveform vs mel spectrogram)
   const [vizMode, setVizMode] = useState<"waveform" | "spectrogram" | "none">("waveform");
+  const vizModeRef = useRef(vizMode);
+  useEffect(() => { vizModeRef.current = vizMode; }, [vizMode]);
   const [spectrograms, setSpectrograms] = useState<Map<string, SpectrogramData>>(new Map());
   const [spectrogramLoading, setSpectrogramLoading] = useState(false);
   const spectrogramsRef = useRef(spectrograms);
@@ -828,45 +851,31 @@ export function ChartEditor() {
     return () => cancelAnimationFrame(rafRef.current);
   }, [isPlaying]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Chart file upload
-  const handleChartFile = useCallback(async (file: File) => {
-    setChartFileName(file.name);
-    const text = await file.text();
-    const ext = file.name.toLowerCase();
-    let parsed: ChartData;
-    if (ext.endsWith(".chart")) {
-      parsed = parseChart(text);
-    } else if (ext.endsWith(".mid") || ext.endsWith(".midi")) {
-      const buf = await file.arrayBuffer();
-      parsed = parseMidi(buf);
-    } else {
-      return;
-    }
-    dispatch({ type: "DO", action: { type: "SET_CHART", chart: parsed } });
-    setCurrentTick(0);
-    setIsPlaying(false);
-    setSelectedNoteIds(new Set());
-
-    if (stemsRef.current.size > 0) {
-      const newStems = new Map<string, AudioStem>();
+  // Waveforms (and spectrograms) map audio samples to ticks through the tempo map
+  // and offset, so redo them when either changes. Debounced: BPM drags commit often.
+  useEffect(() => {
+    if (stemsRef.current.size === 0) return;
+    const timer = setTimeout(() => {
+      const current = chartRef.current;
+      const next = new Map<string, AudioStem>();
       for (const [label, stem] of stemsRef.current) {
-        newStems.set(label, {
-          ...stem,
-          waveform: computeWaveform(stem.buffer, parsed),
-        });
+        next.set(label, { ...stem, waveform: computeWaveform(stem.buffer, current) });
       }
-      setTimeout(() => {
-        setStems(newStems);
-        setSpectrograms(new Map()); // clear spectrograms — tempo map changed
-      }, 0);
-    }
-  }, []);
+      const specs = new Map<string, SpectrogramData>();
+      if (vizModeRef.current === "spectrogram") {
+        for (const [label, stem] of next) specs.set(label, computeSpectrogram(stem.buffer, current));
+      }
+      setStems(next);
+      setSpectrograms(specs);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [chart.syncTrack, chart.metadata.offset, chart.metadata.resolution]);
 
   // Audio files upload (multiple stems) — decode all files in parallel
   const handleAudioFiles = useCallback(async (files: File[]) => {
     const ctx = getAudioCtx();
     const currentChart = chartRef.current;
-    const results = await Promise.all(
+    const settled = await Promise.allSettled(
       files.map(async (file) => {
         const label = inferStemLabel(file.name);
         const buf = await file.arrayBuffer();
@@ -875,6 +884,15 @@ export function ChartEditor() {
         return { label, buffer: decoded, waveform };
       })
     );
+    // One unreadable file shouldn't drop the others
+    const results = settled.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
+    const failed = files.filter((_, i) => settled[i].status === "rejected").map((f) => f.name);
+    if (failed.length > 0) {
+      toast.error(`Could not decode ${failed.join(", ")}`, {
+        description: "The browser can't read this audio file. Try OGG, MP3 or WAV.",
+      });
+    }
+    if (results.length === 0) return;
     setStems((prev) => {
       const next = new Map(prev);
       for (const { label, buffer, waveform } of results) {
@@ -998,6 +1016,111 @@ export function ChartEditor() {
     if (isPlayingRef.current) startAudioAt(target);
   }, [stopAudio, startAudioAt]);
   handleSeekStableRef.current = handleSeek;
+
+  // Load a chart file, filling empty metadata from song.ini when given. Failures are shown, not swallowed.
+  const loadChartFile = useCallback(async (file: File, songIni?: File) => {
+    const lower = file.name.toLowerCase();
+    let parsed: ChartData;
+    // The parser falls back to 120 BPM, so "has a tempo map" means the file declared one
+    let hasSyncTrack = true;
+    try {
+      if (lower.endsWith(".chart")) {
+        const text = await file.text();
+        hasSyncTrack = /^\s*\[SyncTrack\]/im.test(text);
+        parsed = parseChart(text);
+      } else if (lower.endsWith(".mid") || lower.endsWith(".midi")) parsed = parseMidi(await file.arrayBuffer());
+      else {
+        toast.error(`${file.name} is not a chart file`, { description: "Use a .chart or .mid / .midi file." });
+        return;
+      }
+    } catch (err) {
+      toast.error(`Could not read ${file.name}`, {
+        description: err instanceof Error ? err.message : "The file is damaged or in an unknown format.",
+      });
+      return;
+    }
+
+    if (Object.keys(parsed.tracks).length === 0) {
+      if (!hasSyncTrack || parsed.syncTrack.bpmEvents.length === 0) {
+        toast.error(`Could not read ${file.name}`, { description: "No tempo map and no instrument tracks were found." });
+        return;
+      }
+      // A tempo map without notes (e.g. a freshly saved new chart): start an empty Guitar track
+      parsed = { ...parsed, tracks: { ExpertSingle: emptyTrack("Expert", "Single") } };
+    }
+    if (parsed.syncTrack.bpmEvents.length === 0) {
+      parsed = { ...parsed, syncTrack: { ...parsed.syncTrack, bpmEvents: [{ tick: 0, bpm: 120 }] } };
+    }
+    if (parsed.syncTrack.timeSignatures.length === 0) {
+      parsed = { ...parsed, syncTrack: { ...parsed.syncTrack, timeSignatures: [{ tick: 0, numerator: 4, denominator: 4 }] } };
+    }
+
+    if (songIni) {
+      try {
+        const ini = parseSongIni(await songIni.text());
+        const metadata = { ...parsed.metadata };
+        for (const key of ["name", "artist", "album", "genre", "year", "charter"] as const) {
+          if (!metadata[key] && ini[key]) metadata[key] = ini[key];
+        }
+        if (metadata.offset === 0 && ini.offset !== undefined) metadata.offset = ini.offset;
+        parsed = { ...parsed, metadata };
+      } catch {
+        toast.warning("song.ini could not be read; using the chart's own metadata");
+      }
+    }
+
+    stopAudio();
+    isPlayingRef.current = false;
+    setIsPlaying(false);
+    setChartFileName(file.name);
+    dispatch({ type: "DO", action: { type: "SET_CHART", chart: parsed } });
+    setSavedChart(parsed);
+    setCurrentTick(0);
+    setSelectedNoteIds(new Set());
+  }, [stopAudio]);
+
+  // A whole song folder or several files at once: chart + stems + song.ini
+  const handleSongFiles = useCallback(async (files: File[]) => {
+    const { chart: chartFile, audio, songIni } = classifySongFiles(files);
+    if (!chartFile && audio.length === 0) {
+      toast.error("No chart or audio files found", {
+        description: "Expected notes.chart or notes.mid, plus .ogg / .mp3 / .wav / .flac / .opus stems.",
+      });
+      return;
+    }
+    if (chartFile) await loadChartFile(chartFile, songIni);
+    if (audio.length > 0) await handleAudioFiles(audio);
+  }, [loadChartFile, handleAudioFiles]);
+
+  // Start from scratch (e.g. only audio is loaded): 120 BPM, 4/4, an empty Expert Guitar track
+  const handleNewChart = useCallback(() => {
+    const fresh: ChartData = {
+      ...INITIAL_CHART,
+      tracks: { ExpertSingle: emptyTrack("Expert", "Single") },
+    };
+    dispatch({ type: "DO", action: { type: "SET_CHART", chart: fresh } });
+    setSavedChart(fresh);
+    setChartFileName(undefined);
+    setSelectedTrack("ExpertSingle");
+    setSelectedNoteIds(new Set());
+    setCurrentTick(0);
+    setShowMetadata(true);
+  }, []);
+
+  // Save = download in the format it was loaded in (YARG/Clone Hero read notes.chart / notes.mid)
+  const handleSave = useCallback(() => {
+    const current = chartRef.current;
+    if (Object.keys(current.tracks).length === 0) return;
+    const fileName = chartFileName ?? "notes.chart";
+    if (/\.midi?$/i.test(fileName)) downloadMidi(current, fileName);
+    else downloadChart(current, fileName);
+    setSavedChart(current);
+    try {
+      localStorage.setItem("chart-editor-autosave", JSON.stringify(current));
+      localStorage.setItem("chart-editor-autosave-time", Date.now().toString());
+    } catch { /* storage full, ignore */ }
+    toast.success(`Saved ${fileName}`, { description: "Downloaded to your browser's download folder." });
+  }, [chartFileName]);
 
   // Live speed change
   useEffect(() => {
@@ -1204,6 +1327,11 @@ export function ChartEditor() {
       }
 
       if (e.ctrlKey || e.metaKey) {
+        if (e.key === "s" || e.key === "S") {
+          e.preventDefault();
+          handleSave();
+          return;
+        }
         if (e.key === "a") {
           // Select all notes in current track
           if (track) {
@@ -1490,11 +1618,47 @@ export function ChartEditor() {
   }, [
     handlePlayPause,
     handleSeek,
+    handleSave,
     snapDivision,
     bookmarks,
   ]);
 
   const hasChart   = Object.keys(chart.tracks).length > 0;
+  const isDirty    = hasChart && chart !== savedChart;
+
+  // Warn before closing or reloading the tab with unsaved work
+  useEffect(() => {
+    if (!isDirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isDirty]);
+
+  // In-app navigation doesn't fire beforeunload: write the autosave when the editor unmounts
+  const isDirtyRef = useRef(isDirty);
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+  useEffect(() => () => {
+    if (!isDirtyRef.current) return;
+    try {
+      localStorage.setItem("chart-editor-autosave", JSON.stringify(chartRef.current));
+      localStorage.setItem("chart-editor-autosave-time", Date.now().toString());
+    } catch { /* storage full, ignore */ }
+  }, []);
+
+  const handleCreateTrack = useCallback((key: TrackKey) => {
+    const parsed = parseTrackKey(key);
+    if (!parsed || chartRef.current.tracks[key]) return;
+    dispatch({ type: "DO", action: { type: "SET_TRACK", trackKey: key, track: emptyTrack(parsed.difficulty, parsed.instrument) } });
+    setSelectedTrack(key);
+    setSelectedNoteIds(new Set());
+  }, []);
+
+  const handleSaveMetadata = useCallback((metadata: ChartData["metadata"]) => {
+    dispatch({ type: "DO", action: { type: "SET_METADATA", metadata } });
+  }, []);
   const tempoMap   = useMemo(() => buildTempoMap(chart), [chart.syncTrack]);
   const bpm        = getBpmAtTick(currentTick, tempoMap);
   const totalTicks = useMemo(() => getChartDurationTicks(chart), [chart.tracks, chart.syncTrack]);
@@ -1839,15 +2003,46 @@ export function ChartEditor() {
   }, [selectedTrack, stems]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div
+      className="flex flex-col h-full"
+      // Drop a song folder (or chart + stems + song.ini) anywhere on the editor
+      onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }}
+      onDrop={async (e) => {
+        if (!e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        handleSongFiles(await collectDroppedFiles(e.dataTransfer));
+      }}
+    >
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-2 border-b bg-background">
-        <div>
-          <h1 className="text-sm font-semibold">
-            {chart.metadata.name
-              ? `${chart.metadata.artist} — ${chart.metadata.name}`
-              : "Chart Editor"}
-          </h1>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            {hasChart ? (
+              <button
+                className="text-sm font-semibold truncate hover:underline text-left"
+                onClick={() => setShowMetadata(true)}
+                title="Edit song info"
+              >
+                {chart.metadata.name
+                  ? `${chart.metadata.artist || "Unknown artist"} — ${chart.metadata.name}`
+                  : "Untitled chart"}
+              </button>
+            ) : (
+              <h1 className="text-sm font-semibold">Chart Editor</h1>
+            )}
+            {hasChart && (
+              <span
+                className={cn(
+                  "flex items-center gap-1 text-[10px] shrink-0",
+                  isDirty ? "text-amber-400" : "text-muted-foreground"
+                )}
+                title={isDirty ? "Changes since the last save (Ctrl+S)" : "No changes since the last save"}
+              >
+                <span className={cn("h-1.5 w-1.5 rounded-full", isDirty ? "bg-amber-400" : "bg-muted-foreground/50")} />
+                {isDirty ? "Unsaved changes" : "Saved"}
+              </span>
+            )}
+          </div>
           {chart.metadata.charter && (
             <p className="text-xs text-muted-foreground">
               Charter: {chart.metadata.charter}
@@ -1855,6 +2050,16 @@ export function ChartEditor() {
           )}
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1"
+            onClick={() => setShowMetadata(true)}
+            disabled={!hasChart}
+          >
+            <Info className="h-3 w-3" />
+            Song info
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -1883,14 +2088,26 @@ export function ChartEditor() {
             <Download className="h-3 w-3" />
             Export
           </Button>
+          <Button
+            size="sm"
+            className="h-7 text-xs gap-1"
+            onClick={handleSave}
+            disabled={!hasChart}
+            title={`Download ${chartFileName ?? "notes.chart"} (Ctrl+S)`}
+          >
+            <Save className="h-3 w-3" />
+            Save
+          </Button>
         </div>
       </div>
 
       {!hasChart ? (
         <div className="flex-1">
           <FileUpload
-            onChartFile={handleChartFile}
+            onChartFile={(file) => loadChartFile(file)}
             onAudioFiles={handleAudioFiles}
+            onSongFiles={handleSongFiles}
+            onNewChart={handleNewChart}
             chartFileName={chartFileName}
             stems={stems}
           />
@@ -1953,6 +2170,7 @@ export function ChartEditor() {
             onSelectTrack={handleSelectTrack}
             ghostTrackKey={ghostTrackKey}
             onGhostTrackChange={setGhostTrackKey}
+            onCreateTrack={handleCreateTrack}
           />
 
           {/* Global minimap */}
@@ -2150,7 +2368,8 @@ export function ChartEditor() {
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) handleChartFile(f);
+                  if (f) loadChartFile(f);
+                  e.target.value = "";
                 }}
               />
               {chartFileName ? `Chart: ${chartFileName}` : "Load chart…"}
@@ -2217,6 +2436,15 @@ export function ChartEditor() {
         open={exportOpen}
         onOpenChange={setExportOpen}
         chart={chart}
+        fileName={chartFileName}
+        onExported={(format) => { if (format !== "songini") setSavedChart(chart); }}
+        onShowValidation={() => { setExportOpen(false); setShowValidation(true); }}
+      />
+      <MetadataDialog
+        open={showMetadata}
+        onOpenChange={setShowMetadata}
+        metadata={chart.metadata}
+        onSave={handleSaveMetadata}
       />
       <ShortcutsPanel
         open={showShortcuts}

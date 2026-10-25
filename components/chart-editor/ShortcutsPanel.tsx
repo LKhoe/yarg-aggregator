@@ -108,8 +108,9 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     ],
   },
   {
-    category: "History",
+    category: "File & History",
     shortcuts: [
+      { key: "Ctrl+S", description: "Save (downloads the chart file)" },
       { key: "Ctrl+Z", description: "Undo" },
       { key: "Ctrl+Y / Ctrl+Shift+Z", description: "Redo" },
     ],

@@ -2,8 +2,8 @@
 
 import { memo } from "react";
 import { Button } from "@/components/ui/button";
-import { Eye, EyeOff } from "lucide-react";
-import type { ChartData, Difficulty, Instrument, TrackKey } from "@/lib/chart/types";
+import { Eye, EyeOff, Plus } from "lucide-react";
+import type { ChartData, TrackKey } from "@/lib/chart/types";
 import {
   DIFFICULTY_ORDER,
   INSTRUMENT_ORDER,
@@ -17,6 +17,8 @@ export interface TrackSelectorProps {
   onSelectTrack: (key: TrackKey) => void;
   ghostTrackKey?: TrackKey | null;
   onGhostTrackChange?: (key: TrackKey | null) => void;
+  // Create an empty track for a missing instrument/difficulty
+  onCreateTrack?: (key: TrackKey) => void;
 }
 
 export const TrackSelector = memo(function TrackSelector({
@@ -25,6 +27,7 @@ export const TrackSelector = memo(function TrackSelector({
   onSelectTrack,
   ghostTrackKey,
   onGhostTrackChange,
+  onCreateTrack,
 }: TrackSelectorProps) {
   // Find which instruments have at least one difficulty
   const availableInstruments = INSTRUMENT_ORDER.filter((inst) =>
@@ -45,6 +48,8 @@ export const TrackSelector = memo(function TrackSelector({
         ),
       }
     : null;
+
+  const missingInstruments = INSTRUMENT_ORDER.filter((inst) => !availableInstruments.includes(inst));
 
   const selectedInstrument = selectedParsed?.instrument ?? null;
   const selectedDifficulty = selectedParsed?.difficulty ?? null;
@@ -76,6 +81,21 @@ export const TrackSelector = memo(function TrackSelector({
             {INSTRUMENT_LABELS[inst]}
           </Button>
         ))}
+        {onCreateTrack && missingInstruments.length > 0 && (
+          <select
+            aria-label="Add instrument"
+            value=""
+            onChange={(e) => {
+              if (e.target.value) onCreateTrack(makeTrackKey("Expert", e.target.value as (typeof missingInstruments)[number]));
+            }}
+            className="h-7 rounded-md border border-dashed bg-transparent px-2 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+          >
+            <option value="">+ Instrument</option>
+            {missingInstruments.map((inst) => (
+              <option key={inst} value={inst}>{INSTRUMENT_LABELS[inst]}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Difficulty tabs */}
@@ -84,6 +104,21 @@ export const TrackSelector = memo(function TrackSelector({
           {DIFFICULTY_ORDER.map((diff) => {
             const key = makeTrackKey(diff, selectedInstrument);
             const exists = !!chart.tracks[key];
+            if (!exists && onCreateTrack) {
+              return (
+                <Button
+                  key={diff}
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs h-6 gap-0.5 border border-dashed text-muted-foreground"
+                  onClick={() => onCreateTrack(key)}
+                  title={`Create an empty ${diff} track (Auto-reduce can fill it from a harder one)`}
+                >
+                  <Plus className="h-3 w-3" />
+                  {diff}
+                </Button>
+              );
+            }
             return (
               <Button
                 key={diff}
