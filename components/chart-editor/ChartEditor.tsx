@@ -24,9 +24,11 @@ import {
   buildTempoMap,
   getBpmAtTick,
   getChartDurationTicks,
+  secondsToTick,
   snapDivisionToTicks,
   snapToGrid,
   tickToSeconds,
+  type TempoPoint,
 } from "@/lib/chart/tempo-utils";
 import { FileUpload } from "./FileUpload";
 import { Toolbar } from "./Toolbar";
@@ -97,6 +99,8 @@ type EditAction =
     }
   | { type: "RESIZE_NOTE"; track: TrackKey; id: string; newLength: number }
   | { type: "UPDATE_NOTE"; track: TrackKey; note: Note }
+  // Absolute positions (note drag: computed from the drag origin, so clamping is lossless)
+  | { type: "SET_NOTE_POSITIONS"; track: TrackKey; positions: NotePosition[] }
   | { type: "SET_CHART"; chart: ChartData }
   // BPM / Tempo map
   | { type: "ADD_BPM"; tick: number; bpm: number }
@@ -121,6 +125,47 @@ type EditAction =
   | { type: "PASTE_NOTES"; track: TrackKey; notes: Note[] }
   // Auto-reduce / track replacement
   | { type: "SET_TRACK"; trackKey: TrackKey; track: import("@/lib/chart/types").Track };
+
+export interface NotePosition {
+  id: string;
+  tick: number;
+  fret: number;
+}
+
+// Vocals use MIDI pitches (36–83, plus 96/97 percussion); everything else uses fret 0–4
+function clampFret(instrument: Instrument, fret: number): number {
+  const isVocals =
+    instrument === "Vocals" || instrument === "Harmony1" || instrument === "Harmony2" || instrument === "Harmony3";
+  if (!isVocals) return Math.max(0, Math.min(4, fret));
+  return fret >= 84 ? Math.min(97, Math.max(96, fret)) : Math.max(36, Math.min(83, fret));
+}
+
+// Next/previous grid line from `tick` (an off-grid tick moves to the nearest line in that direction)
+function gridStep(tick: number, gridTicks: number, direction: 1 | -1): number {
+  const index = tick / gridTicks;
+  const next = direction === 1 ? Math.floor(index + 1e-6) + 1 : Math.ceil(index - 1e-6) - 1;
+  return Math.max(0, next * gridTicks);
+}
+
+// Next/previous measure line from `tick`, following time signature changes
+function measureStep(chart: ChartData, tick: number, direction: 1 | -1): number {
+  const resolution = chart.metadata.resolution || 192;
+  const sigs = [...chart.syncTrack.timeSignatures].sort((a, b) => a.tick - b.tick);
+  // Going back from a signature change, measure with the signature before it
+  const probe = direction === 1 ? tick : tick - 1;
+  let sig = { tick: 0, numerator: 4, denominator: 4 };
+  for (const s of sigs) {
+    if (s.tick <= probe) sig = s;
+    else break;
+  }
+  const measureTicks = (resolution * 4 * sig.numerator) / sig.denominator;
+  const target = sig.tick + gridStep(tick - sig.tick, measureTicks, direction);
+  if (direction === 1) {
+    const nextSig = sigs.find((s) => s.tick > tick);
+    if (nextSig && nextSig.tick < target) return nextSig.tick;
+  }
+  return Math.max(0, Math.round(target));
+}
 
 function applyAction(chart: ChartData, action: EditAction): ChartData {
   switch (action.type) {
@@ -159,18 +204,29 @@ function applyAction(chart: ChartData, action: EditAction): ChartData {
       const track = chart.tracks[action.track];
       if (!track) return chart;
       const idSet = new Set(action.ids);
-      const isVocalsTrack = track.instrument === "Vocals";
       const notes = track.notes.map((n) => {
         if (!idSet.has(n.id)) return n;
-        const newFret = n.fret + action.deltaFret;
-        const clampedFret = isVocalsTrack
-          ? (newFret >= 84 ? Math.min(97, Math.max(96, newFret)) : Math.max(36, Math.min(83, newFret)))
-          : Math.max(0, Math.min(4, newFret));
         return {
           ...n,
           tick: Math.max(0, n.tick + action.deltaTick),
-          fret: clampedFret,
+          fret: clampFret(track.instrument, n.fret + action.deltaFret),
         };
+      });
+      notes.sort((a, b) => a.tick - b.tick);
+      return {
+        ...chart,
+        tracks: { ...chart.tracks, [action.track]: { ...track, notes } },
+      };
+    }
+
+    case "SET_NOTE_POSITIONS": {
+      const track = chart.tracks[action.track];
+      if (!track) return chart;
+      const byId = new Map(action.positions.map((p) => [p.id, p]));
+      const notes = track.notes.map((n) => {
+        const p = byId.get(n.id);
+        if (!p) return n;
+        return { ...n, tick: Math.max(0, p.tick), fret: clampFret(track.instrument, p.fret) };
       });
       notes.sort((a, b) => a.tick - b.tick);
       return {
@@ -205,8 +261,9 @@ function applyAction(chart: ChartData, action: EditAction): ChartData {
           ...chart.tracks,
           [action.track]: {
             ...track,
+            // Merge so fields the caller didn't send (flags) survive the edit
             notes: track.notes
-              .map((n) => (n.id === action.note.id ? action.note : n))
+              .map((n) => (n.id === action.note.id ? { ...n, ...action.note } : n))
               .sort((a, b) => a.tick - b.tick),
           },
         },
@@ -350,14 +407,19 @@ function applyAction(chart: ChartData, action: EditAction): ChartData {
 
 // ─────────────────────── History reducer ─────────────────────────
 
+const HISTORY_LIMIT = 100;
+
 interface HistoryState {
   past: ChartData[];
   present: ChartData;
   future: ChartData[];
+  // Gesture of the last DO; consecutive DOs with the same key share one undo step
+  coalesceKey: string | null;
 }
 
 type HistoryAction =
-  | { type: "DO"; action: EditAction }
+  // coalesceKey: id of a mouse gesture (drag, resize) that dispatches on every move
+  | { type: "DO"; action: EditAction; coalesceKey?: string }
   | { type: "UNDO" }
   | { type: "REDO" };
 
@@ -389,10 +451,15 @@ function historyReducer(
   switch (action.type) {
     case "DO": {
       const next = applyAction(state.present, action.action);
+      if (next === state.present) return state;
+      if (action.coalesceKey && action.coalesceKey === state.coalesceKey) {
+        return { ...state, present: next, future: [] };
+      }
       return {
-        past: [...state.past.slice(-29), state.present],
+        past: [...state.past.slice(-(HISTORY_LIMIT - 1)), state.present],
         present: next,
         future: [],
+        coalesceKey: action.coalesceKey ?? null,
       };
     }
     case "UNDO": {
@@ -401,16 +468,18 @@ function historyReducer(
       return {
         past: state.past.slice(0, -1),
         present: previous,
-        future: [state.present, ...state.future.slice(0, 29)],
+        future: [state.present, ...state.future.slice(0, HISTORY_LIMIT - 1)],
+        coalesceKey: null,
       };
     }
     case "REDO": {
       if (state.future.length === 0) return state;
       const next = state.future[0];
       return {
-        past: [...state.past.slice(-29), state.present],
+        past: [...state.past.slice(-(HISTORY_LIMIT - 1)), state.present],
         present: next,
         future: state.future.slice(1),
+        coalesceKey: null,
       };
     }
     default:
@@ -425,6 +494,7 @@ export function ChartEditor() {
     past: [],
     present: INITIAL_CHART,
     future: [],
+    coalesceKey: null,
   });
   const chart = history.present;
 
@@ -563,6 +633,11 @@ export function ChartEditor() {
   const gainNodesRef = useRef<Map<string, GainNode>>(new Map());
   const playbackStartTimeRef = useRef(0);
   const playbackStartTickRef = useRef(0);
+  // Chart time (seconds) at playbackStartTick, and the tempo map playback was started with
+  const playbackStartSecondsRef = useRef(0);
+  const playbackTempoMapRef = useRef<TempoPoint[] | null>(null);
+  const isPlayingRef = useRef(isPlaying);
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
   const rafRef = useRef<number>(0);
 
   function getAudioCtx(): AudioContext {
@@ -693,28 +768,23 @@ export function ChartEditor() {
       return;
     }
 
-    // Snapshot tempo info from refs at playback start so the frame closure is stable
-    const tempoMap = buildTempoMap(chartRef.current);
-    const resolution = chartRef.current.metadata.resolution || 192;
-
     function frame() {
       const ctx = audioCtxRef.current;
       if (!ctx) return;
+      // Advance in chart seconds and map back through the tempo map, so the
+      // playhead follows every BPM change instead of the tempo at the start tick
+      const tempoMap = playbackTempoMapRef.current ?? buildTempoMap(chartRef.current);
       const elapsed = ctx.currentTime - playbackStartTimeRef.current;
       const speed = playbackSpeedRef.current;
-      const bpm = getBpmAtTick(playbackStartTickRef.current, tempoMap);
-      const beatsPerSecond = bpm / 60;
-      const newTick =
-        playbackStartTickRef.current +
-        elapsed * speed * beatsPerSecond * resolution;
+      const newTick = secondsToTick(playbackStartSecondsRef.current + elapsed * speed, tempoMap);
 
       // Practice loop: seek back to loopA when passing loopB
       const la = loopARef.current;
       const lb = loopBRef.current;
-      if (la !== null && lb !== null && newTick > lb) {
-        queueMicrotask(() => {
-          handleSeekStableRef.current?.(la);
-        });
+      if (la !== null && lb !== null && la < lb && newTick > lb) {
+        // Restarts the stems at A; keep the frame loop running afterwards
+        handleSeekStableRef.current?.(la);
+        rafRef.current = requestAnimationFrame(frame);
         return;
       }
 
@@ -810,71 +880,7 @@ export function ChartEditor() {
     });
   }, []);
 
-  // Play/pause
-  const handlePlayPause = useCallback(() => {
-    if (isPlaying) {
-      for (const src of sourceNodesRef.current.values()) {
-        try { src.stop(); } catch { /* already stopped */ }
-      }
-      sourceNodesRef.current.clear();
-      gainNodesRef.current.clear();
-      metronomeRef.current?.stop();
-      clapRef.current?.stop();
-      setIsPlaying(false);
-    } else {
-      const ctx = getAudioCtx();
-      if (ctx.state === "suspended") ctx.resume();
-
-      const currentChart = chartRef.current;
-      const resolution = currentChart.metadata.resolution || 192;
-      const bpm = currentChart.syncTrack.bpmEvents[0]?.bpm ?? 120;
-      const startOffset =
-        (currentTick / resolution / bpm) * 60;
-
-      const speed = playbackSpeedRef.current;
-      for (const [label, stem] of stemsRef.current) {
-        const source = ctx.createBufferSource();
-        source.buffer = stem.buffer;
-        source.playbackRate.value = speed;
-        const gain = ctx.createGain();
-        gain.gain.value = mutedStemsRef.current.has(label) ? 0 : 1;
-        source.connect(gain);
-        gain.connect(ctx.destination);
-        source.start(
-          0,
-          Math.max(0, startOffset + currentChart.metadata.offset)
-        );
-        sourceNodesRef.current.set(label, source);
-        gainNodesRef.current.set(label, gain);
-      }
-
-      playbackStartTimeRef.current = ctx.currentTime;
-      playbackStartTickRef.current = currentTick;
-
-      // Start metronome if enabled
-      if (metronomeEnabledRef.current) {
-        const tempoMap = buildTempoMap(currentChart);
-        const metro = new MetronomeScheduler(ctx, tempoMap, currentChart.syncTrack.timeSignatures, resolution);
-        metro.start(currentTick, speed);
-        metronomeRef.current = metro;
-      }
-
-      // Start clap sounds if enabled
-      if (clapEnabledRef.current && selectedTrackRef.current) {
-        const track = currentChart.tracks[selectedTrackRef.current];
-        if (track) {
-          const tempoMap = buildTempoMap(currentChart);
-          const clap = new ClapScheduler(ctx, tempoMap, track.notes, resolution);
-          clap.start(currentTick, speed);
-          clapRef.current = clap;
-        }
-      }
-
-      setIsPlaying(true);
-    }
-  }, [isPlaying, currentTick]);
-
-  const handleStop = useCallback(() => {
+  const stopAudio = useCallback(() => {
     for (const src of sourceNodesRef.current.values()) {
       try { src.stop(); } catch { /* already stopped */ }
     }
@@ -882,35 +888,21 @@ export function ChartEditor() {
     gainNodesRef.current.clear();
     metronomeRef.current?.stop();
     clapRef.current?.stop();
-    setIsPlaying(false);
-    setCurrentTick(0);
   }, []);
 
-  // Seek to a tick — restarts audio at the new position if currently playing
-  const handleSeek = useCallback((tick: number) => {
-    const playing = isPlaying;
-    // Stop existing sources
-    for (const src of sourceNodesRef.current.values()) {
-      try { src.stop(); } catch { /* already stopped */ }
-    }
-    sourceNodesRef.current.clear();
-    gainNodesRef.current.clear();
-    metronomeRef.current?.stop();
-    clapRef.current?.stop();
-
-    setCurrentTick(tick);
-
-    if (!playing) return;
-
-    // Restart audio from new position
-    const ctx = audioCtxRef.current;
-    if (!ctx) return;
+  // Start every stem (plus metronome/clap) at a chart tick, converting through the tempo map
+  const startAudioAt = useCallback((tick: number) => {
+    const ctx = getAudioCtx();
+    if (ctx.state === "suspended") ctx.resume();
 
     const currentChart = chartRef.current;
-    const resolution   = currentChart.metadata.resolution || 192;
-    const bpm          = currentChart.syncTrack.bpmEvents[0]?.bpm ?? 120;
-    const startOffset  = (tick / resolution / bpm) * 60;
-    const speed        = playbackSpeedRef.current;
+    const resolution = currentChart.metadata.resolution || 192;
+    const tempoMap = buildTempoMap(currentChart);
+    const speed = playbackSpeedRef.current;
+    const chartSeconds = tickToSeconds(tick, tempoMap);
+    // chartTime = audioTime - offset (same convention as waveform.ts)
+    const audioSeconds = chartSeconds + currentChart.metadata.offset;
+    const now = ctx.currentTime;
 
     for (const [label, stem] of stemsRef.current) {
       const source = ctx.createBufferSource();
@@ -920,33 +912,63 @@ export function ChartEditor() {
       gain.gain.value = mutedStemsRef.current.has(label) ? 0 : 1;
       source.connect(gain);
       gain.connect(ctx.destination);
-      source.start(0, Math.max(0, startOffset + currentChart.metadata.offset));
+      // Before the audio begins (negative offset): delay the start instead of clamping to 0
+      if (audioSeconds >= 0) source.start(now, audioSeconds);
+      else source.start(now - audioSeconds / speed, 0);
       sourceNodesRef.current.set(label, source);
       gainNodesRef.current.set(label, gain);
     }
 
-    playbackStartTimeRef.current = ctx.currentTime;
+    playbackStartTimeRef.current = now;
     playbackStartTickRef.current = tick;
+    playbackStartSecondsRef.current = chartSeconds;
+    playbackTempoMapRef.current = tempoMap;
 
-    // Restart metronome at new position
     if (metronomeEnabledRef.current) {
-      const tempoMap = buildTempoMap(currentChart);
       const metro = new MetronomeScheduler(ctx, tempoMap, currentChart.syncTrack.timeSignatures, resolution);
       metro.start(tick, speed);
       metronomeRef.current = metro;
     }
 
-    // Restart clap at new position
     if (clapEnabledRef.current && selectedTrackRef.current) {
       const track = currentChart.tracks[selectedTrackRef.current];
       if (track) {
-        const tempoMap = buildTempoMap(currentChart);
         const clap = new ClapScheduler(ctx, tempoMap, track.notes, resolution);
         clap.start(tick, speed);
         clapRef.current = clap;
       }
     }
-  }, [isPlaying]);
+  }, []);
+
+  // Play/pause — uses the 60fps tick ref (the state only updates every few frames)
+  const handlePlayPause = useCallback(() => {
+    if (isPlayingRef.current) {
+      stopAudio();
+      isPlayingRef.current = false;
+      setIsPlaying(false);
+      setCurrentTick(currentTickRef.current);
+    } else {
+      startAudioAt(currentTickRef.current);
+      isPlayingRef.current = true;
+      setIsPlaying(true);
+    }
+  }, [stopAudio, startAudioAt]);
+
+  const handleStop = useCallback(() => {
+    stopAudio();
+    isPlayingRef.current = false;
+    setIsPlaying(false);
+    setCurrentTick(0);
+  }, [stopAudio]);
+
+  // Seek to a tick — restarts audio at the new position if currently playing
+  const handleSeek = useCallback((tick: number) => {
+    const target = Math.max(0, tick);
+    stopAudio();
+    currentTickRef.current = target;
+    setCurrentTick(target);
+    if (isPlayingRef.current) startAudioAt(target);
+  }, [stopAudio, startAudioAt]);
   handleSeekStableRef.current = handleSeek;
 
   // Live speed change
@@ -957,7 +979,12 @@ export function ChartEditor() {
     for (const src of sourceNodesRef.current.values()) {
       src.playbackRate.value = playbackSpeed;
     }
-    playbackStartTickRef.current = currentTick;
+    const tick = currentTickRef.current;
+    playbackStartTickRef.current = tick;
+    playbackStartSecondsRef.current = tickToSeconds(
+      tick,
+      playbackTempoMapRef.current ?? buildTempoMap(chartRef.current)
+    );
     playbackStartTimeRef.current = ctx.currentTime;
     metronomeRef.current?.setPlaybackSpeed(playbackSpeed);
     clapRef.current?.setPlaybackSpeed(playbackSpeed);
@@ -1013,9 +1040,9 @@ export function ChartEditor() {
         }
       }
 
-      // K key: switch to eraser mode
+      // K key: switch to eraser mode (Shift+K is double kick, handled below)
       if (e.key === "k" || e.key === "K") {
-        if (!e.ctrlKey && !e.metaKey) {
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
           e.preventDefault();
           setEditMode((m) => m === "eraser" ? "note" : "eraser");
           return;
@@ -1069,8 +1096,13 @@ export function ChartEditor() {
         return;
       }
 
-      // Escape: clear loop points
+      // Escape: clear the selection first, then the loop points
       if (e.key === "Escape") {
+        if (selectedNoteIdsRef.current.size > 0) {
+          e.preventDefault();
+          setSelectedNoteIds(new Set());
+          return;
+        }
         if (loopARef.current !== null || loopBRef.current !== null) {
           e.preventDefault();
           setLoopA(null);
@@ -1103,6 +1135,30 @@ export function ChartEditor() {
 
       const track = selectedTrackRef.current;
       const noteIds = selectedNoteIdsRef.current;
+
+      // Navigation: PageUp/PageDown = next/previous measure, Home/End = start/end,
+      // Arrow Up/Down without a selection = one snap step
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        const currentChart = chartRef.current;
+        const tick = currentTickRef.current;
+        if (e.key === "PageUp" || e.key === "PageDown") {
+          e.preventDefault();
+          handleSeek(measureStep(currentChart, tick, e.key === "PageUp" ? 1 : -1));
+          return;
+        }
+        if (e.key === "Home" || e.key === "End") {
+          e.preventDefault();
+          handleSeek(e.key === "Home" ? 0 : getChartDurationTicks(chartRef.current));
+          return;
+        }
+        if ((e.key === "ArrowUp" || e.key === "ArrowDown") && noteIds.size === 0) {
+          e.preventDefault();
+          const gridTicks = snapDivisionToTicks(currentChart.metadata.resolution || 192, snapDivision);
+          const target = gridStep(tick, gridTicks, e.key === "ArrowUp" ? 1 : -1);
+          handleSeek(Math.min(getChartDurationTicks(chartRef.current), target));
+          return;
+        }
+      }
 
       if (
         (e.key === "Delete" || e.key === "Backspace") &&
@@ -1431,6 +1487,51 @@ export function ChartEditor() {
   const resolution = chart.metadata.resolution || 192;
   const viewportTicks = ((resolution * 960) / zoom) * renderDistance;
 
+  // Mouse wheel over the lane: scroll through the song one snap step per notch
+  // (wheel up = forward, like the highway), Ctrl/Cmd+wheel or pinch = zoom.
+  // Non-passive listener so the page itself doesn't scroll.
+  const laneContainerRef = useRef<HTMLDivElement>(null);
+  const wheelAccumRef = useRef(0);
+  const snapDivisionRef = useRef(snapDivision);
+  useEffect(() => { snapDivisionRef.current = snapDivision; }, [snapDivision]);
+  useEffect(() => {
+    const el = laneContainerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const scale = e.deltaMode === 1 ? 40 : 1; // DOM_DELTA_LINE → px
+      if (e.ctrlKey || e.metaKey) {
+        const factor = Math.exp(-e.deltaY * scale * 0.0015);
+        setZoom((z) => Math.min(800, Math.max(30, z * factor)));
+        return;
+      }
+      // Seeking restarts every stem, so don't scrub with the wheel while playing
+      if (isPlayingRef.current) return;
+      // Dominant axis: vertical wheel for the highway, horizontal swipe for the vocals lane
+      const forward = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : -e.deltaY;
+      const px = forward * scale;
+      let steps: number;
+      if (Math.abs(px) >= 50) {
+        // Mouse wheel notch: exactly one step
+        steps = Math.sign(px);
+        wheelAccumRef.current = 0;
+      } else {
+        // Trackpad: accumulate small deltas
+        wheelAccumRef.current += px;
+        steps = Math.trunc(wheelAccumRef.current / 25);
+        wheelAccumRef.current -= steps * 25;
+      }
+      if (steps === 0) return;
+      const currentChart = chartRef.current;
+      const gridTicks = snapDivisionToTicks(currentChart.metadata.resolution || 192, snapDivisionRef.current);
+      let target = currentTickRef.current;
+      for (let i = 0; i < Math.abs(steps); i++) target = gridStep(target, gridTicks, steps > 0 ? 1 : -1);
+      handleSeekStableRef.current?.(Math.min(getChartDurationTicks(chartRef.current), target));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [hasChart]);
+
   // First audio buffer (for BPM detection)
   const firstAudioBuffer = useMemo<AudioBuffer | undefined>(() => {
     if (stems.size === 0) return undefined;
@@ -1530,19 +1631,24 @@ export function ChartEditor() {
     setSelectedNoteIds((prev) => { const next = new Set(prev); ids.forEach((id) => next.delete(id)); return next; });
   }, []);
 
-  const handleMoveNotes = useCallback((ids: string[], deltaTick: number, deltaFret: number) => {
+  // gestureId: passed by lanes for live drags so the whole gesture is one undo step
+  const handleMoveNotes = useCallback((ids: string[], deltaTick: number, deltaFret: number, gestureId?: string) => {
     const track = selectedTrackRef.current;
     if (!track) return;
-    dispatch({ type: "DO", action: { type: "MOVE_NOTES", track, ids, deltaTick, deltaFret } });
+    dispatch({ type: "DO", action: { type: "MOVE_NOTES", track, ids, deltaTick, deltaFret }, coalesceKey: gestureId });
   }, []);
 
-  const handleResizeNote = useCallback((id: string, newLength: number) => {
+  const handleDragNotes = useCallback((positions: NotePosition[], gestureId: string) => {
     const track = selectedTrackRef.current;
     if (!track) return;
-    dispatch({ type: "DO", action: { type: "RESIZE_NOTE", track, id, newLength } });
+    dispatch({ type: "DO", action: { type: "SET_NOTE_POSITIONS", track, positions }, coalesceKey: gestureId });
   }, []);
 
-  const handleSeekToTick = useCallback((tick: number) => setCurrentTick(tick), []);
+  const handleResizeNote = useCallback((id: string, newLength: number, gestureId?: string) => {
+    const track = selectedTrackRef.current;
+    if (!track) return;
+    dispatch({ type: "DO", action: { type: "RESIZE_NOTE", track, id, newLength }, coalesceKey: gestureId });
+  }, []);
 
   // Right-click drag: add note with sustain
   const handleRightClickDrag = useCallback((tick: number, fret: number, endTick: number) => {
@@ -1834,7 +1940,7 @@ export function ChartEditor() {
               viewportTicks={viewportTicks}
               tempoMap={tempoMap}
               sections={sections}
-              onSeek={handleSeekToTick}
+              onSeek={handleSeek}
               currentTickRef={currentTickRef}
               isPlaying={isPlaying}
             />
@@ -1855,14 +1961,14 @@ export function ChartEditor() {
             onDeleteTimeSignature={handleDeleteTimeSignature}
             onAddSection={handleAddRulerSection}
             onDeleteSection={handleDeleteSection}
-            onSeek={handleSeekToTick}
+            onSeek={handleSeek}
             currentTickRef={currentTickRef}
             isPlaying={isPlaying}
           />
 
           <div className="flex flex-1 overflow-hidden">
             {/* Lane */}
-            <div className="flex-1 overflow-hidden relative bg-[#0f0f14]">
+            <div ref={laneContainerRef} className="flex-1 overflow-hidden relative bg-[#0f0f14]">
               {selectedTrack ? (
                 isVocalsTrack ? (
                   <VocalsLane
@@ -1880,7 +1986,7 @@ export function ChartEditor() {
                     onDeleteNotes={handleLaneDeleteNotes}
                     onMoveNotes={handleMoveNotes}
                     onResizeNote={handleResizeNote}
-                    onSeekToTick={handleSeekToTick}
+                    onSeekToTick={handleSeek}
                     sections={sections}
                     lyrics={chart.lyrics}
                     waveform={activeWaveform}
@@ -1903,8 +2009,9 @@ export function ChartEditor() {
                     onAddNote={handleAddNote}
                     onDeleteNotes={handleLaneDeleteNotes}
                     onMoveNotes={handleMoveNotes}
+                    onDragNotes={handleDragNotes}
                     onResizeNote={handleResizeNote}
-                    onSeekToTick={handleSeekToTick}
+                    onSeekToTick={handleSeek}
                     sections={sections}
                     onAddPhrase={handleAddPhrase}
                     onDeletePhrase={handleDeletePhrase}
@@ -1961,7 +2068,7 @@ export function ChartEditor() {
                 {showValidation && (
                   <ValidationPanel
                     chart={chart}
-                    onSeek={handleSeekToTick}
+                    onSeek={handleSeek}
                     onSelectNotes={(trackKey, ids) => {
                       setSelectedTrack(trackKey);
                       setSelectedNoteIds(new Set(ids));

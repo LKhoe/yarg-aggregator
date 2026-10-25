@@ -1,6 +1,7 @@
 "use client";
 
 import React, { memo, useEffect, useRef, useCallback, useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 import type { ChartData, LyricEvent, Note, Phrase, Section, TrackKey } from "@/lib/chart/types";
 import {
   buildTempoMap,
@@ -23,7 +24,9 @@ export interface TrackLaneProps {
   onSelectNotes: (ids: string[]) => void;
   onAddNote: (tick: number, fret: number) => void;
   onDeleteNotes: (ids: string[]) => void;
-  onMoveNotes: (ids: string[], deltaTick: number, deltaFret: number) => void;
+  onMoveNotes: (ids: string[], deltaTick: number, deltaFret: number, gestureId?: string) => void;
+  // Live note drag: absolute positions from the drag origin; one gesture = one undo step
+  onDragNotes?: (positions: { id: string; tick: number; fret: number }[], gestureId: string) => void;
   waveform?: WaveformData;
   vizMode?: "waveform" | "spectrogram" | "none";
   spectrogram?: SpectrogramData;
@@ -34,7 +37,7 @@ export interface TrackLaneProps {
   onAddPhrase?: (tick: number, length: number) => void;
   onDeletePhrase?: (id: string) => void;
   onResizePhrase?: (id: string, newLength: number) => void;
-  onResizeNote?: (id: string, newLength: number) => void;
+  onResizeNote?: (id: string, newLength: number, gestureId?: string) => void;
   onSeekToTick?: (tick: number) => void;
   lyrics?: LyricEvent[];
   ghostNotes?: Note[];
@@ -249,6 +252,7 @@ export const TrackLane = memo(function TrackLane({
   onAddPhrase,
   onDeletePhrase,
   onResizeNote,
+  onDragNotes,
   lyrics,
   ghostNotes,
   densityHeatmap,
@@ -264,7 +268,7 @@ export const TrackLane = memo(function TrackLane({
   const numCols = isDrums ? (drumMode === "5lane" ? 5 : 4) : NUM_FRETS;
 
   // Right-click drag state for sustain creation
-  const rightDragRef = useRef({ active: false, startTick: 0, startFret: 0, currentTick: 0 });
+  const rightDragRef = useRef({ active: false, startTick: 0, startFret: 0, currentTick: 0, x: 0, y: 0 });
 
   // Off-screen canvas + ImageData reused across frames for spectrogram rendering
   const spectrogramCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -280,17 +284,26 @@ export const TrackLane = memo(function TrackLane({
   // Pre-allocated waveform arrays (reused across frames)
   const waveformBufRef = useRef<{ lx: number[]; rx: number[]; y: number[]; cap: number }>({ lx: [], rx: [], y: [], cap: 0 });
 
-  // Drag (note move)
-  const dragRef = useRef({ active: false, noteId: "", startTick: 0, startFret: 0 });
+  // Drag (note move): originals are the dragged notes at mousedown; positions are
+  // recomputed from them on every move so clamping at the lane edges is lossless
+  const dragRef = useRef({
+    active: false, startTick: 0, startFret: 0, timeOnly: false, gestureId: "",
+    originals: [] as { id: string; tick: number; fret: number }[],
+    lastDeltaTick: 0, lastDeltaFret: 0,
+  });
   // Lasso (rubber band selection)
   const lassoRef = useRef({ active: false, x1: 0, y1: 0, x2: 0, y2: 0 });
   // Phrase draw
   const phraseDrawRef = useRef({ active: false, startTick: 0, currentTick: 0 });
   // Sustain resize
-  const resizeRef = useRef({ active: false, noteId: "", startY: 0, originalLength: 0, startTick: 0 });
+  const resizeRef = useRef({ active: false, noteId: "", startTick: 0, lastLength: 0, gestureId: "" });
+  // Set when a gesture (drag, lasso, resize) ends, so the click that follows doesn't add a note
+  const suppressClickRef = useRef(false);
 
   const [lassoRect, setLassoRect] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   const [phraseDraw, setPhraseDraw] = useState<{ startTick: number; endTick: number } | null>(null);
+  // Where a click would place a note (display column, tick)
+  const [hoverCell, setHoverCell] = useState<{ col: number; tick: number } | null>(null);
 
   const propsRef = useRef({
     chart, trackKey, currentTick, isPlaying, currentTickRef,
@@ -301,6 +314,8 @@ export const TrackLane = memo(function TrackLane({
     leftyFlip, numCols, isDrums,
     lassoRect: null as { x1: number; y1: number; x2: number; y2: number } | null,
     phraseDraw: null as { startTick: number; endTick: number } | null,
+    hoverCell: null as { col: number; tick: number } | null,
+    onDragNotes,
   });
   propsRef.current = {
     chart, trackKey, currentTick, isPlaying, currentTickRef,
@@ -311,6 +326,8 @@ export const TrackLane = memo(function TrackLane({
     leftyFlip, numCols, isDrums,
     lassoRect,
     phraseDraw,
+    hoverCell,
+    onDragNotes,
   };
 
   // Trigger re-render when fret images finish loading
@@ -343,7 +360,7 @@ export const TrackLane = memo(function TrackLane({
 
     const { chart, trackKey, currentTickRef: ctRef, currentTick: propTick,
             zoom, renderDistance, selectedNoteIds, waveform, editMode, sections, lyrics,
-            ghostNotes, densityHeatmap, lassoRect, phraseDraw, leftyFlip,
+            ghostNotes, densityHeatmap, lassoRect, phraseDraw, hoverCell, leftyFlip,
             numCols: pNumCols, isDrums: pIsDrums } = propsRef.current;
     const currentTick = ctRef?.current ?? propTick;
     const isDrums = pIsDrums;
@@ -1131,6 +1148,32 @@ export const TrackLane = memo(function TrackLane({
         ctx.stroke();
       }
     }
+
+    // ── 14. Placement preview (where a click adds a note)
+    if (hoverCell && editMode === "note") {
+      const dt = hoverCell.tick - currentTick;
+      if (dt >= 0 && dt <= vt) {
+        const rawCol = leftyFlip ? numCols - 1 - hoverCell.col : hoverCell.col;
+        const color  = noteColors[isDrums ? rawCol + 1 : rawCol] ?? "#888";
+        const lF = laneAt(depthAt(dt, vt), W, H, numCols);
+        const lB = laneAt(depthAt(dt + noteThickTicks, vt), W, H, numCols);
+        const fracL = (hoverCell.col + COL_PAD) / numCols;
+        const fracR = (hoverCell.col + 1 - COL_PAD) / numCols;
+        ctx.save();
+        ctx.globalAlpha = 0.45;
+        ctx.fillStyle   = color;
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth   = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(lF.left + fracL * lF.width, lF.y); ctx.lineTo(lF.left + fracR * lF.width, lF.y);
+        ctx.lineTo(lB.left + fracR * lB.width, lB.y); ctx.lineTo(lB.left + fracL * lB.width, lB.y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Static re-render: fires when any non-tick prop changes
@@ -1138,7 +1181,8 @@ export const TrackLane = memo(function TrackLane({
     renderCanvas();
   }, [
     chart, trackKey, zoom, renderDistance, selectedNoteIds, waveform, vizMode, spectrogram,
-    editMode, sections, lyrics, isPlaying, imagesReady, lassoRect, phraseDraw, renderCanvas,
+    editMode, sections, lyrics, isPlaying, imagesReady, lassoRect, phraseDraw, hoverCell, renderCanvas,
+    leftyFlip, ghostNotes, densityHeatmap,
   ]);
 
   // Playback RAF: smooth 60fps canvas updates driven by currentTickRef
@@ -1159,8 +1203,8 @@ export const TrackLane = memo(function TrackLane({
       const { chart, trackKey, currentTick, zoom, renderDistance } = propsRef.current;
       const track = chart.tracks[trackKey];
       if (!track) return null;
-      const isDrums    = trackKey.includes("Drums");
-      const numCols    = isDrums ? 4 : NUM_FRETS;
+      // Same column layout as the render (drum mode, lefty-flip)
+      const { isDrums, numCols, leftyFlip } = propsRef.current;
       const resolution = chart.metadata.resolution || 192;
       const vt         = visibleTicksFromZoom(zoom, resolution, renderDistance);
       const zoomScale  = zoom / DEFAULT_ZOOM;
@@ -1179,7 +1223,8 @@ export const TrackLane = memo(function TrackLane({
           continue;
         }
 
-        const fi = isDrums ? note.fret - 1 : note.fret;
+        const rawFi = isDrums ? note.fret - 1 : note.fret;
+        const fi    = leftyFlip ? numCols - 1 - rawFi : rawFi;
         if (fi < 0 || fi >= numCols) continue;
 
         const dB    = depthAt(Math.max(0, dt + noteThickTicks), vt);
@@ -1213,8 +1258,8 @@ export const TrackLane = memo(function TrackLane({
       const { chart, trackKey, currentTick, zoom, renderDistance } = propsRef.current;
       const track = chart.tracks[trackKey];
       if (!track) return null;
-      const isDrums    = trackKey.includes("Drums");
-      const numCols    = isDrums ? 4 : NUM_FRETS;
+      // Same column layout as the render (drum mode, lefty-flip)
+      const { isDrums, numCols, leftyFlip } = propsRef.current;
       const resolution = chart.metadata.resolution || 192;
       const vt         = visibleTicksFromZoom(zoom, resolution, renderDistance);
       const barFrac    = 0.16;
@@ -1222,7 +1267,8 @@ export const TrackLane = memo(function TrackLane({
       for (const note of track.notes) {
         if (note.length <= 0) continue;
         if (isDrums && note.fret === 0) continue;
-        const fi = isDrums ? note.fret - 1 : note.fret;
+        const rawFi = isDrums ? note.fret - 1 : note.fret;
+        const fi    = leftyFlip ? numCols - 1 - rawFi : rawFi;
         if (fi < 0 || fi >= numCols) continue;
 
         const dtEnd = note.tick + note.length - currentTick;
@@ -1253,8 +1299,8 @@ export const TrackLane = memo(function TrackLane({
       const { chart, trackKey, currentTick, zoom, renderDistance } = propsRef.current;
       const track = chart.tracks[trackKey];
       if (!track) return [];
-      const isDrums    = trackKey.includes("Drums");
-      const numCols    = isDrums ? 4 : NUM_FRETS;
+      // Same column layout as the render (drum mode, lefty-flip)
+      const { isDrums, numCols, leftyFlip } = propsRef.current;
       const resolution = chart.metadata.resolution || 192;
       const vt         = visibleTicksFromZoom(zoom, resolution, renderDistance);
       const zoomScale  = zoom / DEFAULT_ZOOM;
@@ -1270,7 +1316,8 @@ export const TrackLane = memo(function TrackLane({
         const dt = note.tick - currentTick;
         if (dt + noteThickTicks < 0 || dt > vt) continue;
 
-        const fi = isDrums ? note.fret - 1 : note.fret;
+        const rawFi = isDrums ? note.fret - 1 : note.fret;
+        const fi    = leftyFlip ? numCols - 1 - rawFi : rawFi;
         if (isDrums && note.fret === 0) {
           const d    = depthAt(Math.max(0, dt), vt);
           const lane = laneAt(d, W, H, numCols);
@@ -1297,91 +1344,175 @@ export const TrackLane = memo(function TrackLane({
     []
   );
 
-  // ── Mouse handlers ─────────────────────────────────────────────
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // ── Pointer helpers ────────────────────────────────────────────
+  // Snapped tick and display column under a canvas point
+  const cellAt = useCallback((cx: number, cy: number, W: number, H: number) => {
+    const { chart, currentTick, zoom, renderDistance, snapDivision, numCols } = propsRef.current;
+    const resolution = chart.metadata.resolution || 192;
+    const vt         = visibleTicksFromZoom(zoom, resolution, renderDistance);
+    const gridTicks  = snapDivisionToTicks(resolution, snapDivision);
+    const rawDt      = yToTickOffset(cy, W, H, vt);
+    const tick       = Math.max(0, snapToGrid(currentTick + rawDt, gridTicks));
+    const col        = xyToFret(cx, cy, W, H, vt, numCols);
+    return { tick, col };
+  }, []);
+
+  // Display column → note fret (undo lefty-flip; drum pads start at fret 1)
+  const colToFret = useCallback((col: number) => {
+    const { numCols, isDrums, leftyFlip } = propsRef.current;
+    const rawCol = leftyFlip ? numCols - 1 - col : col;
+    return isDrums ? rawCol + 1 : rawCol;
+  }, []);
+
+  // Move the dragged notes to follow the pointer (live, one undo step per drag)
+  const applyDrag = useCallback((cx: number, cy: number, W: number, H: number) => {
+    const drag = dragRef.current;
+    const { onDragNotes, onMoveNotes } = propsRef.current;
+    const { tick, col } = cellAt(cx, cy, W, H);
+    const deltaTick = tick - drag.startTick;
+    const deltaFret = drag.timeOnly ? 0 : colToFret(col) - drag.startFret;
+    if (deltaTick === drag.lastDeltaTick && deltaFret === drag.lastDeltaFret) return;
+    if (onDragNotes) {
+      onDragNotes(
+        drag.originals.map((o) => ({ id: o.id, tick: o.tick + deltaTick, fret: o.fret + deltaFret })),
+        drag.gestureId,
+      );
+    } else {
+      onMoveNotes(
+        drag.originals.map((o) => o.id),
+        deltaTick - drag.lastDeltaTick,
+        deltaFret - drag.lastDeltaFret,
+        drag.gestureId,
+      );
+    }
+    drag.lastDeltaTick = deltaTick;
+    drag.lastDeltaFret = deltaFret;
+  }, [cellAt, colToFret]);
+
+  // Right-click action: delete the phrase (phrase mode) or the note(s) under the point
+  const deleteAt = useCallback((cx: number, cy: number, W: number, H: number) => {
+    const { onDeleteNotes, selectedNoteIds, editMode, onDeletePhrase, chart, trackKey,
+            currentTick, zoom, renderDistance, numCols } = propsRef.current;
+
+    if (editMode === "phrase") {
+      const track = chart.tracks[trackKey];
+      if (!track) return;
+      const resolution = chart.metadata.resolution || 192;
+      const vt         = visibleTicksFromZoom(zoom, resolution, renderDistance);
+      for (const phrase of track.phrases) {
+        const dtS = phrase.tick - currentTick;
+        const dtE = dtS + phrase.length;
+        if (dtE < 0 || dtS > vt) continue;
+        const lS = laneAt(depthAt(Math.max(0, dtS), vt), W, H, numCols);
+        const lE = laneAt(depthAt(Math.min(vt, dtE), vt), W, H, numCols);
+        if (cy >= lE.y - 4 && cy <= lS.y + 4 && cx >= lS.left && cx <= lS.right) {
+          onDeletePhrase?.(phrase.id);
+          return;
+        }
+      }
+      return;
+    }
+
+    const note = getNoteAt(cx, cy, W, H);
+    if (note) onDeleteNotes(selectedNoteIds.has(note.id) ? [...selectedNoteIds] : [note.id]);
+  }, [getNoteAt]);
+
+  // The placement preview is pinned to a tick; drop it when the view scrolls
+  useEffect(() => { setHoverCell(null); }, [currentTick]);
+
+  // ── Pointer handlers ───────────────────────────────────────────
+  // Pointer capture keeps move/up events coming when the cursor leaves the canvas
+  // mid-gesture, so a drag or lasso can't get stuck.
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
       const canvas = canvasRef.current;
       if (!canvas) return;
+      if (e.button !== 0 && e.button !== 2) return;
+      canvas.setPointerCapture(e.pointerId);
+      const rect = canvas.getBoundingClientRect();
+      const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+      const W = canvas.width, H = canvas.height;
+      const { selectedNoteIds, onSelectNotes, editMode, chart, trackKey, isDrums } = propsRef.current;
+      setHoverCell(null);
+      suppressClickRef.current = false;
 
-      // Right-click drag for sustain creation
+      // Right button: drag on empty space = note with sustain, plain click = delete.
+      // Resolved on pointerup (macOS fires contextmenu on mousedown, Windows on mouseup).
       if (e.button === 2) {
-        const rect = canvas.getBoundingClientRect();
-        const cx2 = e.clientX - rect.left, cy2 = e.clientY - rect.top;
-        const { chart, trackKey, currentTick, zoom, renderDistance, snapDivision, numCols, isDrums, leftyFlip } = propsRef.current;
-        const resolution = chart.metadata.resolution || 192;
-        const vt = visibleTicksFromZoom(zoom, resolution, renderDistance);
-        const gridTicks = snapDivisionToTicks(resolution, snapDivision);
-        const rawDt = yToTickOffset(cy2, canvas.width, canvas.height, vt);
-        const tick = Math.max(0, snapToGrid(currentTick + rawDt, gridTicks));
-        const colIdx = xyToFret(cx2, cy2, canvas.width, canvas.height, vt, numCols);
-        const fret = isDrums ? colIdx + 1 : (leftyFlip ? (numCols - 1 - colIdx) : colIdx);
-        rightDragRef.current = { active: true, startTick: tick, startFret: fret, currentTick: tick };
+        const { tick, col } = cellAt(cx, cy, W, H);
+        rightDragRef.current = { active: true, startTick: tick, startFret: colToFret(col), currentTick: tick, x: cx, y: cy };
         return;
       }
 
-      if (e.button !== 0) return;
-      const rect = canvas.getBoundingClientRect();
-      const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
-      const { selectedNoteIds, onSelectNotes, editMode, currentTick, chart, trackKey, zoom, renderDistance, snapDivision, onAddPhrase } = propsRef.current;
-
-      // Eraser mode: click to delete note directly
       if (editMode === "eraser") {
-        const note = getNoteAt(cx, cy, canvas.width, canvas.height);
-        if (note) {
-          const { onDeleteNotes } = propsRef.current;
-          onDeleteNotes([note.id]);
-        }
+        const note = getNoteAt(cx, cy, W, H);
+        if (note) propsRef.current.onDeleteNotes([note.id]);
         return;
       }
 
       if (editMode === "phrase") {
-        // In phrase mode: start drawing a new phrase
-        const resolution = chart.metadata.resolution || 192;
-        const vt         = visibleTicksFromZoom(zoom, resolution, renderDistance);
-        const gridTicks  = snapDivisionToTicks(resolution, snapDivision);
-        const rawDt      = yToTickOffset(cy, canvas.width, canvas.height, vt);
-        const tick       = Math.max(0, snapToGrid(currentTick + rawDt, gridTicks));
+        const { tick } = cellAt(cx, cy, W, H);
         phraseDrawRef.current = { active: true, startTick: tick, currentTick: tick };
         setPhraseDraw({ startTick: tick, endTick: tick });
         return;
       }
 
-      // Check for sustain resize handle first
-      const resizeNote = getSustainResizeAt(cx, cy, canvas.width, canvas.height);
+      // Sustain resize handle first
+      const resizeNote = getSustainResizeAt(cx, cy, W, H);
       if (resizeNote) {
         resizeRef.current = {
           active: true,
           noteId: resizeNote.id,
-          startY: cy,
-          originalLength: resizeNote.length,
           startTick: resizeNote.tick,
+          lastLength: resizeNote.length,
+          gestureId: uuidv4(),
         };
         return;
       }
 
-      const note = getNoteAt(cx, cy, canvas.width, canvas.height);
+      const note = getNoteAt(cx, cy, W, H);
       if (note) {
-        if (!selectedNoteIds.has(note.id))
-          onSelectNotes(e.shiftKey ? [...selectedNoteIds, note.id] : [note.id]);
-        dragRef.current = { active: true, noteId: note.id, startTick: note.tick, startFret: note.fret };
-      } else {
-        // Start lasso
-        lassoRef.current = { active: true, x1: cx, y1: cy, x2: cx, y2: cy };
-        onSelectNotes([]);
+        let ids: string[];
+        if (selectedNoteIds.has(note.id)) {
+          ids = [...selectedNoteIds];
+        } else {
+          ids = e.shiftKey ? [...selectedNoteIds, note.id] : [note.id];
+          onSelectNotes(ids);
+        }
+        const idSet = new Set(ids);
+        // Deltas are measured from the cell under the cursor, so grabbing a note doesn't make it jump
+        const { tick, col } = cellAt(cx, cy, W, H);
+        dragRef.current = {
+          active: true,
+          startTick: tick,
+          startFret: colToFret(col),
+          // A kick spans the whole lane: only move it in time
+          timeOnly: isDrums && note.fret === 0,
+          gestureId: uuidv4(),
+          originals: (chart.tracks[trackKey]?.notes ?? [])
+            .filter((n) => idSet.has(n.id))
+            .map((n) => ({ id: n.id, tick: n.tick, fret: n.fret })),
+          lastDeltaTick: 0,
+          lastDeltaFret: 0,
+        };
+        return;
       }
+
+      // Empty space: start a lasso (Shift adds to the current selection)
+      lassoRef.current = { active: true, x1: cx, y1: cy, x2: cx, y2: cy };
+      if (!e.shiftKey) onSelectNotes([]);
     },
-    [getNoteAt, getSustainResizeAt]
+    [getNoteAt, getSustainResizeAt, cellAt, colToFret]
   );
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
       const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
-      const { chart, trackKey, currentTick, zoom, renderDistance, snapDivision, onResizeNote } = propsRef.current;
+      const W = canvas.width, H = canvas.height;
 
-      // Update lasso
       if (lassoRef.current.active) {
         lassoRef.current.x2 = cx;
         lassoRef.current.y2 = cy;
@@ -1389,230 +1520,148 @@ export const TrackLane = memo(function TrackLane({
         return;
       }
 
-      // Update phrase draw
       if (phraseDrawRef.current.active) {
-        const resolution = chart.metadata.resolution || 192;
-        const vt         = visibleTicksFromZoom(zoom, resolution, renderDistance);
-        const gridTicks  = snapDivisionToTicks(resolution, snapDivision);
-        const rawDt      = yToTickOffset(cy, canvas.width, canvas.height, vt);
-        const tick       = Math.max(0, snapToGrid(currentTick + rawDt, gridTicks));
+        const { tick } = cellAt(cx, cy, W, H);
         phraseDrawRef.current.currentTick = tick;
         setPhraseDraw({ startTick: phraseDrawRef.current.startTick, endTick: tick });
         return;
       }
 
-      // Update resize
+      // Live sustain resize; the whole drag is one undo step
       if (resizeRef.current.active) {
-        const resolution  = chart.metadata.resolution || 192;
-        const vt          = visibleTicksFromZoom(zoom, resolution, renderDistance);
-        const H           = canvas.height;
-        const gridTicks   = snapDivisionToTicks(resolution, snapDivision);
-
-        // Compute tick at current Y
-        const rawDt   = yToTickOffset(cy, canvas.width, H, vt);
-        const endTick = Math.max(resizeRef.current.startTick, snapToGrid(currentTick + rawDt, gridTicks));
-        const newLength = Math.max(0, endTick - resizeRef.current.startTick);
-
-        if (onResizeNote) {
-          onResizeNote(resizeRef.current.noteId, newLength);
+        const r = resizeRef.current;
+        const { tick } = cellAt(cx, cy, W, H);
+        const newLength = Math.max(0, tick - r.startTick);
+        if (newLength !== r.lastLength) {
+          r.lastLength = newLength;
+          propsRef.current.onResizeNote?.(r.noteId, newLength, r.gestureId);
         }
         return;
       }
 
-      // Update right-click drag
       if (rightDragRef.current.active) {
-        const resolution = chart.metadata.resolution || 192;
-        const vt = visibleTicksFromZoom(zoom, resolution, renderDistance);
-        const gridTicks = snapDivisionToTicks(resolution, snapDivision);
-        const rawDt = yToTickOffset(cy, canvas.width, canvas.height, vt);
-        const tick = Math.max(0, snapToGrid(currentTick + rawDt, gridTicks));
-        rightDragRef.current.currentTick = tick;
+        rightDragRef.current.currentTick = cellAt(cx, cy, W, H).tick;
         return;
       }
 
-      // Hover cursor check for resize handles
-      const resizeNote = getSustainResizeAt(cx, cy, canvas.width, canvas.height);
-      const editMode = propsRef.current.editMode;
-      const newCursor = resizeNote ? "ns-resize" : (editMode === "eraser" ? "not-allowed" : "crosshair");
-      if (canvasRef.current) canvasRef.current.style.cursor = newCursor;
+      if (dragRef.current.active) {
+        applyDrag(cx, cy, W, H);
+        return;
+      }
+
+      // Hover: cursor shape + placement preview
+      const { editMode, isPlaying } = propsRef.current;
+      const resizeNote = getSustainResizeAt(cx, cy, W, H);
+      const overNote   = !resizeNote && getNoteAt(cx, cy, W, H) !== null;
+      canvas.style.cursor = resizeNote
+        ? "ns-resize"
+        : editMode === "eraser" ? "not-allowed" : overNote ? "grab" : "crosshair";
+      const inLane = cy > H * HORIZON_Y_RATIO && cy < H * STRIKE_Y_RATIO;
+      const next = editMode === "note" && !isPlaying && inLane && !resizeNote && !overNote
+        ? cellAt(cx, cy, W, H)
+        : null;
+      setHoverCell((prev) => (prev?.col === next?.col && prev?.tick === next?.tick ? prev : next));
     },
-    [getSustainResizeAt]
+    [getNoteAt, getSustainResizeAt, cellAt, applyDrag]
   );
 
-  const handleMouseUp = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
       const canvas = canvasRef.current;
       if (!canvas) return;
-      const { selectedNoteIds, onSelectNotes, onAddPhrase, phraseType } = propsRef.current;
+      const rect = canvas.getBoundingClientRect();
+      const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+      const W = canvas.width, H = canvas.height;
+      const { selectedNoteIds, onSelectNotes, onAddPhrase, editMode } = propsRef.current;
 
-      // Handle right-click drag completion (sustain creation)
       if (rightDragRef.current.active) {
-        const { startTick, startFret, currentTick: endTick } = rightDragRef.current;
-        const length = Math.max(0, endTick - startTick);
-        if (length > 0) {
-          const { onAddNote } = propsRef.current;
-          // We need a special add-note-with-sustain, but we can just add note then
-          // rely on ChartEditor to handle this
-          if (onRightClickDrag) {
-            onRightClickDrag(startTick, startFret, endTick);
-          }
+        const rd = rightDragRef.current;
+        rd.active = false;
+        const startedOnNote = getNoteAt(rd.x, rd.y, W, H) !== null;
+        if (editMode === "note" && !startedOnNote && rd.currentTick > rd.startTick) {
+          onRightClickDrag?.(rd.startTick, rd.startFret, rd.currentTick);
+        } else if (Math.abs(cx - rd.x) < 4 && Math.abs(cy - rd.y) < 4) {
+          deleteAt(rd.x, rd.y, W, H);
         }
-        rightDragRef.current.active = false;
         return;
       }
 
-      // Handle lasso completion
       if (lassoRef.current.active) {
-        const rect = lassoRef.current;
-        const ids = getNotesInLassoRect(rect, canvas.width, canvas.height);
-        if (ids.length > 0) {
-          onSelectNotes(e.shiftKey ? [...selectedNoteIds, ...ids] : ids);
-        } else if (!e.shiftKey) {
-          onSelectNotes([]);
-        }
-        lassoRef.current.active = false;
+        const r = lassoRef.current;
+        r.active = false;
         setLassoRect(null);
+        // No real drag: a plain click on empty space, which onClick turns into a new note
+        if (Math.abs(r.x2 - r.x1) < 4 && Math.abs(r.y2 - r.y1) < 4) return;
+        suppressClickRef.current = true;
+        const ids = getNotesInLassoRect(r, W, H);
+        onSelectNotes(e.shiftKey ? [...new Set([...selectedNoteIds, ...ids])] : ids);
         return;
       }
 
-      // Handle phrase draw completion
       if (phraseDrawRef.current.active) {
         const { startTick, currentTick: endTick } = phraseDrawRef.current;
         const start  = Math.min(startTick, endTick);
         const length = Math.abs(endTick - startTick);
-        if (length > 0 && onAddPhrase) {
-          onAddPhrase(start, length);
-        }
+        if (length > 0 && onAddPhrase) onAddPhrase(start, length);
         phraseDrawRef.current.active = false;
         setPhraseDraw(null);
+        suppressClickRef.current = true;
         return;
       }
 
-      // Handle resize completion
       if (resizeRef.current.active) {
         resizeRef.current.active = false;
+        suppressClickRef.current = true;
         return;
       }
 
-      // Handle note drag completion
-      const drag = dragRef.current;
-      if (!drag.active || !drag.noteId) { dragRef.current.active = false; return; }
-
-      const { chart, trackKey, currentTick, zoom, renderDistance, snapDivision, onMoveNotes, numCols: nc, isDrums: isd, leftyFlip: lf } = propsRef.current;
-      const resolution = chart.metadata.resolution || 192;
-      const vt         = visibleTicksFromZoom(zoom, resolution, renderDistance);
-      const gridTicks  = snapDivisionToTicks(resolution, snapDivision);
-      const rect = canvas.getBoundingClientRect();
-      const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
-
-      const rawDt   = yToTickOffset(cy, canvas.width, canvas.height, vt);
-      const newTick = Math.max(0, snapToGrid(currentTick + rawDt, gridTicks));
-      const colIdx  = xyToFret(cx, cy, canvas.width, canvas.height, vt, nc);
-      const rawCol  = lf ? (nc - 1 - colIdx) : colIdx;
-      const newFret = isd ? rawCol + 1 : rawCol;
-
-      const deltaTick = newTick - drag.startTick;
-      const deltaFret = newFret - drag.startFret;
-      if (deltaTick !== 0 || deltaFret !== 0) {
-        const ids = selectedNoteIds.has(drag.noteId) ? [...selectedNoteIds] : [drag.noteId];
-        onMoveNotes(ids, deltaTick, deltaFret);
+      if (dragRef.current.active) {
+        applyDrag(cx, cy, W, H);
+        dragRef.current.active = false;
+        suppressClickRef.current = true;
       }
-      dragRef.current.active = false;
-
-      // Suppress click if we moved (for drag detection)
-      void phraseType;
     },
-    [getNotesInLassoRect]
+    [getNoteAt, getNotesInLassoRect, deleteAt, applyDrag, onRightClickDrag]
   );
 
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      // If drag was active (we just dropped a note), skip click
-      if (dragRef.current.active) return;
-      // If lasso was completed, skip click
-      if (lassoRef.current.active) return;
-
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
-
-      const { editMode } = propsRef.current;
-      if (editMode === "phrase" || editMode === "eraser") return;
-
-      if (cy <= canvas.height * HORIZON_Y_RATIO || cy >= canvas.height * STRIKE_Y_RATIO) return;
-      if (getNoteAt(cx, cy, canvas.width, canvas.height)) return;
-
-      const { chart, currentTick, zoom, renderDistance, snapDivision, onAddNote, numCols: nc, isDrums: isd, leftyFlip: lf } = propsRef.current;
-      const resolution = chart.metadata.resolution || 192;
-      const vt         = visibleTicksFromZoom(zoom, resolution, renderDistance);
-      const gridTicks  = snapDivisionToTicks(resolution, snapDivision);
-
-      const rawDt = yToTickOffset(cy, canvas.width, canvas.height, vt);
-      const tick  = Math.max(0, snapToGrid(currentTick + rawDt, gridTicks));
-      const colIdx = xyToFret(cx, cy, canvas.width, canvas.height, vt, nc);
-      const rawCol = lf ? (nc - 1 - colIdx) : colIdx;
-      const fret   = isd ? rawCol + 1 : rawCol;
-      onAddNote(tick, fret);
-    },
-    [getNoteAt]
-  );
-
-  const handleContextMenu = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      e.preventDefault();
-      // Skip context menu if right-click drag was used
-      if (rightDragRef.current.active) return;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
-      const { onDeleteNotes, selectedNoteIds, editMode, onDeletePhrase } = propsRef.current;
-
-      if (editMode === "phrase") {
-        // In phrase mode: check if a phrase is under cursor and delete it
-        const { chart, trackKey, currentTick, zoom, renderDistance } = propsRef.current;
-        const track = chart.tracks[trackKey];
-        if (track) {
-          const resolution = chart.metadata.resolution || 192;
-          const vt         = visibleTicksFromZoom(zoom, resolution, renderDistance);
-          const H          = canvas.height;
-
-          for (const phrase of track.phrases) {
-            const dtS = phrase.tick - currentTick;
-            const dtE = dtS + phrase.length;
-            if (dtE < 0 || dtS > vt) continue;
-            const lS = laneAt(depthAt(Math.max(0, dtS), vt), canvas.width, H, numCols);
-            const lE = laneAt(depthAt(Math.min(vt, dtE), vt), canvas.width, H, numCols);
-            // Check if cy is in the phrase band
-            if (cy >= lE.y - 4 && cy <= lS.y + 4 && cx >= lS.left && cx <= lS.right) {
-              if (onDeletePhrase) onDeletePhrase(phrase.id);
-              return;
-            }
-          }
-        }
+      // The click that ends a drag, lasso or resize must not add a note
+      if (suppressClickRef.current) {
+        suppressClickRef.current = false;
         return;
       }
+      if (e.button !== 0) return;
 
-      const note = getNoteAt(cx, cy, canvas.width, canvas.height);
-      if (note) {
-        const ids = selectedNoteIds.has(note.id) ? [...selectedNoteIds] : [note.id];
-        onDeleteNotes(ids);
-      }
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+      const W = canvas.width, H = canvas.height;
+
+      const { editMode, onAddNote } = propsRef.current;
+      if (editMode === "phrase" || editMode === "eraser") return;
+
+      if (cy <= H * HORIZON_Y_RATIO || cy >= H * STRIKE_Y_RATIO) return;
+      if (getNoteAt(cx, cy, W, H)) return;
+
+      const { tick, col } = cellAt(cx, cy, W, H);
+      onAddNote(tick, colToFret(col));
     },
-    [getNoteAt, numCols]
+    [getNoteAt, cellAt, colToFret]
   );
 
   return (
     <div ref={containerRef} className="w-full h-full">
       <canvas
         ref={canvasRef}
-        style={{ display: "block", width: "100%", height: "100%", cursor: "crosshair" }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
+        style={{ display: "block", width: "100%", height: "100%", cursor: "crosshair", touchAction: "none" }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={() => setHoverCell(null)}
         onClick={handleClick}
-        onContextMenu={handleContextMenu}
+        onContextMenu={(e) => e.preventDefault()}
       />
     </div>
   );

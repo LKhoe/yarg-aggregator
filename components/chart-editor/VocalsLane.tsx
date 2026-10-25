@@ -1,6 +1,7 @@
 "use client";
 
 import React, { memo, useEffect, useRef, useCallback } from "react";
+import { v4 as uuidv4 } from "uuid";
 import type { ChartData, LyricEvent, Note, TrackKey } from "@/lib/chart/types";
 import {
   snapDivisionToTicks,
@@ -52,8 +53,9 @@ export interface VocalsLaneProps {
   onSelectNotes: (ids: string[]) => void;
   onAddNote: (tick: number, fret: number) => void;
   onDeleteNotes: (ids: string[]) => void;
-  onMoveNotes: (ids: string[], deltaTick: number, deltaFret: number) => void;
-  onResizeNote?: (id: string, newLength: number) => void;
+  // gestureId groups a whole drag into one undo step
+  onMoveNotes: (ids: string[], deltaTick: number, deltaFret: number, gestureId?: string) => void;
+  onResizeNote?: (id: string, newLength: number, gestureId?: string) => void;
   onSeekToTick?: (tick: number) => void;
   lyrics?: LyricEvent[];
   sections?: { id: string; tick: number; name: string; type: string }[];
@@ -160,6 +162,7 @@ export const VocalsLane = memo(function VocalsLane({
     startPitch: 0,
     originalLength: 0,
     lastDeltaTick: 0,
+    gestureId: "",
   });
 
 
@@ -555,13 +558,13 @@ export const VocalsLane = memo(function VocalsLane({
       const deltaTick = Math.round((mx - drag.startX) / pxPerTick);
       if (drag.mode === "resize") {
         const newLen = Math.max(0, drag.originalLength + deltaTick);
-        propsRef.current.onResizeNote?.(drag.noteId, newLen);
+        propsRef.current.onResizeNote?.(drag.noteId, newLen, drag.gestureId);
       } else {
         const newPitch  = yToPitch(my, rH);
         const df        = newPitch - drag.startPitch;
         const dd        = deltaTick - drag.lastDeltaTick;
         if (dd !== 0 || df !== 0) {
-          propsRef.current.onMoveNotes([drag.noteId], dd, df);
+          propsRef.current.onMoveNotes([drag.noteId], dd, df, drag.gestureId);
           drag.lastDeltaTick = deltaTick;
           drag.startPitch    = newPitch;
         }
@@ -615,6 +618,7 @@ export const VocalsLane = memo(function VocalsLane({
         startPitch: hit.note.fret,
         originalLength: hit.note.length,
         lastDeltaTick: 0,
+        gestureId: uuidv4(),
       };
       if (canvasRef.current) canvasRef.current.style.cursor = hit.mode === "resize" ? "ew-resize" : "grabbing";
       return;
