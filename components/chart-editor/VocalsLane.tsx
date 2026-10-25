@@ -507,11 +507,11 @@ export const VocalsLane = memo(function VocalsLane({
 
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Static re-render: fires when any non-tick prop changes
+  // Static re-render: fires on prop changes, including seeks while paused
   useEffect(() => {
     renderCanvas();
   }, [
-    chart, trackKey, zoom, renderDistance,
+    chart, trackKey, currentTick, zoom, renderDistance,
     selectedNoteIds, lyrics, sections, isPlaying,
     waveform, vizMode, spectrogram, renderCanvas,
   ]);

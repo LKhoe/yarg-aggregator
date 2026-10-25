@@ -1176,11 +1176,11 @@ export const TrackLane = memo(function TrackLane({
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Static re-render: fires when any non-tick prop changes
+  // Static re-render: fires on prop changes, including seeks while paused
   useEffect(() => {
     renderCanvas();
   }, [
-    chart, trackKey, zoom, renderDistance, selectedNoteIds, waveform, vizMode, spectrogram,
+    chart, trackKey, currentTick, zoom, renderDistance, selectedNoteIds, waveform, vizMode, spectrogram,
     editMode, sections, lyrics, isPlaying, imagesReady, lassoRect, phraseDraw, hoverCell, renderCanvas,
     leftyFlip, ghostNotes, densityHeatmap,
   ]);

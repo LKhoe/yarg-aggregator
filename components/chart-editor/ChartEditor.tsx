@@ -28,6 +28,7 @@ import {
   snapDivisionToTicks,
   snapToGrid,
   tickToSeconds,
+  formatPosition,
   type TempoPoint,
 } from "@/lib/chart/tempo-utils";
 import { FileUpload } from "./FileUpload";
@@ -47,6 +48,7 @@ import { StatisticsPanel } from "./StatisticsPanel";
 import { AutoReduceDialog } from "./AutoReduceDialog";
 import { BpmDetectDialog } from "./BpmDetectDialog";
 import { GlobalView } from "./GlobalView";
+import { NamePromptDialog } from "./NamePromptDialog";
 import { MetronomeScheduler, ClapScheduler } from "@/lib/chart/metronome";
 import { autoReduceDifficulty } from "@/lib/chart/auto-reduce";
 import { computeDensityHeatmap } from "@/lib/chart/statistics";
@@ -107,6 +109,10 @@ type EditAction =
   | { type: "DELETE_BPM"; tick: number }
   | { type: "ADD_TIME_SIGNATURE"; tick: number; numerator: number; denominator: number }
   | { type: "DELETE_TIME_SIGNATURE"; tick: number }
+  // Ruler drags (the events at tick 0 stay put: the tempo map starts there)
+  | { type: "MOVE_BPM"; from: number; to: number }
+  | { type: "MOVE_TIME_SIGNATURE"; from: number; to: number }
+  | { type: "MOVE_SECTION"; id: string; tick: number }
   // Phrases
   | { type: "ADD_PHRASE"; track: TrackKey; phrase: Phrase }
   | { type: "DELETE_PHRASE"; track: TrackKey; id: string }
@@ -294,6 +300,31 @@ function applyAction(chart: ChartData, action: EditAction): ChartData {
     case "DELETE_TIME_SIGNATURE": {
       const sigs = chart.syncTrack.timeSignatures.filter((e) => e.tick !== action.tick);
       return { ...chart, syncTrack: { ...chart.syncTrack, timeSignatures: sigs } };
+    }
+
+    case "MOVE_BPM": {
+      const moved = chart.syncTrack.bpmEvents.find((e) => e.tick === action.from);
+      if (!moved || action.from === 0 || action.to <= 0 || action.to === action.from) return chart;
+      const events = chart.syncTrack.bpmEvents.filter((e) => e.tick !== action.from && e.tick !== action.to);
+      events.push({ ...moved, tick: action.to });
+      events.sort((a, b) => a.tick - b.tick);
+      return { ...chart, syncTrack: { ...chart.syncTrack, bpmEvents: events } };
+    }
+
+    case "MOVE_TIME_SIGNATURE": {
+      const moved = chart.syncTrack.timeSignatures.find((e) => e.tick === action.from);
+      if (!moved || action.from === 0 || action.to <= 0 || action.to === action.from) return chart;
+      const sigs = chart.syncTrack.timeSignatures.filter((e) => e.tick !== action.from && e.tick !== action.to);
+      sigs.push({ ...moved, tick: action.to });
+      sigs.sort((a, b) => a.tick - b.tick);
+      return { ...chart, syncTrack: { ...chart.syncTrack, timeSignatures: sigs } };
+    }
+
+    case "MOVE_SECTION": {
+      const sections = (chart.sections ?? [])
+        .map((s) => (s.id === action.id ? { ...s, tick: Math.max(0, action.tick) } : s))
+        .sort((a, b) => a.tick - b.tick);
+      return { ...chart, sections };
     }
 
     case "ADD_PHRASE": {
@@ -531,12 +562,6 @@ export function ChartEditor() {
   const clapEnabledRef = useRef(false);
   clapEnabledRef.current = clapEnabled;
 
-  // Sustain gap capping (auto-trim overlapping sustains)
-  const [sustainGap, setSustainGap] = useState<number>(0); // 0 = disabled, >0 = gap in ticks
-
-  // Global vs Local view mode
-  const [viewMode, setViewMode] = useState<"local" | "global">("local");
-
   // Pattern catalog
   const [catalogPatterns, setCatalogPatterns] = useState<{ name: string; notes: Note[] }[]>(() => {
     if (typeof window === "undefined") return [];
@@ -558,6 +583,9 @@ export function ChartEditor() {
 
   // Keyboard shortcuts panel
   const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // Name prompt (new section at the playhead, or a catalog pattern from the selection)
+  const [namePrompt, setNamePrompt] = useState<{ kind: "section"; tick: number } | { kind: "pattern" } | null>(null);
 
   // Validation & Statistics panels
   const [showValidation, setShowValidation] = useState(false);
@@ -993,14 +1021,21 @@ export function ChartEditor() {
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      const target = e.target instanceof HTMLElement ? e.target : null;
       if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target?.isContentEditable
       )
         return;
+      // A dialog or an open dropdown owns the keyboard (Delete must not edit the chart behind it)
+      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="listbox"], [role="menu"]')) return;
 
       if (e.code === "Space") {
         e.preventDefault();
+        // Otherwise the focused button would also fire on keyup (e.g. Play → toggles twice)
+        if (target?.closest("button, [role='button'], [role='combobox']")) target.blur();
         handlePlayPause();
         return;
       }
@@ -1026,16 +1061,6 @@ export function ChartEditor() {
         if (!e.ctrlKey && !e.metaKey) {
           e.preventDefault();
           setPianoPreview((v) => !v);
-          return;
-        }
-      }
-
-      // G key: toggle global/local view (when no selection to avoid conflicts)
-      if ((e.key === "g" || e.key === "G") && !e.ctrlKey && !e.metaKey) {
-        const noteIds = selectedNoteIdsRef.current;
-        if (noteIds.size === 0) {
-          e.preventDefault();
-          setViewMode((v) => v === "local" ? "global" : "local");
           return;
         }
       }
@@ -1190,12 +1215,13 @@ export function ChartEditor() {
           }
           return;
         }
-        if (e.key === "z") {
+        // Ctrl/Cmd+Z = undo, Ctrl/Cmd+Shift+Z = redo (macOS convention)
+        if (e.key === "z" || e.key === "Z") {
           e.preventDefault();
-          dispatch({ type: "UNDO" });
+          dispatch({ type: e.shiftKey ? "REDO" : "UNDO" });
           return;
         }
-        if (e.key === "y") {
+        if (e.key === "y" || e.key === "Y") {
           e.preventDefault();
           dispatch({ type: "REDO" });
           return;
@@ -1236,7 +1262,9 @@ export function ChartEditor() {
             for (let i = 1; i < clipboard.length; i++) {
               if (clipboard[i].tick < minTick) minTick = clipboard[i].tick;
             }
-            const pastedTick = currentTickRef.current;
+            // Anchor on the nearest grid line so pasted notes stay on the grid
+            const gridTicks = snapDivisionToTicks(chartRef.current.metadata.resolution || 192, snapDivision);
+            const pastedTick = snapToGrid(currentTickRef.current, gridTicks);
             const offset = pastedTick - minTick;
             const newNotes: Note[] = clipboard.map((n) => ({
               ...n,
@@ -1411,21 +1439,7 @@ export function ChartEditor() {
       // M key: add section at current playhead
       if (e.key === "m" || e.key === "M") {
         e.preventDefault();
-        const name = window.prompt("Section name:");
-        if (name && name.trim()) {
-          dispatch({
-            type: "DO",
-            action: {
-              type: "ADD_SECTION",
-              section: {
-                id: uuidv4(),
-                tick: Math.round(currentTickRef.current),
-                name: name.trim(),
-                type: "section",
-              },
-            },
-          });
-        }
+        setNamePrompt({ kind: "section", tick: Math.round(currentTickRef.current) });
         return;
       }
 
@@ -1695,6 +1709,18 @@ export function ChartEditor() {
   const handleDeleteSection = useCallback((id: string) => {
     dispatch({ type: "DO", action: { type: "DELETE_SECTION", id } });
   }, []);
+  const handleRenameSection = useCallback((id: string, name: string) => {
+    dispatch({ type: "DO", action: { type: "RENAME_SECTION", id, name } });
+  }, []);
+  const handleMoveBpm = useCallback((from: number, to: number) => {
+    dispatch({ type: "DO", action: { type: "MOVE_BPM", from, to } });
+  }, []);
+  const handleMoveTimeSignature = useCallback((from: number, to: number) => {
+    dispatch({ type: "DO", action: { type: "MOVE_TIME_SIGNATURE", from, to } });
+  }, []);
+  const handleMoveSection = useCallback((id: string, tick: number) => {
+    dispatch({ type: "DO", action: { type: "MOVE_SECTION", id, tick } });
+  }, []);
 
   // PropertiesPanel callbacks
   const handleUpdateNote = useCallback((id: string, tick: number, fret: number, length: number) => {
@@ -1757,11 +1783,12 @@ export function ChartEditor() {
   const handlePasteFromCatalog = useCallback((pattern: Note[]) => {
     const track = selectedTrackRef.current;
     if (!track) return;
-    const tick = currentTickRef.current;
+    const gridTicks = snapDivisionToTicks(chartRef.current.metadata.resolution || 192, snapDivisionRef.current);
+    const tick = snapToGrid(currentTickRef.current, gridTicks);
     const newNotes = pattern.map((n) => ({
       ...n,
       id: uuidv4(),
-      tick: n.tick + Math.round(tick),
+      tick: n.tick + tick,
     }));
     dispatch({ type: "DO", action: { type: "PASTE_NOTES", track, notes: newNotes } });
     setSelectedNoteIds(new Set(newNotes.map((n) => n.id)));
@@ -1889,6 +1916,8 @@ export function ChartEditor() {
             onRedo={handleRedo}
             currentTick={currentTick}
             bpm={bpm}
+            timeSignatures={chart.syncTrack.timeSignatures}
+            resolution={resolution}
             editMode={editMode}
             onEditModeChange={setEditMode}
             phraseType={phraseType}
@@ -1914,12 +1943,8 @@ export function ChartEditor() {
             onToggleGlobalView={() => setShowGlobalView((v) => !v)}
             leftyFlip={leftyFlip}
             onLeftyFlipToggle={() => setLeftyFlip((v) => !v)}
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
             bookmarks={bookmarks}
             onBookmarkSeek={handleSeek}
-            sustainGap={sustainGap}
-            onSustainGapChange={setSustainGap}
           />
 
           <TrackSelector
@@ -1961,6 +1986,12 @@ export function ChartEditor() {
             onDeleteTimeSignature={handleDeleteTimeSignature}
             onAddSection={handleAddRulerSection}
             onDeleteSection={handleDeleteSection}
+            onRenameSection={handleRenameSection}
+            onMoveBpm={handleMoveBpm}
+            onMoveTimeSignature={handleMoveTimeSignature}
+            onMoveSection={handleMoveSection}
+            snapDivision={snapDivision}
+            tempoMap={tempoMap}
             onSeek={handleSeek}
             currentTickRef={currentTickRef}
             isPlaying={isPlaying}
@@ -2191,6 +2222,28 @@ export function ChartEditor() {
         open={showShortcuts}
         onOpenChange={setShowShortcuts}
       />
+      <NamePromptDialog
+        open={namePrompt !== null}
+        onOpenChange={(open) => { if (!open) setNamePrompt(null); }}
+        title={namePrompt?.kind === "pattern" ? "Save pattern" : "Add section"}
+        description={
+          namePrompt?.kind === "section"
+            ? `At ${formatPosition(namePrompt.tick, tempoMap, chart.syncTrack.timeSignatures, resolution)}`
+            : `${selectedNoteIds.size} selected notes`
+        }
+        placeholder={namePrompt?.kind === "pattern" ? "Pattern name" : "Verse 1"}
+        submitLabel={namePrompt?.kind === "pattern" ? "Save" : "Add"}
+        onSubmit={(name) => {
+          if (namePrompt?.kind === "pattern") {
+            handleSaveToCatalog(name);
+          } else if (namePrompt?.kind === "section") {
+            dispatch({
+              type: "DO",
+              action: { type: "ADD_SECTION", section: { id: uuidv4(), tick: namePrompt.tick, name, type: "section" } },
+            });
+          }
+        }}
+      />
       <AutoReduceDialog
         open={showAutoReduce}
         onOpenChange={setShowAutoReduce}
@@ -2208,8 +2261,8 @@ export function ChartEditor() {
       {/* Autosave recovery dialog */}
       {showRecovery && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-background border rounded-lg p-6 max-w-md shadow-xl">
-            <h3 className="text-sm font-semibold mb-2">Recover Autosaved Chart?</h3>
+          <div role="alertdialog" aria-modal="true" aria-labelledby="chart-recovery-title" className="bg-background border rounded-lg p-6 max-w-md shadow-xl">
+            <h3 id="chart-recovery-title" className="text-sm font-semibold mb-2">Recover Autosaved Chart?</h3>
             <p className="text-xs text-muted-foreground mb-4">
               An autosaved chart was found from a previous session. Would you like to recover it?
             </p>
@@ -2228,8 +2281,8 @@ export function ChartEditor() {
       {/* Pattern catalog dialog */}
       {showCatalog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowCatalog(false)}>
-          <div className="bg-background border rounded-lg p-6 max-w-md shadow-xl w-full" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-sm font-semibold mb-3">Pattern Catalog</h3>
+          <div role="dialog" aria-modal="true" aria-labelledby="chart-catalog-title" className="bg-background border rounded-lg p-6 max-w-md shadow-xl w-full" onClick={(e) => e.stopPropagation()}>
+            <h3 id="chart-catalog-title" className="text-sm font-semibold mb-3">Pattern Catalog</h3>
             {catalogPatterns.length === 0 ? (
               <p className="text-xs text-muted-foreground mb-4">No patterns saved yet. Select notes and use &quot;Save to Catalog&quot; to add patterns.</p>
             ) : (
@@ -2255,10 +2308,7 @@ export function ChartEditor() {
                 variant="outline"
                 className="text-xs"
                 disabled={selectedNoteIds.size === 0}
-                onClick={() => {
-                  const name = window.prompt("Pattern name:");
-                  if (name?.trim()) handleSaveToCatalog(name.trim());
-                }}
+                onClick={() => setNamePrompt({ kind: "pattern" })}
               >
                 Save Selection
               </Button>

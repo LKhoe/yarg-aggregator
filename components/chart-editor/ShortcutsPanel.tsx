@@ -26,7 +26,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { key: "Space", description: "Play / Pause" },
       { key: "I", description: "Set loop start (A)" },
       { key: "O", description: "Set loop end (B)" },
-      { key: "Esc", description: "Clear loop points" },
+      { key: "Esc", description: "Clear selection, then loop points" },
       { key: "N", description: "Toggle clap/hit sounds" },
       { key: "P", description: "Toggle piano tone preview (Vocals)" },
     ],
@@ -34,6 +34,10 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     category: "Navigation",
     shortcuts: [
+      { key: "Mouse wheel", description: "Scroll one snap step (up = forward)" },
+      { key: "Arrow Up/Down", description: "Move playhead one snap step (no selection)" },
+      { key: "Page Up/Down", description: "Next / previous measure" },
+      { key: "Home / End", description: "Jump to start / end" },
       { key: "[", description: "Jump to previous section" },
       { key: "]", description: "Jump to next section" },
       { key: "M", description: "Add section at playhead" },
@@ -64,8 +68,12 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     shortcuts: [
       { key: "Del / Backspace", description: "Delete selected notes" },
       { key: "K", description: "Toggle eraser mode" },
-      { key: "Arrow Up/Down", description: "Move notes forward/backward" },
-      { key: "Arrow Left/Right", description: "Shift notes across frets" },
+      { key: "Click", description: "Add note (dashed preview shows where)" },
+      { key: "Drag note", description: "Move notes in time and across frets" },
+      { key: "Drag sustain end", description: "Change sustain length" },
+      { key: "Arrow Up/Down", description: "Move selected notes forward/backward" },
+      { key: "Arrow Left/Right", description: "Shift selected notes across frets" },
+      { key: "Right-click", description: "Delete note (or phrase in phrase mode)" },
       { key: "Right-click drag", description: "Place note with sustain" },
     ],
   },
@@ -78,22 +86,32 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { key: "Ctrl+D", description: "Duplicate selection" },
       { key: "Ctrl+A", description: "Select all notes in track" },
       { key: "Shift+Click", description: "Add to selection" },
-      { key: "Click+Drag", description: "Lasso select" },
+      { key: "Drag empty space", description: "Lasso select (Shift adds)" },
     ],
   },
   {
     category: "View",
     shortcuts: [
-      { key: "G", description: "Toggle global/local view" },
+      { key: "Ctrl+Wheel", description: "Zoom" },
       { key: "L", description: "Toggle lefty-flip mode" },
       { key: "?", description: "Show keyboard shortcuts" },
+    ],
+  },
+  {
+    category: "Ruler (top strip)",
+    shortcuts: [
+      { key: "Click", description: "Add section" },
+      { key: "Right-click", description: "Add BPM or time signature" },
+      { key: "Click marker", description: "Jump to it" },
+      { key: "Drag marker", description: "Move it (snaps to grid)" },
+      { key: "Right-click marker", description: "Edit or delete it" },
     ],
   },
   {
     category: "History",
     shortcuts: [
       { key: "Ctrl+Z", description: "Undo" },
-      { key: "Ctrl+Y", description: "Redo" },
+      { key: "Ctrl+Y / Ctrl+Shift+Z", description: "Redo" },
     ],
   },
 ];
@@ -113,7 +131,7 @@ export const ShortcutsPanel = memo(function ShortcutsPanel({
         <DialogHeader>
           <DialogTitle>Keyboard Shortcuts</DialogTitle>
           <DialogDescription>
-            Quick reference for chart editor shortcuts
+            Quick reference for chart editor shortcuts. On macOS, Ctrl also works as Cmd.
           </DialogDescription>
         </DialogHeader>
 

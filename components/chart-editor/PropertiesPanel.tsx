@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ChartData, Note, TrackKey } from "@/lib/chart/types";
 import { FRET_COLORS, DRUM_COLORS } from "@/lib/chart/types";
+import { buildTempoMap, formatPosition } from "@/lib/chart/tempo-utils";
 
 export interface PropertiesPanelProps {
   chart: ChartData;
@@ -87,6 +88,10 @@ export const PropertiesPanel = memo(function PropertiesPanel({
   }, [chart, trackKey, selectedNoteIds]);
 
   const singleNote = selectedNotes.length === 1 ? selectedNotes[0] : null;
+
+  const tempoMap = useMemo(() => buildTempoMap(chart), [chart.syncTrack]); // eslint-disable-line react-hooks/exhaustive-deps
+  const position = (tick: number) =>
+    formatPosition(tick, tempoMap, chart.syncTrack.timeSignatures, chart.metadata.resolution || 192);
 
   // Local editable state — only used when user is typing; synced from note when selection changes
   const [editState, setEditState] = useState<{ tick: number; fret: number; length: number; noteId: string | null }>({ tick: 0, fret: 0, length: 0, noteId: null });
@@ -199,6 +204,10 @@ export const PropertiesPanel = memo(function PropertiesPanel({
             </div>
           </div>
 
+          <p className="text-[10px] text-muted-foreground font-mono px-1 -mt-1.5">
+            {position(editState.tick)}
+          </p>
+
           <Button size="sm" className="w-full h-7 text-xs" onClick={handleApply}>
             Apply
           </Button>
@@ -220,8 +229,8 @@ export const PropertiesPanel = memo(function PropertiesPanel({
                   <>
                     <FlagToggle checked={singleNote.flags?.cymbal ?? false} onChange={() => onToggleFlag(singleNote.id, "cymbal")} label="Cymbal" shortcut="C" color="#eab308" />
                     <FlagToggle checked={singleNote.flags?.accent ?? false} onChange={() => onToggleFlag(singleNote.id, "accent")} label="Accent" shortcut="A" color="#ef4444" />
-                    <FlagToggle checked={singleNote.flags?.ghost ?? false} onChange={() => onToggleFlag(singleNote.id, "ghost")} label="Ghost" shortcut="^G" />
-                    <FlagToggle checked={singleNote.flags?.doubleKick ?? false} onChange={() => onToggleFlag(singleNote.id, "doubleKick")} label="Double Kick" shortcut="^K" color="#f97316" />
+                    <FlagToggle checked={singleNote.flags?.ghost ?? false} onChange={() => onToggleFlag(singleNote.id, "ghost")} label="Ghost" shortcut="⇧G" />
+                    <FlagToggle checked={singleNote.flags?.doubleKick ?? false} onChange={() => onToggleFlag(singleNote.id, "doubleKick")} label="Double Kick" shortcut="⇧K" color="#f97316" />
                   </>
                 )}
               </div>
@@ -244,7 +253,7 @@ export const PropertiesPanel = memo(function PropertiesPanel({
       {/* Chord info for multi-select */}
       {multiStats && (
         <div className="text-[10px] text-muted-foreground font-mono px-1">
-          Ticks: {multiStats.minTick} &ndash; {multiStats.maxTick}
+          {position(multiStats.minTick)} &ndash; {position(multiStats.maxTick)}
         </div>
       )}
     </div>

@@ -1,5 +1,7 @@
 import type { ChartData } from "./types";
 
+type TimeSignature = ChartData["syncTrack"]["timeSignatures"][number];
+
 export interface TempoPoint {
   tick: number;
   timeSeconds: number;
@@ -121,4 +123,51 @@ export function getChartDurationTicks(chart: ChartData): number {
   }
   // Add a 4-bar tail
   return maxTick + chart.metadata.resolution * 4 * 4;
+}
+
+/**
+ * 1-based measure and beat at a tick, following time signature changes.
+ * A change that falls mid-measure starts a new measure (as in game charts).
+ */
+export function getMeasureBeat(
+  tick: number,
+  timeSignatures: TimeSignature[],
+  resolution: number
+): { measure: number; beat: number } {
+  const sigs = [...timeSignatures].sort((a, b) => a.tick - b.tick);
+  let sig: TimeSignature = { tick: 0, numerator: 4, denominator: 4 };
+  let measuresBefore = 0;
+  for (const next of sigs) {
+    if (next.tick > tick) break;
+    if (next.tick > sig.tick) {
+      const measureTicks = (resolution * 4 * sig.numerator) / sig.denominator;
+      measuresBefore += Math.ceil((next.tick - sig.tick) / measureTicks - 1e-6);
+    }
+    sig = next;
+  }
+  const beatTicks = (resolution * 4) / sig.denominator;
+  const measureTicks = beatTicks * sig.numerator;
+  const rel = Math.max(0, tick - sig.tick);
+  const measure = Math.floor(rel / measureTicks + 1e-6);
+  const beat = Math.floor((rel - measure * measureTicks) / beatTicks + 1e-6);
+  return { measure: measuresBefore + measure + 1, beat: Math.min(sig.numerator, beat + 1) };
+}
+
+/** Seconds as m:ss.cc */
+export function formatClock(seconds: number): string {
+  const s = Math.max(0, seconds);
+  const m = Math.floor(s / 60);
+  const rest = s - m * 60;
+  return `${m}:${rest.toFixed(2).padStart(5, "0")}`;
+}
+
+/** Position for display: "measure.beat · m:ss.cc" */
+export function formatPosition(
+  tick: number,
+  tempoMap: TempoPoint[],
+  timeSignatures: TimeSignature[],
+  resolution: number
+): string {
+  const { measure, beat } = getMeasureBeat(tick, timeSignatures, resolution);
+  return `${measure}.${beat} · ${formatClock(tickToSeconds(Math.max(0, tick), tempoMap))}`;
 }

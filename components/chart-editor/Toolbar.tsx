@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Section } from "@/lib/chart/types";
-import type { TempoPoint } from "@/lib/chart/tempo-utils";
+import { formatPosition, type TempoPoint } from "@/lib/chart/tempo-utils";
 import { SectionNav } from "./SectionNav";
 
 export interface ToolbarProps {
@@ -57,6 +57,9 @@ export interface ToolbarProps {
   onRedo: () => void;
   currentTick: number;
   bpm: number;
+  // For the measure.beat · time readout
+  timeSignatures?: { tick: number; numerator: number; denominator: number }[];
+  resolution?: number;
   // Edit mode (now includes eraser)
   editMode: "note" | "phrase" | "eraser";
   onEditModeChange: (mode: "note" | "phrase" | "eraser") => void;
@@ -91,17 +94,11 @@ export interface ToolbarProps {
   // Lefty-flip
   leftyFlip?: boolean;
   onLeftyFlipToggle?: () => void;
-  // View mode (global vs local)
-  viewMode?: "local" | "global";
-  onViewModeChange?: (mode: "local" | "global") => void;
   // Help
   onShowShortcuts?: () => void;
   // Bookmarks
   bookmarks?: (number | null)[];
   onBookmarkSeek?: (tick: number) => void;
-  // Sustain gap
-  sustainGap?: number;
-  onSustainGapChange?: (gap: number) => void;
 }
 
 const SNAP_OPTIONS = [
@@ -164,6 +161,8 @@ export const Toolbar = memo(function Toolbar({
   onRedo,
   currentTick,
   bpm,
+  timeSignatures,
+  resolution,
   editMode,
   onEditModeChange,
   phraseType,
@@ -188,13 +187,9 @@ export const Toolbar = memo(function Toolbar({
   onToggleGlobalView,
   leftyFlip,
   onLeftyFlipToggle,
-  viewMode,
-  onViewModeChange,
   onShowShortcuts,
   bookmarks,
   onBookmarkSeek,
-  sustainGap,
-  onSustainGapChange,
 }: ToolbarProps) {
   return (
     <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 px-3 py-1.5 border-b bg-background/80 backdrop-blur-sm min-h-[40px]">
@@ -215,7 +210,7 @@ export const Toolbar = memo(function Toolbar({
           {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
         </Button>
         {onMetronomeToggle && (
-          <Button variant={metronomeEnabled ? "secondary" : "ghost"} size="icon" className="h-7 w-7" onClick={onMetronomeToggle} title="Metronome (M)">
+          <Button variant={metronomeEnabled ? "secondary" : "ghost"} size="icon" className="h-7 w-7" onClick={onMetronomeToggle} title="Metronome">
             <Timer className="h-3.5 w-3.5" />
           </Button>
         )}
@@ -403,34 +398,7 @@ export const Toolbar = memo(function Toolbar({
             <FlipHorizontal className="h-3.5 w-3.5" />
           </Button>
         )}
-        {onViewModeChange && (
-          <Button
-            variant={viewMode === "global" ? "secondary" : "ghost"}
-            size="sm"
-            className={cn("h-6 px-1.5 text-xs", viewMode === "global" && "shadow-sm")}
-            onClick={() => onViewModeChange(viewMode === "local" ? "global" : "local")}
-            title="Global/Local view (G)"
-          >
-            {viewMode === "global" ? "Glb" : "Lcl"}
-          </Button>
-        )}
       </div>
-
-      {/* Sustain gap */}
-      {onSustainGapChange && (
-        <Select value={String(sustainGap ?? 0)} onValueChange={(v) => onSustainGapChange(Number(v))}>
-          <SelectTrigger className="h-6 w-14 text-xs" title="Sustain gap">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="0">Gap: Off</SelectItem>
-            <SelectItem value="1">1 tick</SelectItem>
-            <SelectItem value="12">1/16</SelectItem>
-            <SelectItem value="24">1/8</SelectItem>
-            <SelectItem value="48">1/4</SelectItem>
-          </SelectContent>
-        </Select>
-      )}
 
       {/* Loop indicator */}
       {(loopA !== null || loopB !== null) && (
@@ -465,7 +433,11 @@ export const Toolbar = memo(function Toolbar({
 
       {/* Status */}
       <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono shrink-0">
-        <span>{Math.round(currentTick)}</span>
+        <span className="tabular-nums" title={`Tick ${Math.round(currentTick)}`}>
+          {tempoMap && timeSignatures && resolution
+            ? formatPosition(currentTick, tempoMap, timeSignatures, resolution)
+            : Math.round(currentTick)}
+        </span>
         {onShowBpmDetect ? (
           <button onClick={onShowBpmDetect} className="hover:text-foreground transition-colors" title="BPM Detection">
             {Math.round(bpm * 100) / 100} bpm
