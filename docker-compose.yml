@@ -20,6 +20,9 @@ services:
       - DATABASE_URL=${DATABASE_URL:?set DATABASE_URL in .env}
       - POSTGRES_HOST=${POSTGRES_HOST:-localinfra-postgres}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      # Anonymous usage metrics (/api/metrics → localinfra-metrics); empty key = dropped
+      - METRICS_URL=${METRICS_URL:-http://localinfra-metrics:4100}
+      - METRICS_API_KEY=${METRICS_API_KEY:-}
       # Redis — LocalInfra Redis; ACL user limited to keys/channels "yarg:*"
       - REDIS_HOST=${REDIS_HOST:-localinfra-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
@@ -68,6 +71,7 @@ services:
       - localinfra_postgres
       - localinfra_redis
       - localinfra_llm
+      - localinfra_metrics
       # LocalInfra's Cloudflare tunnel reaches the app here: http://yarg-aggregator:3000
       - localinfra_tunnel
     deploy:
@@ -89,6 +93,8 @@ networks:
   localinfra_redis:
     external: true
   localinfra_llm:
+    external: true
+  localinfra_metrics:
     external: true
   localinfra_tunnel:
     external: true

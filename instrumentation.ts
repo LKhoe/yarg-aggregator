@@ -8,7 +8,7 @@ export async function register() {
 export async function onRequestError(
   err: unknown,
   request: { method: string; path: string },
-  _context: unknown,
+  context: unknown,
 ) {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
   try {
@@ -24,4 +24,7 @@ export async function onRequestError(
   } catch {
     // Never let monitoring errors surface
   }
+  // LocalInfra's metrics: route pattern, error name and a scrubbed message only
+  const { reportServerError } = await import('./lib/metrics/forward');
+  await reportServerError(err, context as { routePath?: string });
 }

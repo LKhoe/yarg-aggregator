@@ -31,7 +31,6 @@ import {
 } from "lucide-react";
 import type {
   MonitoringError,
-  WebVitalMetric,
   QueueStats,
   DbStats,
 } from "@/lib/monitoring";
@@ -41,88 +40,7 @@ export interface MonitoringData {
   queue: QueueStats;
   db: DbStats;
   errors: MonitoringError[];
-  vitals: Record<string, WebVitalMetric[]>;
 }
-
-// ─── Web Vitals config ───────────────────────────────────────────────────────
-
-const VITAL_THRESHOLDS: Record<
-  string,
-  { good: number; poor: number; unit: string; description: string }
-> = {
-  LCP: {
-    good: 2500,
-    poor: 4000,
-    unit: "ms",
-    description: "Largest Contentful Paint",
-  },
-  FCP: {
-    good: 1800,
-    poor: 3000,
-    unit: "ms",
-    description: "First Contentful Paint",
-  },
-  CLS: {
-    good: 0.1,
-    poor: 0.25,
-    unit: "",
-    description: "Cumulative Layout Shift",
-  },
-  INP: {
-    good: 200,
-    poor: 500,
-    unit: "ms",
-    description: "Interaction to Next Paint",
-  },
-  TTFB: {
-    good: 800,
-    poor: 1800,
-    unit: "ms",
-    description: "Time to First Byte",
-  },
-};
-
-function formatVital(name: string, value: number): string {
-  const t = VITAL_THRESHOLDS[name];
-  if (!t) return String(value);
-  return t.unit === "ms" ? `${Math.round(value)} ms` : value.toFixed(3);
-}
-
-function avg(values: number[]): number {
-  if (!values.length) return 0;
-  return values.reduce((a, b) => a + b, 0) / values.length;
-}
-
-function calcRating(
-  name: string,
-  value: number,
-): "good" | "needsWork" | "poor" {
-  const t = VITAL_THRESHOLDS[name];
-  if (!t) return "good";
-  if (value <= t.good) return "good";
-  if (value <= t.poor) return "needsWork";
-  return "poor";
-}
-
-/** Returns 0-100 progress where 100 = at or beyond "poor" threshold */
-function vitalProgress(name: string, value: number): number {
-  const t = VITAL_THRESHOLDS[name];
-  if (!t) return 0;
-  return Math.min(100, Math.round((value / t.poor) * 100));
-}
-
-const RATING_BAR: Record<string, string> = {
-  good: "bg-emerald-500",
-  needsWork: "bg-amber-400",
-  poor: "bg-red-500",
-};
-
-const RATING_BADGE: Record<string, string> = {
-  good: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-  needsWork:
-    "bg-amber-400/10 text-amber-600 dark:text-amber-400 border-amber-400/20",
-  poor: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
-};
 
 // ─── HTTP method colors ───────────────────────────────────────────────────────
 
@@ -218,7 +136,7 @@ function formatPath(raw: string): string {
 
 export function MonitoringDashboard({ data }: { data: MonitoringData }) {
   const { t } = useTranslations();
-  const { queue, db, errors, vitals } = data;
+  const { queue, db, errors } = data;
   const [expandedErrors, setExpandedErrors] = useState<Set<number>>(new Set());
 
   function toggleError(i: number) {
@@ -319,99 +237,15 @@ export function MonitoringDashboard({ data }: { data: MonitoringData }) {
         </div>
       </section>
 
-      {/* ── Web Vitals ── */}
+      {/* ── Web Vitals: collected for every app by LocalInfra (Container Health → Metrics) ── */}
       <section>
         <SectionHeader
           icon={TrendingUp}
           title={t("admin.monitoring.webVitals")}
         />
         <Card>
-          <CardContent className="p-0 overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-35">
-                    {t("admin.monitoring.metric")}
-                  </TableHead>
-                  <TableHead>{t("admin.monitoring.score")}</TableHead>
-                  <TableHead className="w-22.5 text-right">
-                    {t("admin.monitoring.avg")}
-                  </TableHead>
-                  <TableHead className="w-20 text-right">
-                    {t("admin.monitoring.samples")}
-                  </TableHead>
-                  <TableHead className="w-32.5">
-                    {t("admin.monitoring.rating")}
-                  </TableHead>
-                  <TableHead>{t("admin.monitoring.latestPath")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Object.entries(VITAL_THRESHOLDS).map(([name, cfg]) => {
-                  const metrics = vitals[name] ?? [];
-                  const avgVal = avg(metrics.map((m) => m.value));
-                  const rating =
-                    metrics.length > 0 ? calcRating(name, avgVal) : null;
-                  const progress = rating ? vitalProgress(name, avgVal) : 0;
-                  const latestPath = metrics[0]?.path ?? "—";
-                  const ratingText = rating
-                    ? t(`admin.monitoring.${rating}`)
-                    : "—";
-
-                  return (
-                    <TableRow key={name}>
-                      <TableCell>
-                        <p className="font-mono font-semibold text-sm">
-                          {name}
-                        </p>
-                        <p className="text-xs text-muted-foreground leading-tight">
-                          {cfg.description}
-                        </p>
-                      </TableCell>
-                      <TableCell>
-                        {rating ? (
-                          <div className="flex items-center gap-2 min-w-30">
-                            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all ${RATING_BAR[rating]}`}
-                                style={{ width: `${progress}%` }}
-                              />
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">
-                            —
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm">
-                        {metrics.length > 0 ? formatVital(name, avgVal) : "—"}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground text-sm">
-                        {metrics.length}
-                      </TableCell>
-                      <TableCell>
-                        {rating ? (
-                          <Badge
-                            variant="outline"
-                            className={RATING_BADGE[rating]}
-                          >
-                            {ratingText}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">
-                            {t("admin.monitoring.noData")}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm font-mono truncate max-w-45">
-                        {latestPath}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+          <CardContent className="px-4 py-3 text-sm text-muted-foreground">
+            {t("admin.monitoring.webVitalsMoved")}
           </CardContent>
         </Card>
       </section>

@@ -6,7 +6,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { TranslationProvider } from "@/contexts/TranslationContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ServiceWorkerRegistration } from "@/components/pwa/ServiceWorkerRegistration";
-import { WebVitals } from "@/app/components/WebVitals";
+import { Metrics } from "@/app/components/Metrics";
 import { getMessages, getLocale } from "next-intl/server";
 import { cache } from "react";
 import "./globals.css";
@@ -93,7 +93,7 @@ export default async function RootLayout({
           </ThemeProvider>
         </NextIntlClientProvider>
         <ServiceWorkerRegistration />
-        <WebVitals />
+        <Metrics />
       </body>
     </html>
   );
