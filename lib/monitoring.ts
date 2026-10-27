@@ -13,14 +13,6 @@ export interface MonitoringError {
   digest?: string;
 }
 
-export interface WebVitalMetric {
-  name: string;
-  value: number;
-  rating: "good" | "needs-improvement" | "poor";
-  path: string;
-  timestamp: string;
-}
-
 export interface QueueStats {
   waiting: number;
   active: number;
@@ -38,9 +30,7 @@ export interface DbStats {
 }
 
 const ERROR_KEY = "metrics:errors";
-const VITAL_KEY = (name: string) => `metrics:vitals:${name}`;
 const MAX_ERRORS = 50;
-const MAX_VITALS = 100;
 
 export async function pushError(error: MonitoringError): Promise<void> {
   const redis = getRedisClient();
@@ -48,28 +38,10 @@ export async function pushError(error: MonitoringError): Promise<void> {
   await redis.ltrim(ERROR_KEY, 0, MAX_ERRORS - 1);
 }
 
-export async function pushVital(metric: WebVitalMetric): Promise<void> {
-  const redis = getRedisClient();
-  const key = VITAL_KEY(metric.name);
-  await redis.lpush(key, JSON.stringify(metric));
-  await redis.ltrim(key, 0, MAX_VITALS - 1);
-}
-
 export async function getErrors(): Promise<MonitoringError[]> {
   const redis = getRedisClient();
   const items = await redis.lrange(ERROR_KEY, 0, MAX_ERRORS - 1);
   return items.map((item) => JSON.parse(item) as MonitoringError);
-}
-
-export async function getVitals(): Promise<Record<string, WebVitalMetric[]>> {
-  const redis = getRedisClient();
-  const metricNames = ["LCP", "FCP", "CLS", "INP", "TTFB"];
-  const result: Record<string, WebVitalMetric[]> = {};
-  for (const name of metricNames) {
-    const items = await redis.lrange(VITAL_KEY(name), 0, MAX_VITALS - 1);
-    result[name] = items.map((item) => JSON.parse(item) as WebVitalMetric);
-  }
-  return result;
 }
 
 export async function getQueueStats(): Promise<QueueStats> {

@@ -70,6 +70,7 @@ Compose reads `.env` **on the Mac**. It is git-ignored; `.env.example` lists eve
 | `LASTFM_API_KEY`, `LASTFM_API_SECRET` | | Last.fm sign-in and import (disabled when empty) |
 | `YOUTUBE_API_KEY`, `SOUNDCLOUD_CLIENT_ID` | | optional features |
 | `LLM_BASE_URL`, `LLM_API_KEY` | | admin agent, through LocalInfra's LLM gateway: `../LocalInfra/scripts/provision-app.sh yarg . --no-postgres --no-redis --llm` |
+| `METRICS_URL`, `METRICS_API_KEY` | | anonymous usage metrics (`/api/metrics`), shown in Container Health → Metrics: `../LocalInfra/scripts/provision-app.sh yarg . --no-postgres --no-redis --metrics` |
 
 After the first sign-up on a fresh database, that account is the admin. Fill the library
 from **Admin → Providers**.
