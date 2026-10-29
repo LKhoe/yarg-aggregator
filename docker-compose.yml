@@ -2,6 +2,9 @@
 # Postgres, Redis and the LLM gateway are provided by the LocalInfra project (../LocalInfra):
 # start it first, then provision this app once with  scripts/new-project.sh yarg
 # and copy the printed variables into this project's .env.
+# Fixed project name: without it Compose uses the folder name, and deploying from a worktree
+# (any other folder) collides with the live container_name.
+name: yarg-aggregator
 services:
   yarg-aggregator:
     container_name: yarg-aggregator
