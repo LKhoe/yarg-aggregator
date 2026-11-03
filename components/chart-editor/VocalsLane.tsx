@@ -505,7 +505,7 @@ export const VocalsLane = memo(function VocalsLane({
       }
     }
 
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Static re-render: fires on prop changes, including seeks while paused
   useEffect(() => {
@@ -584,7 +584,7 @@ export const VocalsLane = memo(function VocalsLane({
       if (hit) { if (canvasRef.current) canvasRef.current.style.cursor = hit.mode === "resize" ? "ew-resize" : "grab"; return; }
     }
     if (canvasRef.current) canvasRef.current.style.cursor = "crosshair";
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -636,7 +636,7 @@ export const VocalsLane = memo(function VocalsLane({
       const tick = Math.max(0, currentTick + (mx - phX) / pxPerTick);
       propsRef.current.onSeekToTick?.(tick);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleMouseUp = useCallback(() => {
     dragRef.current.active = false;

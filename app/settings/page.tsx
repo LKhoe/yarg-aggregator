@@ -8,8 +8,7 @@ import { useTranslations } from "@/hooks/use-translations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,7 +53,7 @@ function SettingsContent() {
         const data = await response.json();
         toast.error(data.error || t("profile.updateError"));
       }
-    } catch (error) {
+    } catch {
       toast.error(t("profile.updateError"));
     } finally {
       setIsLoading(false);
@@ -92,7 +91,7 @@ function SettingsContent() {
       } else {
         toast.error(t("profile.deleteError"));
       }
-    } catch (error) {
+    } catch {
       toast.error(t("profile.deleteError"));
     } finally {
       setIsDeleting(false);

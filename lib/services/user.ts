@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { user, userProfile, songList, session, trustedDevice, account } from "@/lib/db/schema";
+import { user, userProfile } from "@/lib/db/schema";
 import { eq, ilike, or, sql, and, ne } from "drizzle-orm";
 import type { Role, UserProfile } from "@/lib/db/schema";
 import { escapeLikePattern } from "@/lib/validation";

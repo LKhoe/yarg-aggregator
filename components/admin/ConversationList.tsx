@@ -31,7 +31,7 @@ type ConversationListProps = {
   refreshKey: number;
 };
 
-function timeAgo(dateStr: string, t: (key: string) => string): string {
+function timeAgo(dateStr: string): string {
   const now = Date.now();
   const then = new Date(dateStr).getTime();
   const diffMs = now - then;
@@ -70,6 +70,7 @@ export function ConversationList({
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data loaded on mount/change; the loader's synchronous loading flag is intentional
     fetchConversations();
   }, [fetchConversations, refreshKey]);
 
@@ -128,7 +129,7 @@ export function ConversationList({
                     {conv.title || t("agent.conversations.untitled")}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {timeAgo(conv.updatedAt, t)}
+                    {timeAgo(conv.updatedAt)}
                   </p>
                 </div>
 

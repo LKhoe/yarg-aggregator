@@ -173,7 +173,6 @@ export class CacheHandler {
 
   private QuickReadUpgradeCON(stream: FixedArrayStream): void {
     const root = AbridgedFileInfo.FromStream(stream);
-    const listings = this.GetCacheCONListings(root.FullName);
     const count = stream.ReadInt32AsLittleEndian();
     for (let i = 0; i < count; i++) {
       const name = stream.ReadString();
@@ -229,7 +228,7 @@ export class CacheHandler {
     const loop = new CacheLoopable(stream);
     for (const node of loop) {
       const name = node.Slice.ReadString();
-      const index = node.Slice.ReadByte();
+      node.Slice.ReadByte(); // entry index, not needed
 
       // Unpacked PKG entries share the unpacked CON layout (subName, midi
       // last write, then the RBCON fields); only the file extensions differ.
@@ -275,6 +274,7 @@ export class CacheHandler {
     return mods;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- placeholder, keeps the original signature
   private GetCacheCONListings(filename: string): CONFileListing[] | null {
     // Placeholder
     return null;

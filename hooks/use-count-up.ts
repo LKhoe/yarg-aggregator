@@ -12,6 +12,7 @@ export function useCountUp(target: number, duration = 800): number {
     prevTarget.current = target;
 
     if (target === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the animated value when the target drops to 0
       setValue(0);
       return;
     }

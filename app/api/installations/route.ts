@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/middleware/auth";
 import { getAllInstallations } from "@/services/songs/installed";
 
-export const GET = withAuth(async (_request: NextRequest) => {
+export const GET = withAuth(async () => {
   try {
     const installations = await getAllInstallations();
     return NextResponse.json({ installations });

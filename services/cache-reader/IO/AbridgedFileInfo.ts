@@ -6,6 +6,7 @@ export class AbridgedFileInfo {
 
   constructor(
     fileOrStream: FixedArrayStream | { FullName: string; LastWriteTime: Date },
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- mirrors the original constructor signature
     lastUpdatedTime?: Date,
   ) {
     if (fileOrStream instanceof FixedArrayStream) {

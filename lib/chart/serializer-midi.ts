@@ -68,7 +68,6 @@ export function serializeMidi(chart: ChartData): Uint8Array {
     if (!group) continue;
     const midiTrack = midi.addTrack();
     midiTrack.name = INSTRUMENT_TRACK_NAMES[group.instrument];
-    const isDrums = group.instrument === "Drums";
 
     const allNotes: { ticks: number; durationTicks: number; midi: number }[] = [];
     const starPowerRanges: { tick: number; length: number }[] = [];
@@ -159,7 +158,8 @@ export function serializeMidi(chart: ChartData): Uint8Array {
     rawMidi.tracks[vocalsTrackIdx] = absEvents.map((ev) => {
       const delta = ev.absTick - prev;
       prev = ev.absTick;
-      const { absTick: _at, ...rest } = ev;
+      const rest: Partial<typeof ev> = { ...ev };
+      delete rest.absTick;
       return { ...rest, deltaTime: delta } as MidiEvent;
     });
 

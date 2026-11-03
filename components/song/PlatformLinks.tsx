@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import type { MusicPlatform, PlatformLink } from "@/types";
 import { useTranslations } from "@/hooks/use-translations";
 import { useAuth } from "@/contexts/AuthContext";
@@ -61,7 +61,9 @@ export default function PlatformLinks({
   const [result, setResult] = useState<PlatformLink | null>(null);
   const [error, setError] = useState<string | null>(null);
   const activePlatformRef = useRef(activePlatform);
-  activePlatformRef.current = activePlatform;
+  useEffect(() => {
+    activePlatformRef.current = activePlatform;
+  }, [activePlatform]);
 
   const handleClick = useCallback(
     async (platform: MusicPlatform) => {

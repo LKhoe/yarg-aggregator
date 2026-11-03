@@ -77,6 +77,7 @@ export function InstallationProvider({ children }: InstallationProviderProps) {
 
   // Fetch installations on mount
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data loaded on mount/change; the loader's synchronous loading flag is intentional
     refreshInstallations();
   }, [refreshInstallations]);
 

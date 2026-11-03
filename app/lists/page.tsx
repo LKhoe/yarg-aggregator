@@ -85,6 +85,7 @@ function ListsContent() {
       provider === "google" ||
       provider === "lastfm"
     ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- opens the import dialog when returning from the OAuth callback
       setImportProvider(provider);
       setIsImportOpen(true);
       // Clean up URL
@@ -107,6 +108,7 @@ function ListsContent() {
   }, [t]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data loaded on mount/change; the loader's synchronous loading flag is intentional
     fetchLists();
   }, [fetchLists]);
 

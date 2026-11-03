@@ -238,7 +238,7 @@ export const ChartRuler = memo(function ChartRuler({
     ctx.lineTo(playheadX, 7);
     ctx.closePath();
     ctx.fill();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Static re-render: fires on prop changes, including seeks while paused
   useEffect(() => {

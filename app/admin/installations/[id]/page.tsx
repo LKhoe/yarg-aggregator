@@ -131,6 +131,7 @@ function InstallationDetailContent({
   }, [id, t]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data loaded on mount/change; the loader's synchronous loading flag is intentional
     fetchInstallation();
   }, [fetchInstallation]);
 
@@ -219,6 +220,7 @@ function InstallationDetailContent({
   // Debounce search query and trigger fetch
   useEffect(() => {
     if (!searchQuery.trim()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- data loaded on mount/change; the loader's synchronous loading flag is intentional
       setDebouncedSearchQuery("");
       setSearchResults([]);
       setSearchNextCursor(null);
@@ -259,6 +261,7 @@ function InstallationDetailContent({
     isLoadingMoreSearch,
     searchNextCursor,
     fetchSearchResults,
+    debouncedSearchQuery,
   ]);
 
   const handleAddSong = async (songId: string) => {

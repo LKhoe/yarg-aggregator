@@ -1,6 +1,6 @@
 import type { ProviderMusic } from "@/types";
 import { db } from "@/lib/db";
-import { installation, installationSong, song } from "@/lib/db/schema";
+import { installation, installationSong } from "@/lib/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import type { SongEntry } from "@/services/cache-reader/Song/Entries/SongEntry";

@@ -98,11 +98,13 @@ export class RBCONEntry extends SongEntry {
     // Skipped arrays...
   }
 
+  /* eslint-disable @typescript-eslint/no-unused-vars -- placeholder, keeps the original signature */
   public UpdateInfo(
     updateDir: AbridgedFileInfo | undefined,
     updateMidi: bigint | undefined,
     upgrade: unknown,
   ) {}
+  /* eslint-enable @typescript-eslint/no-unused-vars */
 }
 
 export class PackedRBCONEntry extends RBCONEntry {
@@ -112,6 +114,7 @@ export class PackedRBCONEntry extends RBCONEntry {
   private _imgListing?: CONFileListing;
   private _psuedoDirectory: string = "";
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- placeholder, keeps the original signature
   constructor(root: AbridgedFileInfo, name: string) {
     super();
     // Base logic
@@ -135,12 +138,12 @@ export class PackedRBCONEntry extends RBCONEntry {
     );
 
     if (listings) {
-      const location = `songs/${entry._subName}/${entry._subName}`;
       // Listings search logic placeholder
+      // const location = `songs/${entry._subName}/${entry._subName}`;
       // listings.FindListing(location + ".mid", out entry._midiListing);
       // listings.FindListing(location + ".mogg", out entry._moggListing);
 
-      const genPath = `songs/${entry._subName}/gen/${entry._subName}`;
+      // const genPath = `songs/${entry._subName}/gen/${entry._subName}`;
       // listings.FindListing(genPath + ".milo_xbox", out entry._miloListing);
       // listings.FindListing(genPath + "_keep.png_xbox", out entry._imgListing);
     }
@@ -152,6 +155,7 @@ export class PackedRBCONEntry extends RBCONEntry {
 export class UnpackedRBCONEntry extends RBCONEntry {
   public _midiLastWrite: bigint = BigInt(0);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- placeholder, keeps the original signature
   constructor(root: AbridgedFileInfo, name: string) {
     super();
   }
@@ -174,6 +178,7 @@ export class UnpackedRBCONEntry extends RBCONEntry {
 
 export class UnpackedRBProUpgrade {
   public LastWriteTime: bigint;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- placeholder, keeps the original signature
   constructor(name: string, midiLastWrite: bigint, root: AbridgedFileInfo) {
     this.LastWriteTime = midiLastWrite;
   }

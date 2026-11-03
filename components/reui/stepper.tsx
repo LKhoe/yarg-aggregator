@@ -143,6 +143,7 @@ function Stepper({
       triggerNodes,
       indicators,
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- vendored reui stepper: dependencies kept as in the upstream component
     [
       currentStep,
       handleSetActiveStep,
@@ -250,12 +251,15 @@ function StepperTrigger({
     if (btnRef.current) {
       registerTrigger(btnRef.current)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/refs -- vendored reui stepper: dependencies kept as in the upstream component
   }, [btnRef.current])
 
   // Find our index among triggers for navigation
   const myIdx = useMemo(
     () =>
+      // eslint-disable-next-line react-hooks/refs -- vendored reui stepper: trigger registration needs the DOM node
       triggerNodes.findIndex((n: HTMLButtonElement) => n === btnRef.current),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- vendored reui stepper: dependencies kept as in the upstream component
     [triggerNodes, btnRef.current]
   )
 

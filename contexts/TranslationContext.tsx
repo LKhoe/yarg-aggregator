@@ -38,7 +38,7 @@ interface TranslationProviderProps {
 
 export function TranslationProvider({ children }: TranslationProviderProps) {
   const [locale, setLocale] = useState("en");
-  const [messages, setMessages] = useState<any>({});
+  const [messages, setMessages] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(true);
 
   const loadTranslations = useCallback(async (targetLocale: string) => {
@@ -81,6 +81,7 @@ export function TranslationProvider({ children }: TranslationProviderProps) {
       savedLocale || (browserLocale in translations ? browserLocale : "en");
 
     // Don't block on translation loading
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data loaded on mount/change; the loader's synchronous loading flag is intentional
     loadTranslations(finalLocale);
   }, [loadTranslations]);
 
