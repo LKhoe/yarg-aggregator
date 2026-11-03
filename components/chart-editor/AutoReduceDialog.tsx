@@ -10,7 +10,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import type { ChartData, Difficulty, Instrument, TrackKey } from "@/lib/chart/types";
+import type { ChartData, Difficulty, TrackKey } from "@/lib/chart/types";
 import {
   DIFFICULTY_ORDER,
   makeTrackKey,

@@ -2,6 +2,7 @@
 const TextDecoder =
   typeof window !== "undefined"
     ? window.TextDecoder
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Node-only fallback, must not be bundled for the browser
     : require("util").TextDecoder;
 
 export class FixedArray {

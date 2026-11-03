@@ -17,6 +17,7 @@ export function useUserLists(isAuthenticated: boolean) {
 
   useEffect(() => {
     if (!isAuthenticated) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the cached lists on sign-out
       setLists([]);
       setLoaded(false);
       return;

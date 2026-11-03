@@ -663,6 +663,7 @@ export default function MusicTable({
 
   useEffect(() => {
     isMounted.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch effect; the loading flag is set synchronously on purpose
     fetchData();
     return () => {
       isMounted.current = false;
@@ -767,6 +768,7 @@ export default function MusicTable({
     prevExternalFilterRef.current = externalFilter;
     setQuery("");
     setDebouncedQuery("");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- applies the external filter once per change (guarded by prevExternalFilterRef)
     if (externalFilter.genre !== undefined) setGenre(externalFilter.genre);
     if (externalFilter.artist !== undefined) setArtist(externalFilter.artist);
     if (externalFilter.album !== undefined)
@@ -1082,6 +1084,7 @@ export default function MusicTable({
                     <td colSpan={6} className="p-0 border-0" />
                   </tr>
                 )}
+                {/* eslint-disable-next-line react-hooks/refs -- false positive: only state and the virtualizer's item list are read here */}
                 {virtualItems.map((vi) => {
                   const music = data[vi.index];
                   if (!music) return null;
@@ -1115,6 +1118,7 @@ export default function MusicTable({
                 )}
               </>
             ) : (
+              // eslint-disable-next-line react-hooks/refs -- false positive: only state and the virtualizer's item list are read here
               data.map((music, index) => (
                 <MusicRow
                   key={music.id}

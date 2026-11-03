@@ -47,7 +47,7 @@ function ResetPasswordContent() {
       });
       toast.success(t("auth.resetPassword.success"));
       router.push("/login");
-    } catch (error) {
+    } catch {
       toast.error(t("auth.errors.generic"));
     } finally {
       setIsLoading(false);

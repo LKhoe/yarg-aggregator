@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import he from "he";
+import { decode as decodeHtml } from "he";
 import { getAuthenticatedUser } from "@/lib/middleware/auth";
 import { lyricsRateLimit } from "@/lib/services/rate-limit";
 
@@ -64,7 +64,7 @@ async function fetchFromVagalume(
 
     const raw = match[1].replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "");
 
-    return he.decode(raw).trim() || null;
+    return decodeHtml(raw).trim() || null;
   } catch {
     return null;
   }

@@ -47,6 +47,7 @@ function Button({
     asChild?: boolean;
   }) {
   const Comp = asChild ? Slot : "button";
+  const onClick = props.onClick;
   const ref = React.useRef<HTMLButtonElement>(null);
 
   const handleClick = React.useCallback(
@@ -77,9 +78,9 @@ function Button({
         button.appendChild(ripple);
         ripple.addEventListener("animationend", () => ripple.remove());
       }
-      props.onClick?.(e);
+      onClick?.(e);
     },
-    [asChild, props.onClick],
+    [asChild, onClick],
   );
 
   return (

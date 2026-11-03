@@ -9,7 +9,7 @@ import {
   useMemo,
 } from "react";
 import { v4 as uuidv4 } from "uuid";
-import type { ChartData, Instrument, Note, Phrase, Section, TrackKey, DrumMode, BpmEvent } from "@/lib/chart/types";
+import type { ChartData, Instrument, Note, Phrase, Section, TrackKey, DrumMode } from "@/lib/chart/types";
 import {
   makeTrackKey,
   parseTrackKey,
@@ -43,7 +43,6 @@ import { ExportDialog } from "./ExportDialog";
 import { ChartRuler } from "./ChartRuler";
 import { TimelineBar } from "./TimelineBar";
 import { ShortcutsPanel } from "./ShortcutsPanel";
-import { SectionNav } from "./SectionNav";
 import { ValidationPanel } from "./ValidationPanel";
 import { StatisticsPanel } from "./StatisticsPanel";
 import { AutoReduceDialog } from "./AutoReduceDialog";
@@ -561,10 +560,11 @@ export function ChartEditor() {
   const [editMode, setEditMode] = useState<"note" | "phrase" | "eraser">("note");
   const [phraseType, setPhraseType] = useState<Phrase["type"]>("starPower");
   const phraseTypeRef = useRef(phraseType);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read from callbacks and the animation loop; assigned in render so it is never a frame behind
   phraseTypeRef.current = phraseType;
 
   // Drum mode (4-lane vs 5-lane)
-  const [drumMode, setDrumMode] = useState<DrumMode>("4lane");
+  const [drumMode] = useState<DrumMode>("4lane");
 
   // Bookmarks (10 slots, indexed 0-9)
   const [bookmarks, setBookmarks] = useState<(number | null)[]>(Array(10).fill(null));
@@ -575,6 +575,7 @@ export function ChartEditor() {
   // Clap/hit sounds
   const [clapEnabled, setClapEnabled] = useState(false);
   const clapEnabledRef = useRef(false);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read from callbacks and the animation loop; assigned in render so it is never a frame behind
   clapEnabledRef.current = clapEnabled;
 
   // Pattern catalog
@@ -648,6 +649,7 @@ export function ChartEditor() {
   const [spectrograms, setSpectrograms] = useState<Map<string, SpectrogramData>>(new Map());
   const [spectrogramLoading, setSpectrogramLoading] = useState(false);
   const spectrogramsRef = useRef(spectrograms);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read from callbacks and the animation loop; assigned in render so it is never a frame behind
   spectrogramsRef.current = spectrograms;
 
   // Multi-stem audio state
@@ -656,22 +658,32 @@ export function ChartEditor() {
 
   // Stable refs so callbacks don't need to redeclare deps on everything
   const chartRef = useRef(chart);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read from callbacks and the animation loop; assigned in render so it is never a frame behind
   chartRef.current = chart;
   const stemsRef = useRef(stems);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read from callbacks and the animation loop; assigned in render so it is never a frame behind
   stemsRef.current = stems;
   const mutedStemsRef = useRef(mutedStems);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read from callbacks and the animation loop; assigned in render so it is never a frame behind
   mutedStemsRef.current = mutedStems;
   const playbackSpeedRef = useRef(playbackSpeed);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read from callbacks and the animation loop; assigned in render so it is never a frame behind
   playbackSpeedRef.current = playbackSpeed;
   const selectedNoteIdsRef = useRef(selectedNoteIds);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read from callbacks and the animation loop; assigned in render so it is never a frame behind
   selectedNoteIdsRef.current = selectedNoteIds;
   const selectedTrackRef = useRef(selectedTrack);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read from callbacks and the animation loop; assigned in render so it is never a frame behind
   selectedTrackRef.current = selectedTrack;
   const currentTickRef = useRef(currentTick);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read from callbacks and the animation loop; assigned in render so it is never a frame behind
   currentTickRef.current = currentTick;
   const metronomeEnabledRef = useRef(metronomeEnabled);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read from callbacks and the animation loop; assigned in render so it is never a frame behind
   metronomeEnabledRef.current = metronomeEnabled;
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read from callbacks and the animation loop; assigned in render so it is never a frame behind
   loopARef.current = loopA;
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read from callbacks and the animation loop; assigned in render so it is never a frame behind
   loopBRef.current = loopB;
   const tickFrameRef = useRef(0);
 
@@ -764,6 +776,7 @@ export function ChartEditor() {
       for (const inst of INSTRUMENT_ORDER) {
         const key = makeTrackKey(diff, inst);
         if (chart.tracks[key]) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect -- one-off state sync on mount / when the selected track disappears
           setSelectedTrack(key);
           return;
         }
@@ -794,6 +807,7 @@ export function ChartEditor() {
         if (age < 24 * 60 * 60 * 1000) { // less than 24 hours old
           const parsed = JSON.parse(saved) as ChartData;
           if (Object.keys(parsed.tracks).length > 0) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- one-off state sync on mount / when the selected track disappears
             setRecoveryData(parsed);
             setShowRecovery(true);
           }
@@ -849,7 +863,7 @@ export function ChartEditor() {
 
     rafRef.current = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [isPlaying]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isPlaying]);
 
   // Waveforms (and spectrograms) map audio samples to ticks through the tempo map
   // and offset, so redo them when either changes. Debounced: BPM drags commit often.
@@ -1015,6 +1029,7 @@ export function ChartEditor() {
     setCurrentTick(target);
     if (isPlayingRef.current) startAudioAt(target);
   }, [stopAudio, startAudioAt]);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read from callbacks and the animation loop; assigned in render so it is never a frame behind
   handleSeekStableRef.current = handleSeek;
 
   // Load a chart file, filling empty metadata from song.ini when given. Failures are shown, not swallowed.
@@ -1659,8 +1674,10 @@ export function ChartEditor() {
   const handleSaveMetadata = useCallback((metadata: ChartData["metadata"]) => {
     dispatch({ type: "DO", action: { type: "SET_METADATA", metadata } });
   }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- depends only on the part of chart that matters; the whole chart would recompute on every note edit
   const tempoMap   = useMemo(() => buildTempoMap(chart), [chart.syncTrack]);
   const bpm        = getBpmAtTick(currentTick, tempoMap);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- depends only on the part of chart that matters; the whole chart would recompute on every note edit
   const totalTicks = useMemo(() => getChartDurationTicks(chart), [chart.tracks, chart.syncTrack]);
   const resolution = chart.metadata.resolution || 192;
   const viewportTicks = ((resolution * 960) / zoom) * renderDistance;
@@ -1781,7 +1798,7 @@ export function ChartEditor() {
       window.removeEventListener("mousemove", handler);
       if (pianoOscRef.current) { pianoOscRef.current.stop(); pianoOscRef.current = null; }
     };
-  }, [pianoPreview, isVocalsTrack]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pianoPreview, isVocalsTrack]);
 
   const handleUpdateLyrics = useCallback(
     (lyrics: import("@/lib/chart/types").LyricEvent[]) => {
@@ -1906,11 +1923,6 @@ export function ChartEditor() {
 
   const handleUndo = useCallback(() => dispatch({ type: "UNDO" }), []);
   const handleRedo = useCallback(() => dispatch({ type: "REDO" }), []);
-
-  // Anchored BPM toggle
-  const handleToggleBpmAnchor = useCallback((tick: number) => {
-    dispatch({ type: "DO", action: { type: "TOGGLE_BPM_ANCHOR", tick } });
-  }, []);
 
   // Recovery handlers
   const handleRecoverAutosave = useCallback(() => {

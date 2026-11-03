@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Python virtualenv of the chart-generation lab (third-party JS inside site-packages)
+    "lab_automated_chart/**",
   ]),
 ]);
 

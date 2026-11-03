@@ -203,7 +203,7 @@ export const GlobalView = memo(function GlobalView({
     ctx.moveTo(0, H - 0.5);
     ctx.lineTo(W, H - 0.5);
     ctx.stroke();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Static re-render: when non-tick props change
   useEffect(() => {

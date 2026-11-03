@@ -1,7 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import type { Track, Difficulty, Note } from "./types";
 import type { TempoPoint } from "./tempo-utils";
-import { tickToSeconds } from "./tempo-utils";
 
 /**
  * Auto-generate a lower difficulty from a source track.

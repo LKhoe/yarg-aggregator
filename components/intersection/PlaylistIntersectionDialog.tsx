@@ -134,6 +134,7 @@ export function PlaylistIntersectionDialog({
   // Fetch my lists on open
   useEffect(() => {
     if (!open) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch effect; the loading flag is set synchronously on purpose
     setMyListsLoading(true);
     fetch("/api/lists")
       .then((r) => r.json())
@@ -145,6 +146,7 @@ export function PlaylistIntersectionDialog({
   // Fetch installations when reaching step 4
   useEffect(() => {
     if (step !== 4) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch effect; the loading flag is set synchronously on purpose
     setInstallationsLoading(true);
     fetch("/api/installations")
       .then((r) => r.json())

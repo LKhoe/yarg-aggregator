@@ -197,7 +197,7 @@ export function serializeChart(chart: ChartData): string {
     serializeEvents(chart),
   ];
 
-  for (const [key, track] of Object.entries(chart.tracks)) {
+  for (const track of Object.values(chart.tracks)) {
     if (!track) continue;
     const sectionName =
       INSTRUMENT_SECTION_NAMES[track.instrument]?.[track.difficulty];

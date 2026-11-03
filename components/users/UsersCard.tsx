@@ -63,6 +63,7 @@ export default function UsersCard() {
 
   useEffect(() => {
     isMounted.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch effect; the loading flag is set synchronously on purpose
     fetchUsers(debouncedQuery);
     return () => {
       isMounted.current = false;

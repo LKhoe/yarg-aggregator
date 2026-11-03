@@ -19,6 +19,7 @@ export const InstrumentIcon = ({
     case "harmony_2":
     case "harmony_3":
       return (
+        // eslint-disable-next-line @next/next/no-img-element -- small static SVG icon, nothing for next/image to optimize
         <img
           src={`/instruments/${instrument}.svg`}
           alt={instrument}

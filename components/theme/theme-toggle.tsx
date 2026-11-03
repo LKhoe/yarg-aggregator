@@ -9,12 +9,13 @@ import { useTranslations } from "@/hooks/use-translations";
 
 export function ThemeToggle() {
   const { setTheme, theme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
+  // false on the server and during hydration, true afterwards (theme is only known on the client)
+  const mounted = React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const { t } = useTranslations();
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
 
   if (!mounted) {
     return (

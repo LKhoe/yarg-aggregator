@@ -30,7 +30,7 @@ export class SessionService {
   }
 
   static async invalidateSession(sessionId: string): Promise<boolean> {
-    const result = await db
+    await db
       .delete(session)
       .where(eq(session.id, sessionId));
 

@@ -30,7 +30,6 @@ import {
   MapPin,
   Eraser,
   FlipHorizontal,
-  Music,
   Hand,
 } from "lucide-react";
 import { cn } from "@/lib/utils";

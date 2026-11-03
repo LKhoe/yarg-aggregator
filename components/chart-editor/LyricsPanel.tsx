@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, useEffect, useRef, useCallback } from "react";
+import { memo, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -44,8 +44,10 @@ export const LyricsPanel = memo(function LyricsPanel({
   onUpdateRef.current = onUpdateLyrics;
 
   const lyrics = chart.lyrics;
-  const parsed = parseTrackKey(trackKey);
-  const trackNotes = parsed ? (chart.tracks[trackKey]?.notes ?? []) : [];
+  const trackNotes = useMemo(
+    () => (parseTrackKey(trackKey) ? (chart.tracks[trackKey]?.notes ?? []) : []),
+    [chart.tracks, trackKey],
+  );
 
   // Active lyric index for highlight during playback
   const activeLyricIdx = isPlaying ? getActiveLyricIndex(lyrics, currentTick) : -1;

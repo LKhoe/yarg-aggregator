@@ -113,6 +113,7 @@ function AdminUsersContent() {
   }, [page, searchQuery, limit, t]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data loaded on mount/change; the loader's synchronous loading flag is intentional
     fetchUsers();
   }, [fetchUsers]);
 

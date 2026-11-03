@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useState, useEffect, useCallback } from "react";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useTranslations } from "@/hooks/use-translations";
 import { Button } from "@/components/ui/button";
@@ -26,23 +25,24 @@ function DevicesContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
-  const fetchDevices = async () => {
+  const fetchDevices = useCallback(async () => {
     try {
       const response = await fetch("/api/users/me/devices");
       if (response.ok) {
         const data = await response.json();
         setDevices(data);
       }
-    } catch (error) {
+    } catch {
       toast.error(t("profile.devicesError"));
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data loaded on mount/change; the loader's synchronous loading flag is intentional
     fetchDevices();
-  }, []);
+  }, [fetchDevices]);
 
   const handleRevokeDevice = async (deviceId: string) => {
     setRevokingId(deviceId);
@@ -58,7 +58,7 @@ function DevicesContent() {
       } else {
         toast.error(t("profile.deviceRevokeError"));
       }
-    } catch (error) {
+    } catch {
       toast.error(t("profile.deviceRevokeError"));
     } finally {
       setRevokingId(null);

@@ -90,6 +90,7 @@ export function LoginForm() {
 
   const handleLastfmLogin = () => {
     setIsLastfmLoading(true);
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- API route that redirects to Last.fm; needs a full page load, not client routing
     window.location.href = "/api/auth/lastfm/signin";
   };
 

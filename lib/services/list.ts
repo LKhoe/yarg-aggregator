@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { songList, songListItem, song, artist, album, downloadUrl, userProfile, installationSong } from "@/lib/db/schema";
-import { eq, and, sql, or, desc, inArray, ne, ilike, count } from "drizzle-orm";
+import { eq, and, or, desc, inArray, ne, ilike, count } from "drizzle-orm";
 import type { SongList, SongListItem, Song } from "@/lib/db/schema";
 import { escapeLikePattern } from "@/lib/validation";
 

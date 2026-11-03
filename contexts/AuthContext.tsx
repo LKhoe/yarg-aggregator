@@ -77,6 +77,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     if (!isPending) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- data loaded on mount/change; the loader's synchronous loading flag is intentional
       fetchUserProfile();
     }
   }, [isPending, fetchUserProfile]);

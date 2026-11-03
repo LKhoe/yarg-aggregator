@@ -8,7 +8,6 @@ import type {
   LyricEvent,
   Note,
   Phrase,
-  Track,
   TrackKey,
 } from "./types";
 import { makeTrackKey } from "./types";

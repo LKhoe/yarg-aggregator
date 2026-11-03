@@ -4,7 +4,6 @@ import React, { memo, useEffect, useRef, useCallback, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type { ChartData, LyricEvent, Note, Phrase, Section, TrackKey } from "@/lib/chart/types";
 import {
-  buildTempoMap,
   snapDivisionToTicks,
   snapToGrid,
 } from "@/lib/chart/tempo-utils";
@@ -1044,7 +1043,6 @@ export const TrackLane = memo(function TrackLane({
 
     // ── 8c. Lyrics overlay (Vocals track only)
     if (lyrics && lyrics.length > 0) {
-      const sy2 = H * STRIKE_Y_RATIO;
       ctx.save();
       for (const lyric of lyrics) {
         if (lyric.tick === null) continue;
@@ -1174,7 +1172,7 @@ export const TrackLane = memo(function TrackLane({
         ctx.restore();
       }
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Static re-render: fires on prop changes, including seeks while paused
   useEffect(() => {

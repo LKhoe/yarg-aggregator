@@ -8,7 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev            # Development server (port 3000)
 npm run build          # Production build (also run by the Dockerfile)
 npm run lint           # ESLint
-npx tsc --noEmit       # Type check
+npm run typecheck      # tsc --noEmit
+npm test               # vitest (pure units only: validation, chart parsing/tempo, song normalization)
 npm run db:generate    # Generate a Drizzle migration after editing lib/db/schema.ts (commit it)
 
 # Apply schema locally (the Docker entrypoint runs these on every container start)
@@ -20,7 +21,7 @@ node --env-file=.env.local scripts/apply-sql.mjs   # extensions, full-text searc
 DOCKER_CONTEXT=umbrel docker compose logs -f yarg-aggregator
 ```
 
-There is no test suite. Always pass `DOCKER_CONTEXT` explicitly: the active context is
+Tests live beside the code as `*.test.ts` and need no database or Redis. Always pass `DOCKER_CONTEXT` explicitly: the active context is
 usually `umbrel`, so a bare `docker compose` runs on the Pi (`desktop-linux` = Docker
 Desktop on the Mac).
 

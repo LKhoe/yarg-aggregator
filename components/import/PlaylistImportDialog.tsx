@@ -203,6 +203,7 @@ export function PlaylistImportDialog({
 
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- data loaded on mount/change; the loader's synchronous loading flag is intentional
       fetchAccounts();
     }
   }, [open, fetchAccounts]);
@@ -212,6 +213,7 @@ export function PlaylistImportDialog({
     if (open && initialProvider && accounts.length > 0) {
       const acc = accounts.find((a) => a.provider === initialProvider);
       if (acc?.linked && acc.hasScopes) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- jumps to step 2 once the OAuth callback's account is known
         setSelectedProvider(initialProvider);
         setStep(2);
       }
@@ -259,6 +261,7 @@ export function PlaylistImportDialog({
   // Fetch playlists when step 2 is reached
   useEffect(() => {
     if (step === 2 && selectedProvider) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- data loaded on mount/change; the loader's synchronous loading flag is intentional
       fetchPlaylists(selectedProvider);
     }
   }, [step, selectedProvider, fetchPlaylists]);
@@ -278,6 +281,7 @@ export function PlaylistImportDialog({
   // Fetch user lists for the "add to existing" option
   useEffect(() => {
     if (step === 3) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- data loaded on mount/change; the loader's synchronous loading flag is intentional
       fetchUserLists();
     }
   }, [step, fetchUserLists]);

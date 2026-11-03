@@ -13,6 +13,7 @@ export function getOutputDir(
   layout: OutputLayout,
   fileType: FileType,
   rename: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept so every call site keeps the same signature
   internalName: string,
 ): string {
   switch (layout) {
