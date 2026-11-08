@@ -33,12 +33,12 @@ stores metadata in PostgreSQL and serves a fast search UI.
 - **Stack**: Next.js 16 (App Router) + React 19, TypeScript (strict), Tailwind CSS 4 + Shadcn UI,
   PostgreSQL + Drizzle ORM, Better Auth (email/password, Google, Spotify, Apple, Last.fm),
   BullMQ + Redis, Docker.
-- **Infrastructure**: Postgres and Redis come from the separate LocalInfra repo
-  (`../LocalInfra`, containers `localinfra-postgres` / `localinfra-redis`). This app has
+- **Infrastructure**: Postgres and Redis come from the separate local-infra repo
+  (`../local-infra`, containers `localinfra-postgres` / `localinfra-redis`). This app has
   its own DB role `yarg` and a Redis ACL user limited to keys/channels `yarg:*`. LLM calls (admin
-  agent) go through LocalInfra's LLM gateway (`lib/services/llm.ts`, tiers `simple`/`medium`/`hard`),
+  agent) go through local-infra's LLM gateway (`lib/services/llm.ts`, tiers `simple`/`medium`/`hard`),
   never straight to OpenRouter.
-- **Hosting**: Raspberry Pi 4 with umbrelOS 2; public access via LocalInfra's Cloudflare
+- **Hosting**: Raspberry Pi 4 with umbrelOS 2; public access via local-infra's Cloudflare
   tunnel (`localinfra_tunnel` → `http://yarg-aggregator:3000`). See `DEPLOY.md`.
 
 ### Key paths
@@ -102,7 +102,7 @@ stores metadata in PostgreSQL and serves a fast search UI.
 
 ## Environment
 
-- Local dev: `.env.local` (overrides `.env`) with `localhost` hosts for LocalInfra running on
+- Local dev: `.env.local` (overrides `.env`) with `localhost` hosts for local-infra running on
   Docker Desktop; see README "Local development".
 - Pi: `.env` on the Mac (compose reads it through the Docker context). Required:
   `DATABASE_URL`, `POSTGRES_HOST`, `REDIS_HOST`, `REDIS_USERNAME`, `REDIS_PASSWORD`,

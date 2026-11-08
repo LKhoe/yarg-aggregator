@@ -568,7 +568,7 @@
       "queueHealth": "キューの状態",
       "databaseHealth": "データベースの状態",
       "webVitals": "Webバイタル",
-      "webVitalsMoved": "全アプリのWebバイタル、ルート別の閲覧数、エラーはLocalInfraに移りました：Container Health → Metrics（Umbrel、ローカルネットワーク）。",
+      "webVitalsMoved": "全アプリのWebバイタル、ルート別の閲覧数、エラーはlocal-infraに移りました：Container Health → Metrics（Umbrel、ローカルネットワーク）。",
       "recentApiErrors": "最近のAPIエラー",
       "waiting": "待機中",
       "active": "アクティブ",

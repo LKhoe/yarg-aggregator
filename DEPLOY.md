@@ -5,7 +5,7 @@ through a Docker context named `umbrel`: `docker compose` runs on the Mac, but t
 image is built and the container runs on the Pi. Nothing is cloned on the Pi.
 
 ```
-┌──────────── this repo ───────────────┐     ┌──────────── LocalInfra ─────────────┐
+┌──────────── this repo ───────────────┐     ┌──────────── local-infra ─────────────┐
 │  yarg-aggregator (Next.js)  :3000    │     │                                     │
 │      ├── localinfra_postgres ────────┼────►│  localinfra-postgres  db/role "yarg"│
 │      ├── localinfra_redis ───────────┼────►│  localinfra-redis     user  "yarg"  │
@@ -16,9 +16,9 @@ image is built and the container runs on the Pi. Nothing is cloned on the Pi.
   LAN: http://umbrel.local:3000
 ```
 
-- **Postgres and Redis** come from [LocalInfra](https://github.com/LKhoe/LocalInfra) (start
-  it first). This repo has no data volumes; the database is backed up nightly by LocalInfra.
-- **Public access** goes through LocalInfra's Cloudflare tunnel (`localinfra-tunnel`), which is
+- **Postgres and Redis** come from [local-infra](https://github.com/LKhoe/local-infra) (start
+  it first). This repo has no data volumes; the database is backed up nightly by local-infra.
+- **Public access** goes through local-infra's Cloudflare tunnel (`localinfra-tunnel`), which is
   on `localinfra_tunnel`; the container joins that network, so the tunnel reaches it as
   `http://yarg-aggregator:3000`.
 - **Migrations** run automatically on every container start (`docker-entrypoint.sh`:
@@ -27,25 +27,25 @@ image is built and the container runs on the Pi. Nothing is cloned on the Pi.
 ## Prerequisites (on the Mac)
 
 - Docker CLI (Docker Desktop) and the `umbrel` context, with SSH key login to the Pi.
-  Setup steps are in the LocalInfra README, section 1.
-- LocalInfra running on the Pi: `DOCKER_CONTEXT=umbrel docker ps --filter name=localinfra`
+  Setup steps are in the local-infra README, section 1.
+- local-infra running on the Pi: `DOCKER_CONTEXT=umbrel docker ps --filter name=localinfra`
   shows `localinfra-postgres` and `localinfra-redis` as healthy.
 
 ## First deploy
 
-The easiest way is LocalInfra's bootstrap. It provisions the `yarg` database role and
+The easiest way is local-infra's bootstrap. It provisions the `yarg` database role and
 Redis user, writes their credentials into this repo's `.env`, then builds and starts
 the app:
 
 ```bash
 cp .env.example .env      # then fill in the app settings below (leave the DB/Redis lines)
-../LocalInfra/scripts/bootstrap-pi.sh
+../local-infra/scripts/bootstrap-pi.sh
 ```
 
 By hand, the same thing:
 
 ```bash
-DOCKER_CONTEXT=umbrel ../LocalInfra/scripts/new-project.sh yarg   # paste its output into .env
+DOCKER_CONTEXT=umbrel ../local-infra/scripts/new-project.sh yarg   # paste its output into .env
 DOCKER_CONTEXT=umbrel docker compose up -d --build
 ```
 
@@ -69,8 +69,8 @@ Compose reads `.env` **on the Mac**. It is git-ignored; `.env.example` lists eve
 | `GOOGLE_*`, `SPOTIFY_*`, `APPLE_*` | | OAuth sign-in; the callback URLs must use the public URL |
 | `LASTFM_API_KEY`, `LASTFM_API_SECRET` | | Last.fm sign-in and import (disabled when empty) |
 | `YOUTUBE_API_KEY`, `SOUNDCLOUD_CLIENT_ID` | | optional features |
-| `LLM_BASE_URL`, `LLM_API_KEY` | | admin agent, through LocalInfra's LLM gateway: `../LocalInfra/scripts/provision-app.sh yarg . --no-postgres --no-redis --llm` |
-| `METRICS_URL`, `METRICS_API_KEY` | | anonymous usage metrics (`/api/metrics`), shown in Container Health → Metrics: `../LocalInfra/scripts/provision-app.sh yarg . --no-postgres --no-redis --metrics` |
+| `LLM_BASE_URL`, `LLM_API_KEY` | | admin agent, through local-infra's LLM gateway: `../local-infra/scripts/provision-app.sh yarg . --no-postgres --no-redis --llm` |
+| `METRICS_URL`, `METRICS_API_KEY` | | anonymous usage metrics (`/api/metrics`), shown in Container Health → Metrics: `../local-infra/scripts/provision-app.sh yarg . --no-postgres --no-redis --metrics` |
 
 After the first sign-up on a fresh database, that account is the admin. Fill the library
 from **Admin → Providers**.
@@ -83,9 +83,9 @@ from **Admin → Providers**.
 ./deploy.sh --rollback   # restart the image that was live before the last deploy
 ```
 
-`deploy.sh` is the same file in every app (copied from `LocalInfra/templates/app/deploy.sh`,
-see `LocalInfra/DEPLOYING-APPS.md`); it reads everything app-specific from `docker-compose.yml`.
-Only the app container is rebuilt and restarted; LocalInfra keeps running. Check it:
+`deploy.sh` is the same file in every app (copied from `local-infra/templates/app/deploy.sh`,
+see `local-infra/DEPLOYING-APPS.md`); it reads everything app-specific from `docker-compose.yml`.
+Only the app container is rebuilt and restarted; local-infra keeps running. Check it:
 
 ```bash
 DOCKER_CONTEXT=umbrel docker compose ps                  # STATUS should say (healthy)
@@ -99,7 +99,7 @@ All from the repo folder on the Mac:
 
 ```bash
 DOCKER_CONTEXT=umbrel docker compose restart yarg-aggregator
-DOCKER_CONTEXT=umbrel docker compose down                 # removes the app container only; data stays in LocalInfra
+DOCKER_CONTEXT=umbrel docker compose down                 # removes the app container only; data stays in local-infra
 DOCKER_CONTEXT=umbrel docker compose logs --tail 100 yarg-aggregator
 DOCKER_CONTEXT=umbrel docker compose exec yarg-aggregator sh
 ```
@@ -107,7 +107,7 @@ DOCKER_CONTEXT=umbrel docker compose exec yarg-aggregator sh
 ### Database
 
 The database is `yarg` in `localinfra-postgres`. Nightly backups are handled by
-LocalInfra (its README, section 5).
+local-infra (its README, section 5).
 
 ```bash
 # shell
@@ -122,7 +122,7 @@ DOCKER_CONTEXT=umbrel docker exec -i localinfra-postgres pg_restore -U postgres 
 
 - **Container not healthy**: `DOCKER_CONTEXT=umbrel docker compose logs yarg-aggregator`.
   The entrypoint prints each step (database wait, migrations, SQL setup).
-- **`Database connection failed after 30 attempts`**: LocalInfra isn't running, or the
+- **`Database connection failed after 30 attempts`**: local-infra isn't running, or the
   container isn't on `localinfra_postgres`: `DOCKER_CONTEXT=umbrel docker ps --filter name=localinfra`.
 - **Redis `NOPERM` errors**: `REDIS_KEY_PREFIX` must be `yarg:` and match the ACL user.
 - **Sign-in redirects to the wrong host**: `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` must be

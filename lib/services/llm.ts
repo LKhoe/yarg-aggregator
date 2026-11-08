@@ -1,7 +1,7 @@
-// LLM calls go through LocalInfra's LLM gateway (../LocalInfra, container localinfra-llm).
+// LLM calls go through local-infra's LLM gateway (../local-infra, container localinfra-llm).
 // It holds the OpenRouter key, picks the model for a tier and enforces this app's limits on
 // paid calls. Provision the key with:
-//   ../LocalInfra/scripts/provision-app.sh yarg . --no-postgres --no-redis --llm
+//   ../local-infra/scripts/provision-app.sh yarg . --no-postgres --no-redis --llm
 //
 //   simple → free models, then a small local model (no tools there): the admin agent by
 //            default, titles, translations

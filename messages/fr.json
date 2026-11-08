@@ -568,7 +568,7 @@
       "queueHealth": "Santé de la File d'Attente",
       "databaseHealth": "Santé de la Base de Données",
       "webVitals": "Vitales Web",
-      "webVitalsMoved": "Les Web Vitals, les vues par route et les erreurs de toutes les apps sont maintenant dans LocalInfra : Container Health → Metrics (Umbrel, réseau local).",
+      "webVitalsMoved": "Les Web Vitals, les vues par route et les erreurs de toutes les apps sont maintenant dans local-infra : Container Health → Metrics (Umbrel, réseau local).",
       "recentApiErrors": "Erreurs Récentes d'API",
       "waiting": "En attente",
       "active": "Actif",

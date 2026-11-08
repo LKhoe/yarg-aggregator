@@ -237,7 +237,7 @@ export function MonitoringDashboard({ data }: { data: MonitoringData }) {
         </div>
       </section>
 
-      {/* ── Web Vitals: collected for every app by LocalInfra (Container Health → Metrics) ── */}
+      {/* ── Web Vitals: collected for every app by local-infra (Container Health → Metrics) ── */}
       <section>
         <SectionHeader
           icon={TrendingUp}
