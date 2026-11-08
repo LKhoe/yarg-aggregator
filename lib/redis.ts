@@ -7,7 +7,7 @@ const REDIS_PASSWORD = process.env.REDIS_PASSWORD || undefined;
 
 /**
  * Namespace for every key and pub/sub channel this app uses (e.g. "yarg:").
- * On the shared LocalInfra Redis, this app's ACL user may only touch "yarg:*".
+ * On the shared local-infra Redis, this app's ACL user may only touch "yarg:*".
  * Empty (local dev with a private Redis) = no namespace, same keys as before.
  */
 export const REDIS_PREFIX = process.env.REDIS_KEY_PREFIX || "";

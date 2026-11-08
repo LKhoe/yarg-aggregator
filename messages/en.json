@@ -568,7 +568,7 @@
       "queueHealth": "Queue Health",
       "databaseHealth": "Database Health",
       "webVitals": "Web Vitals",
-      "webVitalsMoved": "Web Vitals, route views and errors for every app are now in LocalInfra: Container Health → Metrics (Umbrel, local network).",
+      "webVitalsMoved": "Web Vitals, route views and errors for every app are now in local-infra: Container Health → Metrics (Umbrel, local network).",
       "recentApiErrors": "Recent API Errors",
       "waiting": "Waiting",
       "active": "Active",

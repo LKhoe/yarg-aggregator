@@ -24,7 +24,7 @@ export async function onRequestError(
   } catch {
     // Never let monitoring errors surface
   }
-  // LocalInfra's metrics: route pattern, error name and a scrubbed message only
+  // local-infra's metrics: route pattern, error name and a scrubbed message only
   const { reportServerError } = await import('./lib/metrics/forward');
   await reportServerError(err, context as { routePath?: string });
 }

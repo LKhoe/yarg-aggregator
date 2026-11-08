@@ -1,5 +1,5 @@
 # YARG Aggregator — app only.
-# Postgres, Redis and the LLM gateway are provided by the LocalInfra project (../LocalInfra):
+# Postgres, Redis and the LLM gateway are provided by the local-infra project (../local-infra):
 # start it first, then provision this app once with  scripts/new-project.sh yarg
 # and copy the printed variables into this project's .env.
 # Fixed project name: without it Compose uses the folder name, and deploying from a worktree
@@ -18,15 +18,15 @@ services:
     ports:
       - "${PORT:-3000}:3000"
     environment:
-      # Database — LocalInfra Postgres; DATABASE_URL carries this app's own role
-      # (create it with: LocalInfra/scripts/new-project.sh yarg)
+      # Database — local-infra Postgres; DATABASE_URL carries this app's own role
+      # (create it with: local-infra/scripts/new-project.sh yarg)
       - DATABASE_URL=${DATABASE_URL:?set DATABASE_URL in .env}
       - POSTGRES_HOST=${POSTGRES_HOST:-localinfra-postgres}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       # Anonymous usage metrics (/api/metrics → localinfra-metrics); empty key = dropped
       - METRICS_URL=${METRICS_URL:-http://localinfra-metrics:4100}
       - METRICS_API_KEY=${METRICS_API_KEY:-}
-      # Redis — LocalInfra Redis; ACL user limited to keys/channels "yarg:*"
+      # Redis — local-infra Redis; ACL user limited to keys/channels "yarg:*"
       - REDIS_HOST=${REDIS_HOST:-localinfra-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_USERNAME=${REDIS_USERNAME:-yarg}
@@ -57,7 +57,7 @@ services:
       # Music Platform APIs
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
       - SOUNDCLOUD_CLIENT_ID=${SOUNDCLOUD_CLIENT_ID}
-      # LLM (admin agent) — LocalInfra's LLM gateway (provision-app.sh --llm)
+      # LLM (admin agent) — local-infra's LLM gateway (provision-app.sh --llm)
       - LLM_BASE_URL=${LLM_BASE_URL:-http://localinfra-llm:4000/v1}
       - LLM_API_KEY=${LLM_API_KEY}
     labels:
@@ -75,7 +75,7 @@ services:
       - localinfra_redis
       - localinfra_llm
       - localinfra_metrics
-      # LocalInfra's Cloudflare tunnel reaches the app here: http://yarg-aggregator:3000
+      # local-infra's Cloudflare tunnel reaches the app here: http://yarg-aggregator:3000
       - localinfra_tunnel
     deploy:
       resources:
@@ -90,7 +90,7 @@ services:
         max-file: "3"
 
 networks:
-  # Created by the LocalInfra project (start it first)
+  # Created by the local-infra project (start it first)
   localinfra_postgres:
     external: true
   localinfra_redis:

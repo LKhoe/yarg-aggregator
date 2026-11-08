@@ -568,7 +568,7 @@
       "queueHealth": "Saúde da Fila",
       "databaseHealth": "Saúde do Banco de Dados",
       "webVitals": "Vitais Web",
-      "webVitalsMoved": "Web Vitals, visualizações por rota e erros de todas as apps agora ficam no LocalInfra: Container Health → Metrics (Umbrel, rede local).",
+      "webVitalsMoved": "Web Vitals, visualizações por rota e erros de todas as apps agora ficam no local-infra: Container Health → Metrics (Umbrel, rede local).",
       "recentApiErrors": "Erros Recentes de API",
       "waiting": "Aguardando",
       "active": "Ativo",

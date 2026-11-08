@@ -568,7 +568,7 @@
       "queueHealth": "Warteschlangen-Status",
       "databaseHealth": "Datenbank-Status",
       "webVitals": "Web-Vitale",
-      "webVitalsMoved": "Web Vitals, Seitenaufrufe pro Route und Fehler aller Apps sind jetzt in LocalInfra: Container Health → Metrics (Umbrel, lokales Netz).",
+      "webVitalsMoved": "Web Vitals, Seitenaufrufe pro Route und Fehler aller Apps sind jetzt in local-infra: Container Health → Metrics (Umbrel, lokales Netz).",
       "recentApiErrors": "Aktuelle API-Fehler",
       "waiting": "Wartend",
       "active": "Aktiv",

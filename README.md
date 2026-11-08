@@ -32,7 +32,7 @@ Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 + Shadcn UI 
 Drizzle ORM · Better Auth · BullMQ + Redis · Docker
 
 Postgres and Redis are **not** part of this repo. They come from the shared
-[LocalInfra](https://github.com/LKhoe/LocalInfra) stack, where this app has its own
+[local-infra](https://github.com/LKhoe/local-infra) stack, where this app has its own
 database role and a Redis user limited to keys starting with `yarg:`.
 
 ## Local development
@@ -40,14 +40,14 @@ database role and a Redis user limited to keys starting with `yarg:`.
 ### Prerequisites
 
 - **Node.js 24+** (`.nvmrc` pins the version used here: `nvm use`)
-- **Docker Desktop**, to run LocalInfra on the Mac
-- [LocalInfra](https://github.com/LKhoe/LocalInfra) cloned at `../LocalInfra`
+- **Docker Desktop**, to run local-infra on the Mac
+- [local-infra](https://github.com/LKhoe/local-infra) cloned at `../local-infra`
   relative to this repo, with its `.env` filled in (see its README)
 
-### 1. Start Postgres and Redis (LocalInfra on Docker Desktop)
+### 1. Start Postgres and Redis (local-infra on Docker Desktop)
 
 ```bash
-cd ../LocalInfra
+cd ../local-infra
 mkdir -p backups-local && touch backups-local/.localinfra-backup-target
 BACKUP_DIR=./backups-local DOCKER_CONTEXT=desktop-linux docker compose up -d --build
 DOCKER_CONTEXT=desktop-linux scripts/new-project.sh yarg     # prints this app's credentials

@@ -249,7 +249,7 @@ const LOCALE_NAMES: Record<string, string> = {
   zh: "Chinese",
 };
 
-// Tiers of LocalInfra's LLM gateway (lib/services/llm.ts). The agent runs on the free tier
+// Tiers of local-infra's LLM gateway (lib/services/llm.ts). The agent runs on the free tier
 // unless the admin picks medium or hard; titles and error translations are always free.
 const AGENT_TIER: LLMTier = "simple";
 const LIGHT_TIER: LLMTier = "simple";
