@@ -49,7 +49,7 @@ DOCKER_CONTEXT=umbrel ../local-infra/scripts/new-project.sh yarg   # paste its o
 DOCKER_CONTEXT=umbrel docker compose up -d --build
 ```
 
-The build runs on the Pi and takes about 3–5 minutes.
+The first build runs on the Pi (3–5 minutes). Later deploys with `./deploy.sh` build on the Mac and load the image into the Pi.
 
 ## Configuration (`.env`)
 
@@ -78,7 +78,7 @@ from **Admin → Providers**.
 ## Redeploy after changes
 
 ```bash
-./deploy.sh              # build on the Pi, restart, wait until healthy
+./deploy.sh              # build here (linux/arm64), load it into the Pi, restart, wait until healthy
 ./deploy.sh --release    # bump the patch version, commit and push first
 ./deploy.sh --rollback   # restart the image that was live before the last deploy
 ```

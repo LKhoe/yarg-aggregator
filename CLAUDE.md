@@ -16,7 +16,7 @@ npm run db:generate    # Generate a Drizzle migration after editing lib/db/schem
 node --env-file=.env.local scripts/migrate.mjs     # Drizzle migrations
 node --env-file=.env.local scripts/apply-sql.mjs   # extensions, full-text search, trigram indexes
 
-# Deploy to the Raspberry Pi (Docker context "umbrel"; builds on the Pi)
+# Deploy to the Raspberry Pi (Docker context "umbrel"; builds on the Mac, loads into the Pi)
 ./deploy.sh                # also: --release (bump + push), --rollback
 DOCKER_CONTEXT=umbrel docker compose logs -f yarg-aggregator
 ```
