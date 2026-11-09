@@ -72,7 +72,7 @@ Compose reads `.env` **on the Mac**. It is git-ignored; `.env.example` lists eve
 | `LLM_BASE_URL`, `LLM_API_KEY` | | admin agent, through local-infra's LLM gateway: `../local-infra/scripts/provision-app.sh yarg . --no-postgres --no-redis --llm` |
 | `METRICS_URL`, `METRICS_API_KEY` | | anonymous usage metrics (`/api/metrics`), shown in Container Health → Metrics: `../local-infra/scripts/provision-app.sh yarg . --no-postgres --no-redis --metrics` |
 
-After the first sign-up on a fresh database, that account is the admin. Fill the library
+After the first sign-in on a fresh database, that account is the admin. Fill the library
 from **Admin → Providers**.
 
 ## Redeploy after changes

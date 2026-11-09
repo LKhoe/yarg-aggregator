@@ -21,7 +21,7 @@ one fast, searchable library.
   a live view shows progress, retries and history (admin → Providers)
 - **YARG integration**: read your game's cache file to see which songs you have installed,
   across several installations
-- **Accounts**: email/password, Google, Spotify, Apple and Last.fm sign-in; favorites and
+- **Accounts**: Google, Spotify, Apple and Last.fm sign-in; favorites and
   song lists; import from Spotify / Last.fm
 - **7 languages** (English, Spanish, French, German, Japanese, Portuguese, Chinese) and
   light/dark themes
@@ -99,7 +99,7 @@ node --env-file=.env.local scripts/apply-sql.mjs    # extensions, full-text sear
 npm run dev
 ```
 
-Open http://localhost:3000 and **sign up: the first account becomes admin**. To fill the
+Open http://localhost:3000 and **sign in with a provider: the first account becomes admin**. To fill the
 library, go to **Admin → Providers** and click the download button on Enchor.us or
 Rhythmverse. The first fetch reads the whole listing (Enchor ~80 pages, Rhythmverse ~400),
 later ones only what changed.

@@ -11,8 +11,6 @@ const nextConfig: NextConfig = {
   output: "standalone",
   env: {
     NEXT_PUBLIC_APP_VERSION: version,
-    NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION:
-      process.env.REQUIRE_EMAIL_VERIFICATION ?? "false",
   },
   experimental: {
     optimizePackageImports: [

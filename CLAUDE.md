@@ -31,7 +31,7 @@ Full-stack platform that indexes music charts for YARG from Enchor.us and Rhythm
 stores metadata in PostgreSQL and serves a fast search UI.
 
 - **Stack**: Next.js 16 (App Router) + React 19, TypeScript (strict), Tailwind CSS 4 + Shadcn UI,
-  PostgreSQL + Drizzle ORM, Better Auth (email/password, Google, Spotify, Apple, Last.fm),
+  PostgreSQL + Drizzle ORM, Better Auth (Google, Spotify, Apple, Last.fm),
   BullMQ + Redis, Docker.
 - **Infrastructure**: Postgres and Redis come from the separate local-infra repo
   (`../local-infra`, containers `localinfra-postgres` / `localinfra-redis`). This app has

@@ -130,18 +130,10 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let password: string | undefined;
-  try {
-    const body = await request.json();
-    password = typeof body?.password === "string" ? body.password : undefined;
-  } catch {
-    // No JSON body provided — falls back to the session-freshness check below.
-  }
-
   try {
     const { headers, response } = await auth.api.deleteUser({
       headers: request.headers,
-      body: { password },
+      body: {},
       returnHeaders: true,
     });
 
@@ -159,14 +151,8 @@ export async function DELETE(request: NextRequest) {
       const code = (error.body as { code?: string } | undefined)?.code;
       if (code === "SESSION_EXPIRED") {
         return NextResponse.json(
-          { error: "Please confirm your password to delete your account", code },
+          { error: "Please sign in again to delete your account", code },
           { status: 401 },
-        );
-      }
-      if (code === "INVALID_PASSWORD" || code === "CREDENTIAL_ACCOUNT_NOT_FOUND") {
-        return NextResponse.json(
-          { error: "Incorrect password", code },
-          { status: 400 },
         );
       }
       return NextResponse.json(

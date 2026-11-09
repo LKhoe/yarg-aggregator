@@ -55,7 +55,6 @@ export default function PrivacyPage() {
           <li>To provide and operate the YARG Aggregator service.</li>
           <li>To authenticate you and maintain your session.</li>
           <li>To store your song lists, favorites, and installations.</li>
-          <li>To send transactional emails (e.g., email verification, password reset).</li>
           <li>To display your public profile and public lists to other users.</li>
           <li>
             If you choose to connect your YouTube account, to read your own

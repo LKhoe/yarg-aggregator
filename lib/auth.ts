@@ -43,9 +43,10 @@ export const auth = betterAuth({
     provider: "pg",
   }),
 
+  // Sign-in is provider-only (Google, Spotify, Apple, Last.fm). Accounts created earlier with a
+  // password get in through accountLinking below (same verified email from a trusted provider).
   emailAndPassword: {
-    enabled: true,
-    requireEmailVerification: process.env.REQUIRE_EMAIL_VERIFICATION === "true",
+    enabled: false,
   },
 
   socialProviders: {
@@ -91,6 +92,11 @@ export const auth = betterAuth({
     accountLinking: {
       enabled: true,
       trustedProviders: ["google", "spotify", "apple"],
+      // Users who signed up with a password before it was removed have emailVerified=false (no
+      // verification mail was ever sent). Without this, Better Auth refuses to attach the
+      // Google/Spotify/Apple sign-in to that existing user ("account not linked"). Safe now that
+      // password sign-in/sign-up is off: an unverified row can no longer be used by whoever created it.
+      requireLocalEmailVerified: false,
     },
   },
 
