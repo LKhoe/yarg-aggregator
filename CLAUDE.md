@@ -92,11 +92,13 @@ stores metadata in PostgreSQL and serves a fast search UI.
 - **Translations have no fallback.** The client `t()` (`contexts/TranslationContext.tsx`)
   returns the key itself when it's missing, so add new keys to all 7 files in `messages/`.
 - **`NEXT_PUBLIC_APP_URL` is baked in at build time** (Docker build arg); rebuild after changing it.
-- **Runner-stage deps come from the lockfile** (`npm ci --omit=dev` in the Dockerfile). Never
-  replace it with `npm install <pkg>`: with a package.json and no lockfile that re-resolves every
-  dependency to the newest matching version, so sharp's libvips (dlopen'd, not traced into the
-  standalone output) drifts from the locked sharp binary and image processing fails with
-  `libvips-cpp.so.X: No such file`.
+- **The runner image has no `npm ci`** (it was ~650 MB). It holds only Next's standalone output
+  (which includes `sharp` and its libvips, traced from the builder's locked install) plus
+  `scripts/migrate.mjs` / `scripts/apply-sql.mjs`, which the builder stage bundles with esbuild
+  (pg + drizzle-orm inlined). A new runtime dependency used only by those scripts needs no Dockerfile
+  change; a native `dlopen`'d library that Next's tracing misses would have to be copied from the
+  builder. Never `npm install <pkg>` in the runner: it re-resolves every dependency and sharp's
+  libvips drifts from the locked binary (`libvips-cpp.so.X: No such file`).
 - **Schema changes**: edit `lib/db/schema.ts`, run `npm run db:generate`, commit the migration.
   It is applied automatically when the container starts.
 

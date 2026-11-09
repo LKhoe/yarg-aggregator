@@ -24,6 +24,14 @@ ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 # Note: Ensure "output: 'standalone'" is set in next.config.js/ts
 RUN npm run build
 
+# Bundle the entrypoint scripts (pg + drizzle-orm inlined) so the runner image needs no node_modules
+# of its own. The banner gives bundled CommonJS deps (pg) a working require() inside the ESM output;
+# pg-native is an optional dependency of pg that is never installed.
+RUN npx esbuild scripts/migrate.mjs scripts/apply-sql.mjs \
+      --bundle --platform=node --format=esm --target=node24 --external:pg-native \
+      --banner:js="import { createRequire } from 'module'; const require = createRequire(import.meta.url);" \
+      --out-extension:.js=.mjs --outdir=/app/scripts-dist
+
 # Production stage
 FROM node:24-alpine AS runner
 
@@ -34,14 +42,6 @@ ENV NODE_ENV=production
 # Don't run as root
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
-
-# Production deps at the lockfile's exact versions, for the plain-.mjs migration scripts
-# (pg + drizzle-orm) that run outside the Next.js server, and for native files Next's
-# standalone tracing misses (sharp's dlopen'd libvips .so). Must come from the lockfile:
-# a bare `npm install <pkg>` re-resolves every dependency to its latest version, and a newer
-# libvips next to the standalone output's locked sharp fails with "libvips-cpp.so.X: No such file".
-COPY --from=builder --chown=nextjs:nodejs /app/package.json /app/package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 # Copy only the necessary files for standalone mode
 COPY --from=builder /app/public ./public
@@ -59,8 +59,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/lib/db/migrations ./lib/db/migrations
 COPY --from=builder --chown=nextjs:nodejs /app/lib/db/setup ./lib/db/setup
 
-# Copy migration/setup scripts (plain .mjs — no tsx needed)
-COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+# Migration/setup scripts: self-contained bundles built above (same names the entrypoint calls)
+COPY --from=builder --chown=nextjs:nodejs /app/scripts-dist ./scripts
 
 # Copy and setup entrypoint script
 COPY --chown=nextjs:nodejs docker-entrypoint.sh /usr/local/bin/
