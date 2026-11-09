@@ -13,7 +13,7 @@ image is built and the container runs on the Pi. Nothing is cloned on the Pi.
 └──────────│───────────────────────────┘     │  localinfra-backup → external drive │
            ▼                                 └─────────────────────────────────────┘
   localinfra-tunnel (Cloudflare) → http://yarg-aggregator:3000
-  LAN: http://umbrel.local:3000
+  Host port: 127.0.0.1:3000 on the Pi only (not reachable from the LAN)
 ```
 
 - **Postgres and Redis** come from [local-infra](https://github.com/LKhoe/local-infra) (start
@@ -65,7 +65,7 @@ Compose reads `.env` **on the Mac**. It is git-ignored; `.env.example` lists eve
 | `BETTER_AUTH_SECRET` | ✅ | `openssl rand -base64 32` |
 | `BETTER_AUTH_URL` | ✅ | public URL, e.g. `https://yarg.example.com` |
 | `NEXT_PUBLIC_APP_URL` | ✅ | same as `BETTER_AUTH_URL`. Baked in at **build** time: rebuild after changing it |
-| `PORT` | | host port on the Pi, default `3000` |
+| `PORT` | | host port on the Pi, bound to `127.0.0.1` only (default `3000`) |
 | `GOOGLE_*`, `SPOTIFY_*`, `APPLE_*` | | OAuth sign-in; the callback URLs must use the public URL |
 | `LASTFM_API_KEY`, `LASTFM_API_SECRET` | | Last.fm sign-in and import (disabled when empty) |
 | `YOUTUBE_API_KEY`, `SOUNDCLOUD_CLIENT_ID` | | optional features |
@@ -90,7 +90,8 @@ Only the app container is rebuilt and restarted; local-infra keeps running. Chec
 ```bash
 DOCKER_CONTEXT=umbrel docker compose ps                  # STATUS should say (healthy)
 DOCKER_CONTEXT=umbrel docker compose logs -f yarg-aggregator
-curl -s http://umbrel.local:3000/api/health              # {"status":"ok"}
+DOCKER_CONTEXT=umbrel docker compose exec yarg-aggregator wget -qO- http://127.0.0.1:3000/api/health   # {"status":"ok"}
+# (the host port is loopback-only, so there is no http://umbrel.local:3000; use the public URL from outside)
 ```
 
 ## Common commands

@@ -16,7 +16,9 @@ services:
       args:
         - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
     ports:
-      - "${PORT:-3000}:3000"
+      # Loopback only: the Cloudflare tunnel reaches the container by name over localinfra_tunnel and
+      # the healthcheck is internal, so nothing needs the port on the LAN. From the Pi: curl 127.0.0.1:3000
+      - "127.0.0.1:${PORT:-3000}:3000"
     environment:
       # Database — local-infra Postgres; DATABASE_URL carries this app's own role
       # (create it with: local-infra/scripts/new-project.sh yarg)
