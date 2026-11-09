@@ -9,7 +9,7 @@ import {
   songList,
   songListItem,
 } from "@/lib/db/schema";
-import { eq, and, desc, asc, sql, or, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
 import type { ProviderMusic, SearchParams, PaginatedResponse } from "@/types";
 
 export class MusicService {
@@ -126,36 +126,40 @@ export class MusicService {
     let relevanceScore: ReturnType<typeof sql<number>> | null = null;
 
     if (query) {
-      const similarityThreshold = 0.3;
       const { songQuery, artistQuery, isCombined } =
         this.parseSearchQuery(query);
 
+      // Candidate sets use the trigram operators (`%`, threshold = pg_trgm.similarity_threshold,
+      // default 0.3, the same cut-off the old `similarity() >= 0.3` used) so the GIN gin_trgm_ops
+      // indexes on song.title, artist.name and album.name can be used. A function call such as
+      // similarity(col, q) >= x can never use them. An OR across joined tables would also defeat
+      // the indexes, so each table gets its own subquery and the song ids are combined.
+      // Table names here are fixed strings; every user value is a bound parameter.
       if (isCombined && songQuery && artistQuery) {
-        conditions.push(
-          or(
-            and(
-              sql`similarity(${song.title}, ${songQuery}) >= ${similarityThreshold}`,
-              sql`similarity(${artist.name}, ${artistQuery}) >= ${similarityThreshold}`,
-            ),
-            and(
-              sql`similarity(${song.title}, ${artistQuery}) >= ${similarityThreshold}`,
-              sql`similarity(${artist.name}, ${songQuery}) >= ${similarityThreshold}`,
-            ),
-          ),
-        );
+        conditions.push(sql`${song.id} IN (
+          SELECT s.id FROM song s
+            WHERE s.title % ${songQuery}
+              AND s.artist_id IN (SELECT a.id FROM artist a WHERE a.name % ${artistQuery})
+          UNION
+          SELECT s.id FROM song s
+            WHERE s.title % ${artistQuery}
+              AND s.artist_id IN (SELECT a.id FROM artist a WHERE a.name % ${songQuery})
+        )`);
 
         relevanceScore = sql`GREATEST(
             (similarity(${song.title}, ${songQuery}) * 0.6) + (similarity(${artist.name}, ${artistQuery}) * 0.4),
             (similarity(${song.title}, ${artistQuery}) * 0.6) + (similarity(${artist.name}, ${songQuery}) * 0.4)
           )`;
       } else {
-        conditions.push(
-          or(
-            sql`similarity(${song.title}, ${query}) >= ${similarityThreshold}`,
-            sql`similarity(${artist.name}, ${query}) >= ${similarityThreshold}`,
-            sql`similarity(${album.name}, ${query}) >= ${similarityThreshold * 0.8}`,
-          ),
-        );
+        conditions.push(sql`${song.id} IN (
+          SELECT s.id FROM song s WHERE s.title % ${query}
+          UNION
+          SELECT s.id FROM song s
+            WHERE s.artist_id IN (SELECT a.id FROM artist a WHERE a.name % ${query})
+          UNION
+          SELECT s.id FROM song s
+            WHERE s.album_id IN (SELECT al.id FROM album al WHERE al.name % ${query})
+        )`);
 
         relevanceScore = sql`GREATEST(
             similarity(${song.title}, ${query}) * 1.0,

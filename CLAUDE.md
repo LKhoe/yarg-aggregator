@@ -14,7 +14,7 @@ npm run db:generate    # Generate a Drizzle migration after editing lib/db/schem
 
 # Apply schema locally (the Docker entrypoint runs these on every container start)
 node --env-file=.env.local scripts/migrate.mjs     # Drizzle migrations
-node --env-file=.env.local scripts/apply-sql.mjs   # extensions, full-text search, trigram indexes
+node --env-file=.env.local scripts/apply-sql.mjs   # extensions, trigram indexes
 
 # Deploy to the Raspberry Pi (Docker context "umbrel"; builds on the Mac, loads into the Pi)
 ./deploy.sh                # also: --release (bump + push), --rollback
@@ -49,7 +49,7 @@ stores metadata in PostgreSQL and serves a fast search UI.
 - `lib/db/schema.ts` — Drizzle schema; migrations in `lib/db/migrations/`, search SQL in `lib/db/setup/`
 - `lib/auth.ts` — Better Auth config; `databaseHooks.user.create.after` creates the profile
   (first user = admin) and the Favorites list
-- `lib/services/music.ts` — search (fuzzy `similarity()`, "song - artist" parsing, cursor pagination, filters)
+- `lib/services/music.ts` — search (fuzzy trigram `%` candidate subqueries that use the GIN indexes, `similarity()` only for ranking; "song - artist" parsing, cursor pagination, filters)
 - `lib/redis.ts` — Redis clients and key namespacing
 - `lib/queue.ts` — BullMQ queue + worker (concurrency 1) that runs provider fetches
 - `services/providers/` — provider fetch pipeline (below)

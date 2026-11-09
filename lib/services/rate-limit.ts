@@ -78,3 +78,11 @@ export async function importUrlRateLimit(
 ): Promise<{ blocked: boolean; retryAfter?: number }> {
   return checkRateLimit(`ratelimit:import-url:${userId}`, 15, 600);
 }
+
+/** 120 requests per minute per IP, for the unauthenticated music search (GET /api/music). */
+export async function musicSearchRateLimit(
+  request: NextRequest,
+): Promise<{ blocked: boolean; retryAfter?: number }> {
+  const ip = getClientIp(request);
+  return checkRateLimit(`ratelimit:music-search:${ip}`, 120, 60);
+}

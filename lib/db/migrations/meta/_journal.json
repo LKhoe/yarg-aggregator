@@ -64,6 +64,13 @@
       "when": 1791943174745,
       "tag": "0008_bumpy_serpent_society",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794249751611,
+      "tag": "0009_true_retro_girl",
+      "breakpoints": true
     }
   ]
 }

@@ -90,7 +90,7 @@ The Docker image runs these on every start; locally you run them yourself:
 
 ```bash
 node --env-file=.env.local scripts/migrate.mjs      # Drizzle migrations
-node --env-file=.env.local scripts/apply-sql.mjs    # extensions, full-text search, trigram indexes
+node --env-file=.env.local scripts/apply-sql.mjs    # extensions, trigram indexes
 ```
 
 ### 4. Run

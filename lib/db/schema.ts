@@ -234,7 +234,6 @@ export const song = pgTable(
     diffKeys: integer("diff_keys"),
     diffVocals: integer("diff_vocals"),
     vocalParts: integer("vocal_parts"),
-    searchVector: text("search_vector"), // For full-text search
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

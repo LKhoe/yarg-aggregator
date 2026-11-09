@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MusicService } from "@/lib/services/music";
 import { getAuthenticatedUser } from "@/lib/middleware/auth";
-import { musicBatchRateLimit } from "@/lib/services/rate-limit";
+import { musicBatchRateLimit, musicSearchRateLimit } from "@/lib/services/rate-limit";
 import type { SearchParams } from "@/types";
+
+const MAX_QUERY_LENGTH = 100;
 
 export async function POST(request: NextRequest) {
   try {
@@ -67,6 +69,18 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    // Public endpoint: per-IP limit (the UI debounces typing at 300ms, so 120/min is generous)
+    const rl = await musicSearchRateLimit(request);
+    if (rl.blocked) {
+      return NextResponse.json(
+        { error: "Too many requests. Please slow down." },
+        {
+          status: 429,
+          headers: rl.retryAfter ? { "Retry-After": String(rl.retryAfter) } : undefined,
+        },
+      );
+    }
+
     // Optional auth - don't fail for unauthenticated users
     const authUser = await getAuthenticatedUser(request).catch(() => null);
 
@@ -109,7 +123,8 @@ export async function GET(request: NextRequest) {
       : [];
 
     const params: SearchParams = {
-      query: searchParams.get("query") || "",
+      // Capped: the trigram match cost grows with the length of the input
+      query: (searchParams.get("query") || "").slice(0, MAX_QUERY_LENGTH),
       limit: Math.min(
         Math.max(parseInt(searchParams.get("limit") || "20", 10), 1),
         100,
