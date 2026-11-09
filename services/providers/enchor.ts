@@ -84,11 +84,6 @@ const describeEnchorSong = (song: EnchorSong) => ({
   artist: optionalText(song?.artist) ?? undefined,
 });
 
-/** Lenient bulk parse (ZIP upload): entries that cannot be parsed are skipped */
-export function parseEnchorData(songs: EnchorSong[]): ProviderMusic[] {
-  return parseEntries(songs, parseEnchorSong, describeEnchorSong).items;
-}
-
 function requestBody(page: number, pageSize: number) {
   return {
     instrument: "bass",

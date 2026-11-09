@@ -131,13 +131,6 @@ const describeRhythmverseSong = (entry: RhythmVerseSongEntry) => ({
     optionalText(entry?.file?.file_artist ?? entry?.data?.artist) ?? undefined,
 });
 
-/** Lenient bulk parse (ZIP upload): entries that cannot be parsed are skipped */
-export function parseRhythmverseData(
-  songs: RhythmVerseSongEntry[],
-): ProviderMusic[] {
-  return parseEntries(songs, parseRhythmverseSong, describeRhythmverseSong).items;
-}
-
 export const rhythmverseAdapter: ProviderAdapter = {
   source: "rhythmverse",
   label: "Rhythmverse",

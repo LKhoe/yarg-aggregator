@@ -170,9 +170,7 @@
   "provider": {
     "title": "Controle de Provedores",
     "description": "Buscar partituras musicais do Enchor.us e Rhythmverse",
-    "uploadStatus": "Status do Upload",
     "fetchStatus": "Status do Fetch",
-    "uploadProgress": "Progresso do Upload",
     "source": "Fonte",
     "phase": "Fase",
     "clear": "Limpar",
@@ -183,8 +181,6 @@
       "issues": "Ilegíveis",
       "gaps": "Páginas com falha"
     },
-    "uploadCompleted": "Upload concluído! Adicionado: {added}, Atualizado: {updated}, Ignorado: {ignored}",
-    "uploadFailed": "Falha no upload: {error}",
     "phases": {
       "running": "Executando",
       "fetching": "Buscando",
@@ -192,12 +188,6 @@
       "saving": "Salvando músicas",
       "completed": "Concluído",
       "failed": "Falhou",
-      "uploading": "Enviando arquivo",
-      "deduplicating songs": "Deduplicando músicas",
-      "fetching existing songs": "Buscando músicas existentes",
-      "pre-resolving metadata": "Pré-resolvendo metadados",
-      "building transactions": "Construindo transações",
-      "saving songs": "Salvando músicas",
       "noDetailsAvailable": "Nenhum detalhe disponível"
     },
     "reasons": {
@@ -213,7 +203,6 @@
     "songs": "músicas",
     "never": "Nunca buscado",
     "fetchFromApi": "Buscar da API",
-    "uploadZip": "Enviar ZIP",
     "modes": {
       "incremental": "Incremental",
       "full": "Completa"

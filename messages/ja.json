@@ -170,9 +170,7 @@
   "provider": {
     "title": "プロバイダーコントロール",
     "description": "Enchor.usとRhythmverseから音楽チャートを取得",
-    "uploadStatus": "アップロードステータス",
     "fetchStatus": "フェッチステータス",
-    "uploadProgress": "アップロード進行状況",
     "source": "ソース",
     "phase": "フェーズ",
     "clear": "クリア",
@@ -183,8 +181,6 @@
       "issues": "解析不可",
       "gaps": "失敗ページ"
     },
-    "uploadCompleted": "アップロード完了！追加：{added}、更新：{updated}、無視：{ignored}",
-    "uploadFailed": "アップロード失敗：{error}",
     "phases": {
       "running": "実行中",
       "fetching": "取得中",
@@ -192,12 +188,6 @@
       "saving": "曲を保存中",
       "completed": "完了",
       "failed": "失敗",
-      "uploading": "ファイルをアップロード中",
-      "deduplicating songs": "曲の重複排除中",
-      "fetching existing songs": "既存曲を取得中",
-      "pre-resolving metadata": "メタデータを事前解決中",
-      "building transactions": "トランザクション構築中",
-      "saving songs": "曲を保存中",
       "noDetailsAvailable": "詳細がありません"
     },
     "reasons": {
@@ -213,7 +203,6 @@
     "songs": "曲",
     "never": "未取得",
     "fetchFromApi": "APIから取得",
-    "uploadZip": "ZIPアップロード",
     "modes": {
       "incremental": "差分",
       "full": "全件"

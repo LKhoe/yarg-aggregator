@@ -170,9 +170,7 @@
   "provider": {
     "title": "Contrôle des Fournisseurs",
     "description": "Récupérer des partitions musicales d'Enchor.us et Rhythmverse",
-    "uploadStatus": "Statut de Téléchargement",
     "fetchStatus": "Statut de Récupération",
-    "uploadProgress": "Progression du Téléchargement",
     "source": "Source",
     "phase": "Phase",
     "clear": "Effacer",
@@ -183,8 +181,6 @@
       "issues": "Illisibles",
       "gaps": "Pages en échec"
     },
-    "uploadCompleted": "Téléchargement terminé ! Ajouté : {added}, Mis à jour : {updated}, Ignoré : {ignored}",
-    "uploadFailed": "Échec du téléchargement : {error}",
     "phases": {
       "running": "En cours",
       "fetching": "Récupération",
@@ -192,12 +188,6 @@
       "saving": "Sauvegarde des chansons",
       "completed": "Terminé",
       "failed": "Échec",
-      "uploading": "Téléchargement du fichier",
-      "deduplicating songs": "Déduplication des chansons",
-      "fetching existing songs": "Récupération des chansons existantes",
-      "pre-resolving metadata": "Pré-résolution des métadonnées",
-      "building transactions": "Construction des transactions",
-      "saving songs": "Sauvegarde des chansons",
       "noDetailsAvailable": "Aucun détail disponible"
     },
     "reasons": {
@@ -213,7 +203,6 @@
     "songs": "chansons",
     "never": "Jamais récupéré",
     "fetchFromApi": "Récupérer de l'API",
-    "uploadZip": "Envoyer ZIP",
     "modes": {
       "incremental": "Incrémentale",
       "full": "Complète"

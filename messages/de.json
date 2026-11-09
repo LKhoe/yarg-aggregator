@@ -170,9 +170,7 @@
   "provider": {
     "title": "Anbieter-Steuerung",
     "description": "Musik-Charts von Enchor.us und Rhythmverse abrufen",
-    "uploadStatus": "Upload-Status",
     "fetchStatus": "Abruf-Status",
-    "uploadProgress": "Upload-Fortschritt",
     "source": "Quelle",
     "phase": "Phase",
     "clear": "Löschen",
@@ -183,8 +181,6 @@
       "issues": "Unlesbar",
       "gaps": "Fehlgeschlagene Seiten"
     },
-    "uploadCompleted": "Upload abgeschlossen! Hinzugefügt: {added}, Aktualisiert: {updated}, Ignoriert: {ignored}",
-    "uploadFailed": "Upload fehlgeschlagen: {error}",
     "phases": {
       "running": "Läuft",
       "fetching": "Abrufen",
@@ -192,12 +188,6 @@
       "saving": "Lieder speichern",
       "completed": "Abgeschlossen",
       "failed": "Fehlgeschlagen",
-      "uploading": "Datei hochladen",
-      "deduplicating songs": "Lieder deduplizieren",
-      "fetching existing songs": "Vorhandene Lieder abrufen",
-      "pre-resolving metadata": "Metadaten vorauflösen",
-      "building transactions": "Transaktionen erstellen",
-      "saving songs": "Lieder speichern",
       "noDetailsAvailable": "Keine Details verfügbar"
     },
     "reasons": {
@@ -213,7 +203,6 @@
     "songs": "Lieder",
     "never": "Nie abgerufen",
     "fetchFromApi": "Von API abrufen",
-    "uploadZip": "ZIP hochladen",
     "modes": {
       "incremental": "Inkrementell",
       "full": "Vollständig"

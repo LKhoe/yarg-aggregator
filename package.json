@@ -36,7 +36,6 @@
     "@tanstack/react-virtual": "^3.14.26",
     "@tonejs/midi": "^2.0.28",
     "@types/pg": "^8.23.1",
-    "adm-zip": "^0.6.1",
     "better-auth": "^1.7.16",
     "bullmq": "^6.5.4",
     "class-variance-authority": "^0.7.1",
@@ -68,7 +67,6 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.4",
-    "@types/adm-zip": "^0.5.7",
     "@types/he": "^1.2.3",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",

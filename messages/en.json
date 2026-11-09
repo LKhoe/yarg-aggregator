@@ -170,9 +170,7 @@
   "provider": {
     "title": "Provider Control",
     "description": "Fetch music charts from Enchor.us and Rhythmverse",
-    "uploadStatus": "Upload Status",
     "fetchStatus": "Fetch Status",
-    "uploadProgress": "Upload Progress",
     "source": "Source",
     "phase": "Phase",
     "clear": "Clear",
@@ -183,8 +181,6 @@
       "issues": "Unparseable",
       "gaps": "Failed pages"
     },
-    "uploadCompleted": "Upload completed! Added: {added}, Updated: {updated}, Ignored: {ignored}",
-    "uploadFailed": "Upload failed: {error}",
     "phases": {
       "running": "Running",
       "fetching": "Fetching",
@@ -192,12 +188,6 @@
       "saving": "Saving songs",
       "completed": "Completed",
       "failed": "Failed",
-      "uploading": "Uploading file",
-      "deduplicating songs": "Deduplicating songs",
-      "fetching existing songs": "Fetching existing songs",
-      "pre-resolving metadata": "Pre-resolving metadata",
-      "building transactions": "Building transactions",
-      "saving songs": "Saving songs",
       "noDetailsAvailable": "No details available"
     },
     "reasons": {
@@ -213,7 +203,6 @@
     "songs": "songs",
     "never": "Never fetched",
     "fetchFromApi": "Fetch from API",
-    "uploadZip": "Upload ZIP",
     "modes": {
       "incremental": "Incremental",
       "full": "Full"

@@ -1,6 +1,6 @@
 # Provider Update System
 
-The provider system is responsible for importing song data from external sources (**Enchor.us** and **Rhythmverse**) into the aggregator's PostgreSQL database. There are two ingestion paths — **API fetch** (background job) and **ZIP upload** (synchronous) — both feeding into the same song processing pipeline. Real-time progress is delivered to the admin panel via **SSE over Redis Pub/Sub**.
+The provider system is responsible for importing song data from external sources (**Enchor.us** and **Rhythmverse**) into the aggregator's PostgreSQL database. Songs come in through one path, the **API fetch** (background job), which feeds the song processing pipeline. Real-time progress is delivered to the admin panel via **SSE over Redis Pub/Sub**.
 
 ---
 
@@ -8,33 +8,28 @@ The provider system is responsible for importing song data from external sources
 
 ```
 Admin Panel (ProviderPanel.tsx)
-    |                          \
-    | POST /api/providers       \ POST /api/providers/upload
-    |                            \
-    v                             v
- BullMQ Queue                  Upload Route
- (lib/queue.ts)                (upload/route.ts)
-    |                             |
-    |  Background Worker          |  Synchronous
-    |                             |
-    v                             v
- External API -----> processSongs() <----- ZIP file
- (paginated)        (services/songs/)      (parsed JSON)
-    |                     |
-    |  Redis Pub/Sub      |  SSE stream (response body)
-    v                     v
- SSE Endpoint          Client reads stream directly
- (/api/providers/events)
     |
+    | POST /api/providers
     v
- EventSource in ProviderPanel
+ BullMQ Queue (lib/queue.ts)
+    |
+    |  Background Worker
+    v
+ External API --> processSongs() (services/songs/)
+ (paginated)           |
+                       |  Redis Pub/Sub
+                       v
+                 SSE Endpoint (/api/providers/events)
+                       |
+                       v
+                 EventSource in ProviderPanel
 ```
 
 ---
 
 ## Data Flow
 
-### Path 1: API Fetch (Background Job)
+### API Fetch (Background Job)
 
 1. **Admin clicks fetch button** in `ProviderPanel`
 2. **`POST /api/providers`** validates auth, checks Redis lock (`provider:{source}:running`), reads `lastSuccessfulFetch` from DB, and enqueues a BullMQ job
@@ -48,14 +43,6 @@ Admin Panel (ProviderPanel.tsx)
    - On completion: updates `lastSuccessfulFetch` in DB, publishes final stats
    - On failure: publishes error details
 4. **Worker event handlers** clear the running flag and publish state changes on `completed`, `failed`, and `drained` events
-
-### Path 2: ZIP Upload (Synchronous)
-
-1. **Admin uploads a ZIP file** via the upload button in `ProviderPanel`
-2. **`POST /api/providers/upload`** validates auth, extracts JSON files from the ZIP, and parses songs using the appropriate provider parser (`parseEnchorData` or `parseRhythmverseData`)
-3. Runs `processSongs()` synchronously, streaming progress as SSE events directly in the response body
-4. After processing: computes `max(sourceUpdatedAt)` across all parsed songs and calls `ProviderService.updateLastSuccessfulFetchIfNewer()` — this prevents a subsequent API fetch from re-fetching songs already imported via ZIP
-5. Sends final stats (added/updated/ignored with details) as a `complete` SSE event
 
 ---
 
@@ -119,20 +106,17 @@ On client connect:
 
 ### Auto-creation
 
-Provider rows are created lazily via `ProviderService.findOrCreate()`. Both `updateLastSuccessfulFetch()` and `updateLastSuccessfulFetchIfNewer()` call this internally, so the provider table is populated automatically on first use — whether triggered by an API fetch or a ZIP upload.
+Provider rows are created lazily via `ProviderService.findOrCreate()`. Both `updateLastSuccessfulFetch()` and `updateLastSuccessfulFetchIfNewer()` call this internally, so the provider table is populated automatically on first use.
 
 ### `lastSuccessfulFetch` Logic
 
 - **API fetch**: set to `now()` on completion
-- **ZIP upload**: set to `max(sourceUpdatedAt)` across all songs in the ZIP, but only if newer than the existing value (conditional update via `updateLastSuccessfulFetchIfNewer`)
-
-This ensures that uploading a ZIP with old data doesn't roll back the timestamp, and a subsequent API fetch correctly skips already-imported songs.
 
 ---
 
 ## Song Processing Pipeline (`processSongs`)
 
-Both ingestion paths converge on `processSongs()` in `services/songs/index.ts`:
+Fetched songs go through `processSongs()` in `services/songs/index.ts`:
 
 1. **Deduplication** — removes duplicate songs within the batch
 2. **Fetch existing** — queries DB for songs matching the batch keys
@@ -140,7 +124,7 @@ Both ingestion paths converge on `processSongs()` in `services/songs/index.ts`:
 4. **Build transactions** — determines inserts vs updates based on instrument count comparison
 5. **Save** — executes DB transactions (insert new songs + download URLs, update existing songs)
 
-Progress is reported via a callback at each phase, which the caller (worker or upload route) forwards to the appropriate channel (Redis Pub/Sub or response stream).
+Progress is reported via a callback at each phase, which the worker forwards to Redis Pub/Sub.
 
 ### Filtering Rules
 
@@ -158,9 +142,8 @@ Songs are ignored if:
 | `lib/queue.ts` | BullMQ queue, worker, Redis publish calls |
 | `app/api/providers/route.ts` | POST (start fetch), DELETE (stop), GET (status query) |
 | `app/api/providers/events/route.ts` | SSE endpoint with Redis Pub/Sub subscription |
-| `app/api/providers/upload/route.ts` | ZIP upload, parse, process, stream progress |
 | `lib/services/provider.ts` | ProviderService (CRUD, findOrCreate, conditional timestamp update) |
 | `services/providers/enchor.ts` | Enchor.us API client and response parser |
 | `services/providers/rhythmverse.ts` | Rhythmverse API client and response parser |
 | `services/songs/index.ts` | `processSongs()` — shared processing pipeline |
-| `components/providers/ProviderPanel.tsx` | Admin UI with EventSource, upload handling, progress display |
+| `components/providers/ProviderPanel.tsx` | Admin UI with EventSource, progress display |

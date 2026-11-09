@@ -44,7 +44,7 @@ stores metadata in PostgreSQL and serves a fast search UI.
 ### Key paths
 
 - `app/api/` — API routes: `music` (search), `providers` (start/stop/retry fetches, `events` SSE,
-  `runs` history, `upload` ZIP import), `auth/[...all]`, `installations`, `installed-songs`, `lists`, ...
+  `runs` history), `auth/[...all]`, `installations`, `installed-songs`, `lists`, ...
 - `app/admin/` — admin pages (`ProtectedRoute requiredRole="admin"`), e.g. `providers`
 - `lib/db/schema.ts` — Drizzle schema; migrations in `lib/db/migrations/`, search SQL in `lib/db/setup/`
 - `lib/auth.ts` — Better Auth config; `databaseHooks.user.create.after` creates the profile

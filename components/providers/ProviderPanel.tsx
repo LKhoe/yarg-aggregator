@@ -3,8 +3,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
   CollapsibleContent,
@@ -43,7 +41,6 @@ import {
   AlertCircle,
   AlertTriangle,
   Loader2,
-  Upload,
   RefreshCcw,
   Square,
 } from "lucide-react";
@@ -61,32 +58,6 @@ interface ProviderStatus {
 }
 
 type SongDetail = FetchSongDetail;
-
-interface JobProgress {
-  status: string;
-  progress: number;
-  currentSource?: string;
-  currentPage?: number;
-  totalPages?: number;
-  songsProcessed?: number;
-  totalSongs?: number;
-  totalAvailable?: number;
-  totalFetched?: number;
-  totalSaved?: number;
-  jobsCompleted?: number;
-  jobsTotal?: number;
-  failedJobIndex?: number;
-  errors?: string[];
-  phase?: string;
-  added?: number;
-  updated?: number;
-  ignored?: number;
-  details?: {
-    added: SongDetail[];
-    updated: SongDetail[];
-    ignored: Record<string, SongDetail[]>;
-  };
-}
 
 const SOURCES: ProviderSource[] = ["enchor", "rhythmverse"];
 const SOURCE_LABELS: Record<ProviderSource, string> = {
@@ -127,7 +98,6 @@ function ProviderCard({
   onFetch,
   onFullFetch,
   onStop,
-  onUpload,
   t,
 }: {
   src: ProviderSource;
@@ -137,7 +107,6 @@ function ProviderCard({
   onFetch: () => void;
   onFullFetch: () => void;
   onStop: () => void;
-  onUpload: (file: File) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   const run = status?.run ?? null;
@@ -239,34 +208,6 @@ function ProviderCard({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-          <input
-            type="file"
-            id={`upload-${src}`}
-            className="hidden"
-            accept=".zip"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) onUpload(file);
-              e.target.value = "";
-            }}
-          />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() =>
-                  document.getElementById(`upload-${src}`)?.click()
-                }
-              >
-                <Upload className="w-3.5 h-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={4}>
-              {t("provider.uploadZip")}
-            </TooltipContent>
-          </Tooltip>
         </div>
       </div>
 
@@ -324,9 +265,6 @@ function SongList({ songs }: { songs: SongDetail[] }) {
 
 export default function ProviderPanel() {
   const { t } = useTranslations();
-  const [uploadProgress, setUploadProgress] = useState<JobProgress | null>(
-    null,
-  );
   const [providerStatuses, setProviderStatuses] = useState<
     Record<string, ProviderStatus>
   >({});
@@ -434,97 +372,6 @@ export default function ProviderPanel() {
     }
   };
 
-  const handleUpload = async (file: File, source: string) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("source", source);
-
-    setUploadProgress({
-      status: "uploading",
-      progress: 0,
-      currentSource: source,
-    });
-
-    try {
-      const response = await fetch("/api/providers/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (!reader) {
-        throw new Error("No response body");
-      }
-
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          const trimmedLine = line.trim();
-          if (!trimmedLine || !trimmedLine.startsWith("data: ")) continue;
-
-          try {
-            const data = JSON.parse(trimmedLine.slice(6));
-
-            if (data.type === "progress") {
-              setUploadProgress({
-                status: "processing",
-                progress: data.progress,
-                currentSource: source,
-                phase: data.phase,
-                added: data.stats?.added,
-                updated: data.stats?.updated,
-                ignored: data.stats?.ignored,
-              });
-            } else if (data.type === "complete") {
-              setUploadProgress({
-                status: "completed",
-                progress: 100,
-                currentSource: source,
-                added: data.stats?.added,
-                updated: data.stats?.updated,
-                ignored: data.stats?.ignored,
-                details: data.stats?.details,
-              });
-              toast.success(
-                t("provider.uploadCompleted", {
-                  added: data.stats?.added,
-                  updated: data.stats?.updated,
-                  ignored: data.stats?.ignored,
-                }),
-              );
-            } else if (data.type === "error") {
-              throw new Error(data.message);
-            }
-          } catch (parseError) {
-            console.error("Error parsing SSE data:", parseError);
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Upload error:", error);
-      toast.error(
-        t("provider.uploadFailed", {
-          error: error instanceof Error ? error.message : "Unknown error",
-        }),
-      );
-      setUploadProgress(null);
-    }
-  };
-
   // Runs to show: active ones always, finished ones until cleared
   const visibleRuns = SOURCES.flatMap((src) => {
     const run = providerStatuses[src]?.run;
@@ -533,28 +380,9 @@ export default function ProviderPanel() {
     return [run];
   });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "running":
-      case "fetching":
-      case "processing":
-        return "bg-blue-500";
-      case "starting":
-        return "bg-yellow-500";
-      case "completed":
-        return "bg-green-500";
-      case "failed":
-        return "bg-red-500";
-      default:
-        return "bg-gray-500";
-    }
-  };
-
-  // Detail dialog content: a finished fetch run, or the upload
+  // Detail dialog content: a finished fetch run
   const detailRun = detail?.source ? providerStatuses[detail.source]?.run : null;
-  const uploadDetails =
-    uploadProgress?.status === "completed" ? uploadProgress.details : undefined;
-  const detailLists = detail?.source ? detailRun?.details : uploadDetails;
+  const detailLists = detailRun?.details;
 
   const renderDetail = () => {
     if (!detail) return null;
@@ -659,7 +487,6 @@ export default function ProviderPanel() {
               onFetch={() => startFetch(src)}
               onFullFetch={() => startFetch(src, { mode: "full" })}
               onStop={() => stopFetch(src)}
-              onUpload={(file) => handleUpload(file, src)}
               t={t}
             />
           ))}
@@ -683,120 +510,6 @@ export default function ProviderPanel() {
             t={t}
           />
         ))}
-
-        {uploadProgress && (
-          <div className="space-y-3 pt-4 border-t">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">
-                {t("provider.uploadStatus")}
-              </span>
-              <div className="flex items-center gap-2">
-                <Badge className={getStatusColor(uploadProgress.status)}>
-                  {t(`provider.phases.${uploadProgress.status}`, {
-                    default: uploadProgress.status,
-                  })}
-                </Badge>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setUploadProgress(null)}
-                  className="h-6 px-2 text-xs"
-                >
-                  {t("provider.clear")}
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex justify-between text-sm">
-                <span>{t("provider.uploadProgress")}</span>
-                <span>{uploadProgress.progress || 0}%</span>
-              </div>
-              <Progress value={uploadProgress.progress || 0} />
-            </div>
-
-            {uploadProgress.currentSource && (
-              <div className="flex justify-between text-sm">
-                <span>{t("provider.source")}</span>
-                <span className="capitalize">
-                  {uploadProgress.currentSource}
-                </span>
-              </div>
-            )}
-
-            {uploadProgress.phase && (
-              <div className="flex justify-between text-sm">
-                <span>{t("provider.phase")}</span>
-                <span className="capitalize">
-                  {t(`provider.phases.${uploadProgress.phase?.toLowerCase()}`, {
-                    default: uploadProgress.phase,
-                  })}
-                </span>
-              </div>
-            )}
-
-            {(uploadProgress.added !== undefined ||
-              uploadProgress.updated !== undefined ||
-              uploadProgress.ignored !== undefined) && (
-              <div className="grid grid-cols-3 gap-2 text-sm">
-                <div
-                  onClick={() => setDetail({ type: "added", source: null })}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetail({ type: "added", source: null }); } }}
-                  role="button"
-                  tabIndex={uploadProgress.status === "completed" ? 0 : -1}
-                  className={`text-center p-2 bg-green-50 dark:bg-green-950 rounded ${
-                    uploadProgress.status === "completed"
-                      ? "cursor-pointer hover:opacity-80"
-                      : ""
-                  }`}
-                >
-                  <div className="font-medium text-green-600 dark:text-green-400">
-                    {uploadProgress.added || 0}
-                  </div>
-                  <div className="text-xs text-green-500 dark:text-green-300">
-                    {t("provider.stats.added")}
-                  </div>
-                </div>
-                <div
-                  onClick={() => setDetail({ type: "updated", source: null })}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetail({ type: "updated", source: null }); } }}
-                  role="button"
-                  tabIndex={uploadProgress.status === "completed" ? 0 : -1}
-                  className={`text-center p-2 bg-blue-50 dark:bg-blue-950 rounded ${
-                    uploadProgress.status === "completed"
-                      ? "cursor-pointer hover:opacity-80"
-                      : ""
-                  }`}
-                >
-                  <div className="font-medium text-blue-600 dark:text-blue-400">
-                    {uploadProgress.updated || 0}
-                  </div>
-                  <div className="text-xs text-blue-500 dark:text-blue-300">
-                    {t("provider.stats.updated")}
-                  </div>
-                </div>
-                <div
-                  onClick={() => setDetail({ type: "ignored", source: null })}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetail({ type: "ignored", source: null }); } }}
-                  role="button"
-                  tabIndex={uploadProgress.status === "completed" ? 0 : -1}
-                  className={`text-center p-2 bg-gray-50 dark:bg-gray-950 rounded ${
-                    uploadProgress.status === "completed"
-                      ? "cursor-pointer hover:opacity-80"
-                      : ""
-                  }`}
-                >
-                  <div className="font-medium text-gray-600 dark:text-gray-400">
-                    {uploadProgress.ignored || 0}
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-300">
-                    {t("provider.stats.ignored")}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         <Dialog
           open={!!detail}
