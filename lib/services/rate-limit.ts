@@ -1,9 +1,17 @@
 import { getRedisClient } from "@/lib/redis";
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 
-function getClientIp(request: NextRequest): string {
+/**
+ * Client IP behind the Cloudflare tunnel. `cf-connecting-ip` is set by Cloudflare itself and
+ * cannot be spoofed by the client. Fallback: the LAST `x-forwarded-for` entry, the one appended
+ * by the closest proxy (the first entries are whatever the client sent).
+ */
+export function getClientIp(request: { headers: Pick<Headers, "get"> }): string {
+  const cf = request.headers.get("cf-connecting-ip")?.trim();
+  if (cf) return cf;
   const forwarded = request.headers.get("x-forwarded-for");
-  return forwarded?.split(",")[0]?.trim() ?? "unknown";
+  const last = forwarded?.split(",").at(-1)?.trim();
+  return last || "unknown";
 }
 
 async function checkRateLimit(
@@ -12,10 +20,14 @@ async function checkRateLimit(
   windowSeconds: number,
 ): Promise<{ blocked: boolean; retryAfter?: number }> {
   const redis = getRedisClient();
-  const count = await redis.incr(key);
-  if (count === 1) {
-    await redis.expire(key, windowSeconds);
-  }
+  // INCR + EXPIRE NX in one MULTI: a crash between the two can't leave a key without TTL.
+  // (Keys still go through the prefixed client: the ACL only allows yarg:*.)
+  const results = await redis
+    .multi()
+    .incr(key)
+    .expire(key, windowSeconds, "NX")
+    .exec();
+  const count = Number(results?.[0]?.[1] ?? 0);
   if (count > maxAttempts) {
     const ttl = await redis.ttl(key);
     return { blocked: true, retryAfter: ttl > 0 ? ttl : windowSeconds };
