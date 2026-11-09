@@ -46,10 +46,10 @@ By hand, the same thing:
 
 ```bash
 DOCKER_CONTEXT=umbrel ../local-infra/scripts/new-project.sh yarg   # paste its output into .env
-DOCKER_CONTEXT=umbrel docker compose up -d --build
+DOCKER_CONTEXT=umbrel ./deploy.sh   # builds on the Mac, loads the image into the Pi (about a minute)
 ```
 
-The first build runs on the Pi (3–5 minutes). Later deploys with `./deploy.sh` build on the Mac and load the image into the Pi.
+`bootstrap-pi.sh` does the same. `DEPLOY_BUILD=remote ./deploy.sh` builds on the Pi instead (3–5 minutes).
 
 ## Configuration (`.env`)
 
