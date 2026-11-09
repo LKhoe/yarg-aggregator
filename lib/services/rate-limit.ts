@@ -79,10 +79,18 @@ export async function importUrlRateLimit(
   return checkRateLimit(`ratelimit:import-url:${userId}`, 15, 600);
 }
 
-/** 120 requests per minute per IP, for the unauthenticated music search (GET /api/music). */
+/**
+ * 120 requests per minute per IP, for the unauthenticated music search (GET /api/music).
+ * Fails open: search is the app's main read path and must keep working when Redis is down
+ * (the Redis client queues commands forever while it is unreachable, hence the timeout).
+ */
 export async function musicSearchRateLimit(
   request: NextRequest,
 ): Promise<{ blocked: boolean; retryAfter?: number }> {
   const ip = getClientIp(request);
-  return checkRateLimit(`ratelimit:music-search:${ip}`, 120, 60);
+  const failOpen = { blocked: false };
+  return Promise.race([
+    checkRateLimit(`ratelimit:music-search:${ip}`, 120, 60).catch(() => failOpen),
+    new Promise<typeof failOpen>((resolve) => setTimeout(() => resolve(failOpen), 1000)),
+  ]);
 }
