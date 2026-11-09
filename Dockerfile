@@ -13,8 +13,10 @@ RUN npm ci
 # Copy source files (overwrites package.json with the real version)
 COPY . .
 
-# Generate drizzle migrations before build
-RUN npm run db:generate
+# Fail the build if lib/db/schema.ts has changes without a committed migration. (Never generate
+# migrations here: one made during the build would ship without ever being committed, and a rename
+# prompt would hang the build.) db:check runs against a temp copy, non-interactively.
+RUN npm run db:check
 
 # Build args for NEXT_PUBLIC_ vars (must be available at build time)
 ARG NEXT_PUBLIC_APP_URL

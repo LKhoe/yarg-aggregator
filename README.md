@@ -113,6 +113,7 @@ later ones only what changed.
 | `npm run start` | Serve the production build |
 | `npm run lint` | ESLint |
 | `npm run db:generate` | Generate a Drizzle migration after changing `lib/db/schema.ts` |
+| `npm run db:check` | Fails if the schema and the committed migrations are out of sync (also run by the Docker build) |
 | `npm run db:studio` | Drizzle Studio (`DATABASE_URL` must be set in the shell) |
 | `node --env-file=.env.local scripts/migrate.mjs` | Apply migrations |
 | `node --env-file=.env.local scripts/apply-sql.mjs` | Apply the search/extension SQL |

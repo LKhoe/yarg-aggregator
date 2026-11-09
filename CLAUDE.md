@@ -11,6 +11,7 @@ npm run lint           # ESLint
 npm run typecheck      # tsc --noEmit
 npm test               # vitest (pure units only: validation, chart parsing/tempo, song normalization)
 npm run db:generate    # Generate a Drizzle migration after editing lib/db/schema.ts (commit it)
+npm run db:check       # Fails if schema.ts and the committed migrations are out of sync (also run by the Dockerfile)
 
 # Apply schema locally (the Docker entrypoint runs these on every container start)
 node --env-file=.env.local scripts/migrate.mjs     # Drizzle migrations
@@ -100,7 +101,8 @@ stores metadata in PostgreSQL and serves a fast search UI.
   builder. Never `npm install <pkg>` in the runner: it re-resolves every dependency and sharp's
   libvips drifts from the locked binary (`libvips-cpp.so.X: No such file`).
 - **Schema changes**: edit `lib/db/schema.ts`, run `npm run db:generate`, commit the migration.
-  It is applied automatically when the container starts.
+  It is applied automatically when the container starts. The image build runs `npm run db:check`
+  and fails on drift; it never generates migrations itself.
 
 ## Environment
 
