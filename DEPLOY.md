@@ -21,6 +21,8 @@ image is built and the container runs on the Pi. Nothing is cloned on the Pi.
 - **Public access** goes through local-infra's Cloudflare tunnel (`localinfra-tunnel`), which is
   on `localinfra_tunnel`; the container joins that network, so the tunnel reaches it as
   `http://yarg-aggregator:3000`.
+- **Container hardening**: `cap_drop: ALL`, `no-new-privileges`, read-only root filesystem with
+  tmpfs for `/tmp` and `/app/.next/cache`, host port bound to loopback.
 - **Migrations** run automatically on every container start (`docker-entrypoint.sh`:
   wait for Postgres → `scripts/migrate.mjs` → `scripts/apply-sql.mjs` → start Next.js).
 

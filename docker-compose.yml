@@ -72,6 +72,16 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
+    # Hardening. The app only writes to /tmp and Next's cache (ISR / fetch cache); migrations and
+    # the entrypoint only read. Verified: health, pages, auth and API routes run with this set.
+    cap_drop:
+      - ALL
+    security_opt:
+      - "no-new-privileges:true"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache:uid=1001,gid=1001,mode=0700
     networks:
       - localinfra_postgres
       - localinfra_redis
