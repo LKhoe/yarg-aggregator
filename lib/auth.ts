@@ -80,6 +80,15 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 30, // 30 days
     updateAge: 60 * 60 * 24, // refresh daily
+    // Signed session snapshot in a cookie, so most getSession() calls skip the DB.
+    // Trade-off: a revoked session (sign-out elsewhere, "revoke other sessions") can stay valid
+    // for up to 5 minutes. Roles are NOT affected: admin/moderator live in user_profile, which
+    // lib/middleware/auth.ts reads from the DB on every request (and a user without a profile row,
+    // e.g. a deleted account, is rejected there even while the cookie is still cached).
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60,
+    },
   },
 
   user: {
