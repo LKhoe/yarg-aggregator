@@ -27,7 +27,9 @@ async function createConnection() {
   if (!cached.promise) {
     console.log("Creating new database connection...");
     const client = postgres(DATABASE_URL, {
-      max: 3,           // max pool connections (default is 10)
+      // Max pool connections (default 10). The BullMQ provider worker runs in this same process and
+      // can hold connections during a fetch (processSongs transactions), so 3 starved web requests.
+      max: 5,
       idle_timeout: 20, // close idle connections after 20s
       // debug:
       //   process.env.NODE_ENV === "development"
