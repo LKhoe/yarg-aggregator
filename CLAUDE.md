@@ -1,6 +1,8 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Indexes music charts for YARG from Enchor.us and Rhythmverse into PostgreSQL and serves a fast
+search UI. Workspace rules (branching, `DOCKER_CONTEXT`, env files, security, local-infra):
+`../CLAUDE.md`. Deployment: `DEPLOY.md`.
 
 ## Commands
 
@@ -9,6 +11,7 @@ npm run dev            # Development server (port 3000)
 npm run build          # Production build (also run by the Dockerfile)
 npm run lint           # ESLint
 npm run typecheck      # tsc --noEmit
+npm run check          # fresh route types + typecheck + lint + test, in one go
 npm test               # vitest (pure units only: validation, chart parsing/tempo, song normalization)
 npm run db:generate    # Generate a Drizzle migration after editing lib/db/schema.ts (commit it)
 npm run db:check       # Fails if schema.ts and the committed migrations are out of sync (also run by the Dockerfile)
@@ -17,30 +20,19 @@ npm run db:check       # Fails if schema.ts and the committed migrations are out
 node --env-file=.env.local scripts/migrate.mjs     # Drizzle migrations
 node --env-file=.env.local scripts/apply-sql.mjs   # extensions, trigram indexes
 
-# Deploy to the Raspberry Pi (Docker context "umbrel"; builds on the Mac, loads into the Pi)
+# Deploy to the Pi
 ./deploy.sh                # also: --release (bump + push), --rollback
 DOCKER_CONTEXT=umbrel docker compose logs -f yarg-aggregator
 ```
 
-Tests live beside the code as `*.test.ts` and need no database or Redis. Always pass `DOCKER_CONTEXT` explicitly: the active context is
-usually `umbrel`, so a bare `docker compose` runs on the Pi (`desktop-linux` = Docker
-Desktop on the Mac).
+Tests live beside the code as `*.test.ts` and need no database or Redis.
 
 ## Architecture
 
-Full-stack platform that indexes music charts for YARG from Enchor.us and Rhythmverse,
-stores metadata in PostgreSQL and serves a fast search UI.
-
-- **Stack**: Next.js 16 (App Router) + React 19, TypeScript (strict), Tailwind CSS 4 + Shadcn UI,
-  PostgreSQL + Drizzle ORM, Better Auth (Google, Spotify, Apple, Last.fm),
-  BullMQ + Redis, Docker.
-- **Infrastructure**: Postgres and Redis come from the separate local-infra repo
-  (`../local-infra`, containers `localinfra-postgres` / `localinfra-redis`). This app has
-  its own DB role `yarg` and a Redis ACL user limited to keys/channels `yarg:*`. LLM calls (admin
-  agent) go through local-infra's LLM gateway (`lib/services/llm.ts`, tiers `simple`/`medium`/`hard`),
-  never straight to OpenRouter.
-- **Hosting**: Raspberry Pi 4 with umbrelOS 2; public access via local-infra's Cloudflare
-  tunnel (`localinfra_tunnel` → `http://yarg-aggregator:3000`). See `DEPLOY.md`.
+- Next.js 16 + React 19, Better Auth (Google, Spotify, Apple, Last.fm), BullMQ + Redis.
+- DB role `yarg`; Redis ACL user limited to keys/channels `yarg:*`.
+- LLM calls (admin agent) go through local-infra's gateway (`lib/services/llm.ts`), never straight
+  to OpenRouter.
 
 ### Key paths
 
@@ -103,12 +95,5 @@ stores metadata in PostgreSQL and serves a fast search UI.
 - **Schema changes**: edit `lib/db/schema.ts`, run `npm run db:generate`, commit the migration.
   It is applied automatically when the container starts. The image build runs `npm run db:check`
   and fails on drift; it never generates migrations itself.
-
-## Environment
-
-- Local dev: `.env.local` (overrides `.env`) with `localhost` hosts for local-infra running on
-  Docker Desktop; see README "Local development".
-- Pi: `.env` on the Mac (compose reads it through the Docker context). Required:
-  `DATABASE_URL`, `POSTGRES_HOST`, `REDIS_HOST`, `REDIS_USERNAME`, `REDIS_PASSWORD`,
-  `REDIS_KEY_PREFIX=yarg:`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_APP_URL`.
-  Full list in `.env.example`.
+- **Env**: variable list in `.env.example` (`REDIS_KEY_PREFIX=yarg:`); local setup in README
+  "Local development".

@@ -12,6 +12,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "types:fresh": "rm -rf .next/types .next/dev/types && next typegen",
+    "check": "npm run types:fresh && npm run typecheck && npm run lint && npm test",
     "db:generate": "drizzle-kit generate",
     "db:check": "node scripts/db-check.mjs",
     "db:migrate": "drizzle-kit migrate",
