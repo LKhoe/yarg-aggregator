@@ -11,6 +11,7 @@ npm run dev            # Development server (port 3000)
 npm run build          # Production build (also run by the Dockerfile)
 npm run lint           # ESLint
 npm run typecheck      # tsc --noEmit
+npm run check          # fresh route types + typecheck + lint + test, in one go
 npm test               # vitest (pure units only: validation, chart parsing/tempo, song normalization)
 npm run db:generate    # Generate a Drizzle migration after editing lib/db/schema.ts (commit it)
 npm run db:check       # Fails if schema.ts and the committed migrations are out of sync (also run by the Dockerfile)
